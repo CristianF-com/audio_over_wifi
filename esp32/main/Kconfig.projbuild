@@ -1,0 +1,62 @@
+menu "SonosWiFi receiver"
+
+    config RECEIVER_ID
+        int "ID del receptor por defecto (0-9); el NVS lo sobreescribe"
+        range 0 9
+        default 0
+
+    config WIFI_SSID_DEFAULT
+        string "SSID por defecto (el NVS lo sobreescribe)"
+        default "TuRedWiFi"
+
+    config WIFI_PASS_DEFAULT
+        string "Password por defecto (el NVS lo sobreescribe)"
+        default "TuPassword"
+
+    choice SONOS_WIFI_BAND
+        prompt "Banda WiFi"
+        default SONOS_WIFI_BAND_5G
+        help
+            El ESP32-C5 no puede usar 2.4 y 5 GHz a la vez. Fijar la banda evita que, con un SSID
+            compartido entre bandas, se conecte a 2.4 GHz por tener más señal.
+
+        config SONOS_WIFI_BAND_5G
+            bool "Solo 5 GHz (recomendado)"
+        config SONOS_WIFI_BAND_AUTO
+            bool "Automática (la de mejor señal)"
+        config SONOS_WIFI_BAND_2G
+            bool "Solo 2.4 GHz"
+    endchoice
+
+    config I2S_BCK_GPIO
+        int "GPIO de BCK  -> PCM5102A BCK  (XIAO D8 = GPIO8)"
+        default 8
+
+    config I2S_WS_GPIO
+        int "GPIO de WS   -> PCM5102A LCK  (XIAO D9 = GPIO9)"
+        default 9
+
+    config I2S_DOUT_GPIO
+        int "GPIO de DOUT -> PCM5102A DIN  (XIAO D10 = GPIO10)"
+        default 10
+
+    config SONOS_RPI_IP
+        string "IP fija de la RPi (opcional; vacío = solo broadcast). El NVS/BLE la sobreescribe"
+        default ""
+
+    config SONOS_BLE_ENABLE
+        bool "Configuración por Bluetooth LE (NimBLE)"
+        default y
+
+    config SONOS_BLE_WINDOW_S
+        int "Segundos que el BLE permanece anunciándose tras arrancar (si hay WiFi)"
+        depends on SONOS_BLE_ENABLE
+        range 30 3600
+        default 300
+
+    config SONOS_BLE_REQUIRE_ENC
+        bool "Exigir enlace cifrado (emparejamiento Just Works) para escribir"
+        depends on SONOS_BLE_ENABLE
+        default y
+
+endmenu

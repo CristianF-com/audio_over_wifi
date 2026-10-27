@@ -1,0 +1,81 @@
+/* Sistema de diseño compartido por las tres páginas (panel, /calibrate, /ble). Negro puro + azul señal. */
+:root{
+  --bg:#000; --panel:#0a0d13; --raise:#121722; --line:#1f2735; --line2:#2b3548;
+  --fg:#e9edf5; --mut:#8a93a6; --ac:#4aa3ff; --ac-bg:rgba(74,163,255,.13); --ac-ln:rgba(74,163,255,.5);
+  --ok:#3ecf8e; --warn:#f5b84a; --bad:#ff6b6b;
+  --font:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Roboto,sans-serif;
+}
+*{box-sizing:border-box;margin:0}
+html{color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:15px/1.45 var(--font);-webkit-font-smoothing:antialiased;
+  font-variant-numeric:tabular-nums;min-height:100vh;-webkit-text-size-adjust:100%}
+a{color:var(--ac);text-decoration:none}a:hover{text-decoration:underline}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+[hidden]{display:none!important}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px;border-radius:6px}
+h1{font-size:1.55rem;font-weight:650;letter-spacing:-.01em}
+h2{font-size:1.02rem;font-weight:650}
+.mut{color:var(--mut)}
+.small{font-size:.86rem}
+
+.btn{appearance:none;border:0;background:var(--ac);color:#04121f;font-weight:650;padding:10px 18px;border-radius:10px;min-height:42px;
+  transition:filter .12s,transform .06s}
+.btn:hover{filter:brightness(1.1)}.btn:active{transform:translateY(1px)}
+.btn.ghost{background:var(--raise);color:var(--fg);border:1px solid var(--line2);font-weight:550}
+.btn.danger{background:transparent;color:var(--bad);border:1px solid rgba(255,107,107,.45);font-weight:550}
+.btn.sm{padding:6px 12px;min-height:34px;font-size:.88rem;border-radius:8px}
+.btn:disabled{opacity:.4;cursor:not-allowed;filter:none}
+
+.seg{display:inline-flex;background:var(--raise);border:1px solid var(--line);border-radius:11px;padding:3px;gap:2px;max-width:100%}
+.seg button{appearance:none;border:0;background:transparent;color:var(--mut);padding:7px 14px;border-radius:8px;min-height:34px;font-weight:550;white-space:nowrap}
+.seg button:hover{color:var(--fg)}
+.seg button[aria-pressed=true]{background:var(--ac-bg);color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac-ln)}
+.seg.block{display:flex}.seg.block button{flex:1}
+
+.switch{appearance:none;position:relative;width:46px;height:27px;border-radius:14px;border:1px solid var(--line2);background:var(--raise);flex:none;
+  transition:background .15s,border-color .15s}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:21px;height:21px;border-radius:50%;background:var(--mut);transition:transform .15s,background .15s}
+.switch[aria-checked=true]{background:var(--ac-bg);border-color:var(--ac-ln)}
+.switch[aria-checked=true]::after{transform:translateX(19px);background:var(--ac)}
+
+input[type=range].rng{-webkit-appearance:none;appearance:none;width:100%;height:28px;background:transparent;border-radius:0;cursor:pointer;
+  --f:.5;
+  background:linear-gradient(to right,var(--ac) calc(var(--f)*(100% - 20px) + 10px),var(--line2) 0) no-repeat center/100% 6px}
+input[type=range].rng.mid{--lo:.5;--hi:.5;
+  background:linear-gradient(to right,var(--line2) calc(var(--lo)*(100% - 20px) + 10px),var(--ac) 0,var(--ac) calc(var(--hi)*(100% - 20px) + 10px),var(--line2) 0) no-repeat center/100% 6px}
+.rng::-webkit-slider-runnable-track{height:28px;background:transparent}
+.rng::-moz-range-track{height:28px;background:transparent}
+.rng::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:0;margin-top:4px;box-shadow:0 0 0 3px rgba(74,163,255,.38)}
+.rng::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:0;box-shadow:0 0 0 3px rgba(74,163,255,.38)}
+.rng:focus-visible{outline-offset:0}
+
+.num,.txt,.sel{background:var(--raise);border:1px solid var(--line2);border-radius:9px;padding:9px 11px;min-height:40px;width:100%;color:var(--fg)}
+.num{width:110px}
+.num:focus,.txt:focus,.sel:focus{outline:2px solid var(--ac);outline-offset:1px;border-color:transparent}
+.sel{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--mut) 50%),linear-gradient(135deg,var(--mut) 50%,transparent 50%);
+  background-position:calc(100% - 17px) 17px,calc(100% - 12px) 17px;background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:32px}
+label,.lbl{display:block;color:var(--mut);font-size:.86rem;margin-bottom:5px}
+
+.chip{display:inline-flex;align-items:center;gap:7px;padding:4px 11px;border-radius:999px;background:var(--raise);border:1px solid var(--line);font-size:.84rem;color:var(--mut)}
+.chip.ac{color:var(--ac);border-color:var(--ac-ln);background:var(--ac-bg)}
+.chip.warn{color:var(--warn);border-color:rgba(245,184,74,.4)}
+.chip.bad{color:var(--bad);border-color:rgba(255,107,107,.4)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mut);flex:none}
+.dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
+
+.top{position:sticky;top:0;z-index:30;background:rgba(0,0,0,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top .in{max-width:1180px;margin:auto;display:flex;align-items:center;gap:18px;padding:10px 18px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.05rem;color:var(--fg)}
+.brand:hover{text-decoration:none}
+.logo{width:26px;height:26px;flex:none}
+.panelbox{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px}
+.note{border-radius:12px;padding:12px 14px;background:var(--raise);border:1px solid var(--line2);font-size:.92rem}
+.note.bad{border-color:rgba(255,107,107,.5);color:#ffb0b0}.note.warn{border-color:rgba(245,184,74,.5)}
+
+.toasts{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:60;pointer-events:none;width:max-content;max-width:92vw}
+.toast{background:var(--raise);border:1px solid var(--line2);border-left:3px solid var(--ok);padding:9px 14px;border-radius:10px;font-size:.9rem;
+  animation:tin .18s ease-out}
+.toast.bad{border-left-color:var(--bad)}
+@keyframes tin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}

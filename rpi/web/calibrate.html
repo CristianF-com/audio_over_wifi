@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#000000">
+<title>SonosWiFi — Calibración</title>
+<style>
+/*@SHARED_CSS@*/
+main{max-width:760px;margin:0 auto;padding:20px 16px 80px;display:flex;flex-direction:column;gap:16px}
+.top .in{max-width:760px}
+.steps{display:flex;gap:8px;align-items:center;color:var(--mut);font-size:.9rem}
+.steps i{flex:1;height:2px;background:var(--line);border-radius:2px}
+.steps span{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.steps b{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--line2);display:grid;place-items:center;font-size:.8rem}
+.steps .on{color:var(--fg)}.steps .on b{border-color:var(--ac);color:var(--ac)}
+.steps .done b{background:var(--ac);border-color:var(--ac);color:#04121f}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.meter{height:10px;background:var(--raise);border-radius:5px;overflow:hidden;border:1px solid var(--line)}
+.meter>div{height:100%;width:0;background:linear-gradient(90deg,var(--ac),#9ad0ff);transition:width .08s}
+.prog{height:4px;background:var(--line);border-radius:2px;overflow:hidden}.prog>div{height:100%;width:0;background:var(--ac);transition:width .25s linear}
+.count{font-size:2.6rem;font-weight:700;letter-spacing:-.02em;line-height:1}
+.node{border:1px solid var(--line);background:var(--panel);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+.node.bad{border-color:rgba(255,107,107,.45)}
+.node h3{font-size:1rem;display:flex;align-items:center;gap:10px}
+.node h3 .chip{margin-left:auto}
+.mets{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.mets div{background:var(--raise);border-radius:10px;padding:8px 10px}
+.mets span{display:block;font-size:.76rem;color:var(--mut)}.mets b{font-weight:600}
+.eqm{display:flex;align-items:stretch;gap:6px;height:64px}
+.eqm div{flex:1;position:relative;background:var(--raise);border-radius:6px}
+.eqm div::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:var(--line2)}
+.eqm i{position:absolute;left:18%;right:18%;border-radius:3px;background:var(--ac)}
+.eqm i.neg{background:#2f6fb3}
+.eqm em{position:absolute;left:0;right:0;bottom:-18px;text-align:center;font-style:normal;font-size:.7rem;color:var(--mut)}
+.eqw{padding-bottom:20px}
+.tg{display:flex;gap:18px;flex-wrap:wrap}
+.tg label.ck{display:flex;align-items:center;gap:8px;margin:0;color:var(--fg);font-size:.9rem}
+input[type=checkbox]{appearance:none;width:20px;height:20px;border-radius:6px;border:1.5px solid var(--line2);background:var(--raise);display:inline-grid;place-items:center;flex:none;cursor:pointer}
+input[type=checkbox]:checked{background:var(--ac);border-color:var(--ac)}
+input[type=checkbox]:checked::after{content:"";width:5px;height:10px;border:solid #04121f;border-width:0 2.5px 2.5px 0;transform:rotate(45deg) translate(-1px,-1px)}
+.applybox{display:flex;flex-direction:column;gap:12px}
+.log{font:.82rem/1.6 ui-monospace,Consolas,monospace;color:var(--mut);white-space:pre-wrap;max-height:150px;overflow:auto}
+@media (max-width:560px){.opts{grid-template-columns:1fr}.mets{grid-template-columns:1fr 1fr}.steps span em{display:none}}
+</style></head><body>
+<div class="top"><div class="in">
+  <a class="brand" href="/"><svg class="logo" viewBox="0 0 26 26" fill="none" stroke="#4aa3ff" stroke-width="2" stroke-linecap="round"><path d="M3 13h2M8 8v10M13 4v18M18 8v10M23 13h-2"/></svg>SonosWiFi</a>
+  <a class="btn ghost sm" style="margin-left:auto" href="/">Volver al panel</a>
+</div></div>
+<main>
+  <div><h1>Calibración acústica</h1><p class="mut">Mide cuándo y con qué nivel llega cada altavoz a tu asiento, y propone latencia, volumen y EQ.</p></div>
+  <div class="steps" id="steps"><span class="on" id="sp1"><b>1</b><em>Preparar</em></span><i></i><span id="sp2"><b>2</b><em>Medir</em></span><i></i><span id="sp3"><b>3</b><em>Aplicar</em></span></div>
+
+  <div class="panelbox" id="v1" style="display:flex;flex-direction:column;gap:14px">
+    <p>Pon el móvil <b>donde te sientas a escuchar</b>, con el micrófono libre y la sala en silencio. Cada altavoz emite un barrido y se mide lo que llega. Dura unos 20 s.</p>
+    <div class="opts">
+      <div><label for="lvl">Volumen de la prueba (dBFS)</label><input class="num" style="width:100%" id="lvl" type="number" value="-12" min="-40" max="-3" step="1"></div>
+      <div><label for="rounds">Rondas (más = más precisión)</label><input class="num" style="width:100%" id="rounds" type="number" value="2" min="1" max="3" step="1"></div>
+    </div>
+    <div class="note bad" id="err" hidden></div>
+    <div><button class="btn" id="go">Empezar a medir</button></div>
+  </div>
+
+  <div class="panelbox" id="v2" style="display:none;flex-direction:column;gap:14px">
+    <div class="count" id="count">—</div>
+    <div class="prog"><div id="prog"></div></div>
+    <p id="msg" class="mut">Silencio, por favor…</p>
+    <div><div class="lbl">Micrófono</div><div class="meter"><div id="mic"></div></div></div>
+    <div><button class="btn ghost" id="cancel">Cancelar</button></div>
+  </div>
+
+  <div id="v3" style="display:none;flex-direction:column;gap:14px">
+    <div id="cards" style="display:flex;flex-direction:column;gap:12px"></div>
+    <div class="panelbox applybox">
+      <h2>Qué quieres aplicar</h2>
+      <div class="tg">
+        <label class="ck"><input type="checkbox" id="ck_lat" checked> Latencias</label>
+        <label class="ck"><input type="checkbox" id="ck_vol" checked> Volúmenes</label>
+        <label class="ck"><input type="checkbox" id="ck_eq" checked> EQ</label>
+      </div>
+      <div class="note" id="eqoff" hidden><label class="ck" style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="ck_enable" checked> <span>La EQ está en pass-through. Activarla al aplicar, para que se oiga el cambio.</span></label></div>
+      <p class="mut small">Latencia: retrasa los altavoces cercanos para que todo llegue a la vez. Volumen: iguala al más bajo. EQ: acerca el timbre de cada altavoz al promedio, con ±6 dB como máximo. Los subwoofers vienen sin marcar en volumen y EQ.</p>
+      <div class="row2" style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" id="apply">Aplicar selección</button>
+        <button class="btn ghost" id="again">Medir otra vez</button>
+        <button class="btn danger" id="reset">Restablecer todo</button>
+      </div>
+      <div class="small" id="applied" style="color:var(--ok)"></div>
+    </div>
+  </div>
+
+  <div class="panelbox"><h2 style="margin-bottom:8px">Actividad</h2><div class="log" id="log" role="log"></div></div>
+</main>
+<div class="toasts" id="tb"></div>
+<script>
+/*@ANALYSIS@*/
+
+const $=id=>document.getElementById(id);
+const log=m=>{const l=$('log');l.textContent+=new Date().toLocaleTimeString()+'  '+m+'\n';l.scrollTop=l.scrollHeight;};
+function toast(m,ok=true){const d=document.createElement('div');d.className='toast'+(ok?'':' bad');d.textContent=m;$('tb').appendChild(d);setTimeout(()=>d.remove(),2600);}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function api(m,p,b){const r=await fetch(p,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});
+  let j={};try{j=await r.json();}catch(e){}j._status=r.status;return j;}
+let chunks=[],lastRes=null,volIncl={},eqIncl={},cancelled=false,eqOn=true;
+const CH=['FL','FR','C','LFE','SL','SR','SBL','SBR','AUX-L','AUX-R'];
+let info={};
+function view(n){$('v1').style.display=n===1?'flex':'none';$('v2').style.display=n===2?'flex':'none';$('v3').style.display=n===3?'flex':'none';
+  [1,2,3].forEach(i=>$('sp'+i).className=i===n?'on':i<n?'done':'');}
+function showErr(h){$('err').hidden=!h;$('err').innerHTML=h||'';}
+
+async function runCal(){
+  cancelled=false;showErr('');
+  if(!window.isSecureContext||!navigator.mediaDevices){
+    showErr('<b>El micrófono exige HTTPS.</b> Abre <a href="https://'+location.hostname+':8443/calibrate">https://'+location.hostname+':8443/calibrate</a> y acepta el aviso del certificado.');return;}
+  $('go').disabled=true;
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false,channelCount:1}});
+    view(2);$('count').textContent='…';$('prog').style.width='0';$('msg').textContent='Silencio, por favor…';
+    const ctx=new (window.AudioContext||window.webkitAudioContext)(),sr=ctx.sampleRate;
+    const src=ctx.createMediaStreamSource(stream),proc=ctx.createScriptProcessor(4096,1,1);
+    chunks=[];
+    proc.onaudioprocess=e=>{const d=e.inputBuffer.getChannelData(0);chunks.push(new Float32Array(d));
+      let s=0;for(let i=0;i<d.length;i+=8)s+=d[i]*d[i];$('mic').style.width=Math.min(100,Math.sqrt(s/(d.length/8))*400)+'%';};
+    src.connect(proc);proc.connect(ctx.destination);
+    log('Micrófono a '+sr+' Hz. Midiendo ruido ambiente (1,3 s)…');
+    await sleep(1300);
+    let nPost=0;for(const c of chunks)nPost+=c.length;
+    const cfg=await api('POST','/api/cal/start',{level_db:+$('lvl').value,rounds:+$('rounds').value});
+    if(!cfg.ok){stream.getTracks().forEach(t=>t.stop());await ctx.close();
+      view(1);showErr('<b>'+(cfg.error||'No se pudo empezar')+'</b>');$('go').disabled=false;return;}
+    try{const ni=await (await fetch('/api/nodes')).json();for(const n of ni)if(n.role===2){if(volIncl[n.id]===undefined)volIncl[n.id]=false;if(eqIncl[n.id]===undefined)eqIncl[n.id]=false;}}catch(e){}
+    try{eqOn=!!(await (await fetch('/api/status')).json()).dsp_eq;}catch(e){}
+    log('Secuencia: altavoces '+cfg.sequence.join(', ')+' ('+(cfg.total_ms/1000).toFixed(1)+' s)');
+    const t0=Date.now(),tot=cfg.total_ms+900;
+    $('msg').textContent='Midiendo cada altavoz. No hagas ruido.';
+    while(Date.now()-t0<tot&&!cancelled){
+      const el=Date.now()-t0;$('count').textContent=Math.max(0,Math.round((tot-el)/1000))+' s';$('prog').style.width=Math.min(100,el*100/tot)+'%';await sleep(200);}
+    stream.getTracks().forEach(t=>t.stop());proc.disconnect();src.disconnect();await ctx.close();$('mic').style.width='0';
+    if(cancelled){view(1);$('go').disabled=false;return;}
+    let n=0;for(const c of chunks)n+=c.length;const rec=new Float32Array(n);let o=0;for(const c of chunks){rec.set(c,o);o+=c.length;}
+    $('count').textContent='…';$('msg').textContent='Analizando…';await sleep(30);
+    const res=analyze(rec,sr,{slot_ms:cfg.slot_ms,chirp_ms:cfg.chirp_ms,f0:cfg.f0,f1:cfg.f1,fade_ms:cfg.fade_ms,sequence:cfg.sequence,expect_s:nPost/sr+cfg.lead_ms/1000,eq_edges:cfg.eq_edges});
+    if(res.error){view(1);showErr('<b>'+res.error+'</b>');$('go').disabled=false;return;}
+    lastRes=res;log('Ruido ambiente: '+res.noise_db.toFixed(1)+' dB');
+    try{info={};for(const n of await (await fetch('/api/nodes')).json())info[n.id]=n;}catch(e){}
+    render();view(3);$('applied').textContent='';
+  }catch(e){view(1);showErr('<b>'+e.name+':</b> '+e.message);log('Error: '+e);}
+  $('go').disabled=false;
+}
+async function stopCal(){cancelled=true;await api('POST','/api/cal/stop');log('Cancelado');}
+
+function eqBars(eq){
+  const M=6;return '<div class="eqw"><div class="eqm">'+['354','707','1,4k','2,8k','5,7k','9,8k'].map((f,i)=>{const g=eq[i]||0,h=Math.min(1,Math.abs(g)/M)*50;
+    return '<div title="'+f+' Hz: '+(g>0?'+':'')+g.toFixed(1)+' dB"><i class="'+(g<0?'neg':'')+'" style="'+(g>=0?'bottom:50%':'top:50%')+';height:'+h+'%"></i><em>'+f+'</em></div>';}).join('')+'</div></div>';
+}
+function render(){
+  const ps=propose(lastRes.nodes,volIncl,eqIncl);let h='';
+  for(const n of ps){const nd=info[n.id]||{},lab=nd.ch_left!==undefined?(nd.mono||nd.ch_left===nd.ch_right?CH[nd.ch_left]:CH[nd.ch_left]+' + '+CH[nd.ch_right]):'';
+    const sub=nd.role===2;
+    h+='<div class="node'+(n.ok?'':' bad')+'"><h3>Altavoz #'+n.id+(lab?' · '+lab:'')+(sub?' · sub':'')+
+      '<span class="chip '+(n.ok?'ac':'bad')+'">'+(n.ok?'Señal buena':'Señal débil')+'</span></h3>'+
+      (n.ok?'<div class="mets"><div><span>Llegada</span><b>'+(n.d_us/1000).toFixed(2)+' ms</b></div><div><span>Dispersión</span><b'+(n.spread_us>200?' style="color:var(--warn)"':'')+'>±'+(n.spread_us/1000).toFixed(2)+' ms</b></div>'+
+      '<div><span>Nivel</span><b>'+n.level_db.toFixed(1)+' dB</b></div><div><span>SNR</span><b>'+(n.snr>999?'999+':n.snr.toFixed(0))+' dB</b></div></div>'+
+      '<div class="mets" style="grid-template-columns:1fr 1fr"><div><span>Latencia propuesta</span><b>'+(n.latency_us/1000).toFixed(3)+' ms</b></div><div><span>Volumen propuesto</span><b>'+Math.round(n.volume/2.55)+'%</b></div></div>'+
+      (n.eq?'<div><div class="lbl">EQ propuesta (±6 dB)</div>'+eqBars(n.eq)+'</div>':'')+
+      '<div class="tg"><label class="ck"><input type="checkbox" data-k="v" data-id="'+n.id+'"'+(volIncl[n.id]===false?'':' checked')+'> Incluir en volumen</label><label class="ck"><input type="checkbox" data-k="e" data-id="'+n.id+'"'+(eqIncl[n.id]===false?'':' checked')+'> Incluir en EQ</label></div>'
+      :'<p class="mut small">No se oyó bien este altavoz. Sube el volumen de la prueba o acerca el móvil.</p>')+'</div>';}
+  $('cards').innerHTML=h;
+  $('cards').querySelectorAll('input[type=checkbox]').forEach(c=>c.onchange=()=>{(c.dataset.k==='v'?volIncl:eqIncl)[c.dataset.id]=c.checked;render();});
+  $('eqoff').hidden=eqOn;
+  const bad=ps.filter(n=>!n.ok).map(n=>'#'+n.id);
+  if(bad.length)log('AVISO: señal débil en '+bad.join(', ')+' (sube el nivel de prueba o acerca el móvil)');
+  if(ps.some(n=>n.spread_us>200))log('AVISO: ± > 0,2 ms entre rondas: repite con más rondas y menos ruido');
+}
+async function apply(lat,vol,eq){
+  const ps=propose(lastRes.nodes,volIncl,eqIncl).filter(n=>n.ok);let k=0;
+  for(const n of ps){
+    if(lat){await api('POST','/api/calibrate',{esp_id:n.id,latency_us:n.latency_us});}
+    if(vol){await api('POST','/api/node',{id:n.id,volume_l:n.volume,volume_r:n.volume});}
+    if(eq&&n.eq){const b={id:n.id};n.eq.forEach((g,i)=>b['eq'+i]=g);await api('POST','/api/eq',b);}
+    k++;}
+  let extra='';
+  if(eq&&!eqOn&&$('ck_enable').checked){const r=await api('POST','/api/dsp',{eq:true});if(r.ok){eqOn=true;extra=' EQ activada.';}}
+  const what=[lat?'latencia':'',vol?'volumen':'',eq?'EQ':''].filter(Boolean).join(', ');
+  log('Aplicado a '+k+' altavoz(ces): '+what+'.'+extra);return {k,what,extra};
+}
+async function resetAll(){for(let i=0;i<10;i++){await api('POST','/api/calibrate',{esp_id:i,latency_us:0});await api('POST','/api/node',{id:i,volume_l:255,volume_r:255});await api('POST','/api/eq',{id:i,reset:true});}
+  log('Restablecido: latencia 0, volumen 100% y EQ plano en todos los altavoces');}
+
+$('go').onclick=runCal;
+$('cancel').onclick=()=>{stopCal();};
+$('again').onclick=()=>{view(1);};
+$('apply').onclick=async()=>{
+  const lat=$('ck_lat').checked,vol=$('ck_vol').checked,eq=$('ck_eq').checked;
+  if(!lat&&!vol&&!eq){$('applied').textContent='';toast('Marca al menos una opción',false);return;}
+  $('apply').disabled=true;const r=await apply(lat,vol,eq);$('apply').disabled=false;
+  $('applied').textContent='Aplicado a '+r.k+' altavoz(ces): '+r.what+'.'+r.extra;toast('Aplicado');render();
+};
+$('reset').onclick=async()=>{if(confirm('¿Poner latencia a 0, volumen al 100% y EQ plano en todos los altavoces?')){await resetAll();toast('Restablecido');$('applied').textContent='Restablecido.';}};
+view(1);
+</script></body></html>

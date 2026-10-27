@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#000000">
+<title>SonosWiFi — Añadir altavoz</title>
+<style>
+/*@SHARED_CSS@*/
+main{max-width:600px;margin:0 auto;padding:20px 16px 80px;display:flex;flex-direction:column;gap:16px}
+.top .in{max-width:600px}
+.step{display:flex;gap:14px}
+.num2{flex:none;width:30px;height:30px;border-radius:50%;border:1.5px solid var(--line2);display:grid;place-items:center;font-weight:700;color:var(--mut)}
+.step.cur .num2{border-color:var(--ac);color:var(--ac)}
+.step.done .num2{background:var(--ac);border-color:var(--ac);color:#04121f}
+.step .bd{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
+.step.lock .bd{opacity:.4;pointer-events:none}
+.pills{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.pills button{appearance:none;background:var(--raise);border:1px solid var(--line2);border-radius:12px;min-height:46px;font-weight:650;font-size:1.05rem}
+.pills button:hover{border-color:var(--ac-ln)}
+.pills button[aria-pressed=true]{background:var(--ac-bg);border-color:var(--ac);color:var(--ac)}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.kv div{background:var(--raise);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.kv span{display:block;font-size:.8rem;color:var(--mut)}.kv b{font-weight:600}
+.pw{position:relative}.pw button{position:absolute;right:6px;top:5px}
+details.adv{border:1px solid var(--line);border-radius:14px;padding:4px 14px;background:var(--panel)}
+details.adv summary{cursor:pointer;padding:10px 0;font-weight:600;color:var(--mut)}
+details.adv[open] summary{color:var(--fg)}
+details.adv .in2{padding:4px 0 14px;display:flex;flex-direction:column;gap:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.log{font:.82rem/1.6 ui-monospace,Consolas,monospace;color:var(--mut);white-space:pre-wrap;max-height:150px;overflow:auto}
+@media (max-width:420px){.kv{grid-template-columns:1fr}}
+</style></head><body>
+<div class="top"><div class="in">
+  <a class="brand" href="/"><svg class="logo" viewBox="0 0 26 26" fill="none" stroke="#4aa3ff" stroke-width="2" stroke-linecap="round"><path d="M3 13h2M8 8v10M13 4v18M18 8v10M23 13h-2"/></svg>SonosWiFi</a>
+  <a class="btn ghost sm" style="margin-left:auto" href="/">Volver al panel</a>
+</div></div>
+<main>
+  <div><h1>Añadir un altavoz</h1><p class="mut">Conecta el ESP32 por Bluetooth y dile a qué WiFi unirse. Solo hace falta una vez.</p></div>
+
+  <div class="note bad" id="nosup" hidden><b>Este navegador no admite Web Bluetooth.</b><br>Usa Chrome o Edge en Android o en un ordenador, o la app Bluefy en iPhone.</div>
+  <div class="note warn" id="nohttps" hidden><b>Falta HTTPS.</b> Abre <a id="httpslink" href="#">esta página con HTTPS</a> y acepta el aviso del certificado.</div>
+
+  <div class="panelbox step cur" id="s1">
+    <div class="num2">1</div>
+    <div class="bd">
+      <h2>Conecta el ESP32</h2>
+      <p class="mut small">Enciéndelo cerca del móvil. Aparece como «SonosWiFi-XXXX».</p>
+      <div class="row"><button class="btn" id="bc">Buscar altavoz</button><button class="btn ghost" id="bd" disabled>Desconectar</button></div>
+      <div id="kv" class="kv" hidden>
+        <div><span>Estado</span><b id="k_wifi">—</b></div><div><span>Señal</span><b id="k_rssi">—</b></div>
+        <div><span>Dirección IP</span><b id="k_ip">—</b></div><div><span>Con la Raspberry</span><b id="k_rpi">—</b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panelbox step lock" id="s2">
+    <div class="num2">2</div>
+    <div class="bd">
+      <h2>Elige su número</h2>
+      <p class="mut small">Cada altavoz necesita un número distinto del 0 al 9. Anótalo en el ESP32.</p>
+      <div class="pills" id="pills" role="group" aria-label="Número del altavoz"></div>
+    </div>
+  </div>
+
+  <div class="panelbox step lock" id="s3">
+    <div class="num2">3</div>
+    <div class="bd">
+      <h2>Indica la WiFi</h2>
+      <div><label for="ssid">Nombre de la red (mejor de 5 GHz)</label><input class="txt" id="ssid" maxlength="32" autocapitalize="off" autocomplete="off"></div>
+      <div><label for="pass">Contraseña (vacía = mantener la actual)</label>
+        <div class="pw"><input class="txt" id="pass" type="password" maxlength="63" autocomplete="new-password"><button class="btn ghost sm" id="eye" type="button">Ver</button></div></div>
+      <div class="row"><button class="btn" id="save">Guardar y reiniciar</button><button class="btn ghost" id="ident">Hacer sonar un pitido</button></div>
+      <div class="savestate small mut" id="res"></div>
+    </div>
+  </div>
+
+  <details class="adv" id="adv">
+    <summary>Opciones avanzadas</summary>
+    <div class="in2">
+      <div><label for="rip">IP de la Raspberry (solo si el router bloquea el broadcast; vacío = automática)</label>
+        <input class="txt" id="rip" maxlength="15" inputmode="decimal" autocomplete="off" placeholder="192.168.1.10"></div>
+      <div class="row"><button class="btn ghost" id="reboot">Reiniciar</button><button class="btn danger" id="factory">Borrar configuración</button></div>
+      <p class="mut small">Borrar configuración elimina la WiFi y el número guardados en este ESP32.</p>
+    </div>
+  </details>
+
+  <div class="panelbox"><h2 style="margin-bottom:8px">Actividad</h2><div class="log" id="log" role="log"></div></div>
+</main>
+<div class="toasts" id="tb"></div>
+<script>
+const U=n=>'5c0a'+n.toString(16).padStart(4,'0')+'-8e3b-4d5e-9a41-534f4e4f5346';
+const SVC=U(1),C_SSID=U(2),C_PASS=U(3),C_ID=U(4),C_ST=U(5),C_CMD=U(6),C_RPI=U(7);
+const $=i=>document.getElementById(i),enc=new TextEncoder(),dec=new TextDecoder();
+const log=m=>{const l=$('log');l.textContent+=new Date().toLocaleTimeString()+'  '+m+'\n';l.scrollTop=l.scrollHeight;};
+function toast(m,ok=true){const d=document.createElement('div');d.className='toast'+(ok?'':' bad');d.textContent=m;$('tb').appendChild(d);setTimeout(()=>d.remove(),2600);}
+let dev=null,ch={},curId=0,connected=false;
+if(!navigator.bluetooth)$('nosup').hidden=false;
+if(!window.isSecureContext){$('nohttps').hidden=false;$('httpslink').href='https://'+location.hostname+':8443/ble';}
+$('pills').innerHTML=[0,1,2,3,4,5,6,7,8,9].map(i=>'<button data-i="'+i+'" aria-pressed="'+(i===0)+'">'+i+'</button>').join('');
+function setId(i){curId=i;$('pills').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.i===i));}
+$('pills').onclick=e=>{const b=e.target.closest('button');if(b)setId(+b.dataset.i);};
+function stage(on){connected=on;$('s1').className='panelbox step '+(on?'done':'cur');
+  $('s2').className='panelbox step '+(on?'cur':'lock');$('s3').className='panelbox step '+(on?'cur':'lock');
+  $('adv').style.opacity=on?1:.5;$('adv').style.pointerEvents=on?'auto':'none';
+  $('bc').disabled=on;$('bd').disabled=!on;$('kv').hidden=!on;$('s1').querySelector('.num2').textContent=on?'✓':'1';}
+stage(false);
+function showStatus(t){let j=null;try{j=JSON.parse(t);}catch(e){}if(!j)return;
+  $('k_wifi').textContent=j.wifi?'Conectado a la WiFi':'Sin WiFi';
+  $('k_rssi').textContent=j.wifi?(j.rssi>-60?'Buena':j.rssi>-72?'Aceptable':'Débil')+' ('+j.rssi+' dBm)':'—';
+  $('k_ip').textContent=j.wifi&&j.ip?j.ip:'—';
+  $('k_rpi').textContent=j.rpi?(j.sync?'Sincronizado':'Conectado'):'Buscando…';}
+async function readStatus(){try{showStatus(dec.decode(await ch.st.readValue()));}catch(e){}}
+const wr=(c,b)=>c.writeValueWithResponse?c.writeValueWithResponse(b):c.writeValue(b);
+$('bc').onclick=async()=>{
+  try{
+    if(!window.isSecureContext){log('Web Bluetooth exige HTTPS.');return;}
+    dev=await navigator.bluetooth.requestDevice({filters:[{services:[SVC]}]});
+    dev.addEventListener('gattserverdisconnected',()=>{log('Desconectado');stage(false);});
+    log('Conectando a '+dev.name+'…');$('bc').disabled=true;
+    const s=await dev.gatt.connect(),svc=await s.getPrimaryService(SVC);
+    ch.ssid=await svc.getCharacteristic(C_SSID);ch.pass=await svc.getCharacteristic(C_PASS);
+    ch.id=await svc.getCharacteristic(C_ID);ch.st=await svc.getCharacteristic(C_ST);ch.cmd=await svc.getCharacteristic(C_CMD);
+    try{ch.rpi=await svc.getCharacteristic(C_RPI);$('rip').value=dec.decode(await ch.rpi.readValue());}catch(e){ch.rpi=null;}
+    try{$('ssid').value=dec.decode(await ch.ssid.readValue());setId((await ch.id.readValue()).getUint8(0));}catch(e){}
+    await ch.st.startNotifications();ch.st.addEventListener('characteristicvaluechanged',readStatus);await readStatus();
+    stage(true);log('Conectado a '+dev.name);
+  }catch(e){log('Error: '+e.name+': '+e.message);$('bc').disabled=false;if(e.name!=='NotFoundError')toast('No se pudo conectar',false);}
+};
+$('bd').onclick=()=>{if(dev&&dev.gatt.connected)dev.gatt.disconnect();};
+async function cmd(c){try{await wr(ch.cmd,enc.encode(c));log('Comando: '+c);return true;}catch(e){log('Error: '+e.message);toast('El ESP32 no respondió',false);return false;}}
+$('ident').onclick=()=>cmd('identify');
+$('reboot').onclick=()=>cmd('reboot');
+$('factory').onclick=async()=>{if(confirm('¿Borrar WiFi y número guardados en este ESP32?'))if(await cmd('factory'))toast('Configuración borrada');};
+$('eye').onclick=()=>{const p=$('pass');const s=p.type==='password';p.type=s?'text':'password';$('eye').textContent=s?'Ocultar':'Ver';};
+$('save').onclick=async()=>{
+  const ssid=$('ssid').value,pass=$('pass').value;
+  if(!ssid){$('res').textContent='Escribe el nombre de la WiFi.';return;}
+  if(pass&&(pass.length<8||pass.length>63)){$('res').textContent='La contraseña debe tener entre 8 y 63 caracteres.';return;}
+  try{
+    $('save').disabled=true;$('res').textContent='Enviando…';
+    await wr(ch.id,new Uint8Array([curId]));
+    await wr(ch.ssid,enc.encode(ssid));
+    if(ch.rpi)await wr(ch.rpi,enc.encode($('rip').value.trim()));
+    if(pass)await wr(ch.pass,enc.encode(pass));
+    log('Valores enviados. Aplicando…');
+    if(await cmd('apply')){$('res').textContent='Listo. El altavoz #'+curId+' se reinicia y se une a «'+ssid+'». Aparecerá en el panel en unos segundos.';toast('Guardado');}
+  }catch(e){log('Error: '+e.name+': '+e.message);$('res').textContent='No se pudo guardar. Si el móvil pide emparejar, acepta.';}
+  $('save').disabled=false;
+};
+</script></body></html>
