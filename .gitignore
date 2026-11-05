@@ -1,0 +1,18 @@
+# Compilación
+rpi/build/
+esp32/build/
+esp32/sdkconfig
+esp32/sdkconfig.old
+esp32/managed_components/
+esp32/dependencies.lock
+# Python / Node
+__pycache__/
+*.pyc
+node_modules/
+# Temporales de las pruebas
+*.log
+*.tmp
+# Secretos locales (contraseña web, certificados, ajustes con la WiFi de los altavoces)
+password
+*.pem
+*.ble
