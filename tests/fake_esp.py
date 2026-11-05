@@ -397,6 +397,15 @@ check("cal/start informa los bordes de banda del EQ", c == 200 and '"eq_edges":[
 time.sleep(0.5)
 http("POST", "/api/layout", {"layout": "stereo5"})
 
+# 8b) Vúmetros de entrada y estado de la transmisión (/api/levels)
+c, b = http("GET", "/api/levels"); lv = json.loads(b)
+check("levels: capturando, con señal y enviando a los altavoces en línea", c == 200 and lv["capturing"] is True and lv["signal"] is True and lv["sending"] is True and lv["nodes_online"] >= 1, b)
+check("levels: 10 canales en dBFS", len(lv["db"]) == 10 and all(-90.0 <= x <= 0.0 for x in lv["db"]), lv["db"])
+check("levels: ch0/ch1 (±0x40000000) = −6,0 dBFS", abs(lv["db"][0] + 6.0) < 0.2 and abs(lv["db"][1] + 6.0) < 0.2, lv["db"])
+check("levels: ch2 (0x20000000) = −12,0 dBFS y ch4 (seno, pico ≈ amplitud) ≈ −12 dBFS", abs(lv["db"][2] + 12.04) < 0.2 and abs(lv["db"][4] + 12.04) < 0.5, lv["db"])
+check("levels: canales sin señal = −90 dBFS", all(lv["db"][i] == -90.0 for i in (3, 5, 6, 7, 8, 9)), lv["db"])
+check("levels: pps plausible (> 100 paquetes/s) y signal_age_ms pequeño", lv["pps"] > 100 and 0 <= lv["signal_age_ms"] < 500, (lv["pps"], lv["signal_age_ms"]))
+
 # 9) Configuración de ESP32 por Bluetooth desde la RPi (ayudante en modo simulado, ver ble_mock_setup.py)
 c, b = http("GET", "/api/ble/status"); bs = json.loads(b)
 check("BLE: ayudante disponible, sin WiFi guardada", c == 200 and bs["available"] is True and bs["ssid"] == "" and bs["has_pass"] is False, b)

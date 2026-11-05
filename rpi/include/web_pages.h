@@ -140,6 +140,19 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 .chips button[aria-expanded=true]{border-color:var(--ac-ln);background:var(--ac-bg)}
 .empty{padding:26px;text-align:center;color:var(--mut)}
 
+/* Vúmetros de entrada */
+.meters{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 14px 10px;margin-bottom:14px}
+.mh{display:flex;align-items:baseline;gap:10px;margin-bottom:8px}.mh b{font-weight:650}.mh .hint{margin-left:auto}
+.mb{display:grid;grid-template-columns:repeat(10,1fr);gap:8px}
+.mc{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
+.mc .bar{display:flex;flex-direction:column-reverse;gap:2px;width:100%;max-width:34px;padding:2px;background:#000;border:1px solid var(--line2);border-radius:0}
+.seg{display:block;height:5px;border-radius:0;background:var(--c);opacity:.16}   /* LED apagado: el mismo color, muy tenue */
+.seg.on{opacity:1}
+.seg.g{--c:#30d158}.seg.y{--c:#ffd60a}.seg.r{--c:#ff453a}
+.mc .lab{font-size:.68rem;color:var(--mut);line-height:1}
+.mc .cl{width:8px;height:8px;border-radius:0;background:#3a1512}.mc .cl.on{background:#ff453a}
+.ms{color:var(--mut);font-size:.74rem;margin-top:8px}
+.meters.off .seg.on{opacity:.16}
 /* Cajón del altavoz */
 .scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40;opacity:0;pointer-events:none;transition:opacity .18s}
 .scrim.on{opacity:1;pointer-events:auto}
@@ -239,6 +252,11 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
     <div class="seg" id="lyseg" role="group" aria-label="Distribución">
       <button data-ly="stereo5" aria-pressed="false">5 estéreo</button><button data-ly="mono10" aria-pressed="false">10 mono</button>
     </div></div>
+  <div class="meters" id="meters" role="group" aria-label="Niveles de entrada por canal">
+    <div class="mh"><b>Entrada</b><span class="hint" id="mtxt">Esperando datos…</span></div>
+    <div class="mb" id="mb"></div>
+    <div class="ms">Cada LED son 3 dB (de −60 a 0 dBFS): verde hasta −18, amarillo hasta −6 y rojo por encima. El LED suelto por encima de la barra es el pico reciente.</div>
+  </div>
   <div class="room" id="room" aria-label="Plano de la sala con los altavoces">
     <svg class="lines" id="lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
       <ellipse class="ring" cx="50" cy="76" rx="22" ry="17"/><ellipse class="ring" cx="50" cy="76" rx="42" ry="30"/>
@@ -351,8 +369,7 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>showTab(b.dataset.tab
 /* Datos */
 async function loadStatus(){
   try{const d=await (await fetch('/api/status')).json();st=d;
-    $('hs').textContent=(d.running?'Capturando':'Detenido')+' · '+d.sample_rate/1000+' kHz';
-    $('dot').className='dot '+(d.running?'ok':'bad');
+    if(!lvOK){$('hs').textContent=(d.running?'Capturando':'Detenido')+' · '+d.sample_rate/1000+' kHz';$('dot').className='dot '+(d.running?'ok':'bad');}
     if(d.layout!==undefined&&d.layout!==layout){layout=d.layout;}
     setSeg($('lyseg'),'ly',layout===0?'stereo5':layout===1?'mono10':'');
     if(document.activeElement!==$('xos')){$('xos').value=d.xover_hz||80;$('xod').textContent=Math.round(d.xover_hz||80)+' Hz';fillRng($('xos'));}
@@ -360,7 +377,7 @@ async function loadStatus(){
     if(document.activeElement!==$('pls')&&d.playout_ms){$('pls').value=d.playout_ms;$('pld').textContent=Math.round(d.playout_ms)+' ms';fillRng($('pls'));setSeg($('plseg'),'pl',Math.round(d.playout_ms));}
     if(document.activeElement!==$('mvs')&&d.master_volume!==undefined){const v=Math.round(Math.min(1,d.master_volume)*100);$('mvs').value=v;$('mvd').textContent=v+'%';fillRng($('mvs'));}
     drawSound();
-  }catch(e){$('hs').textContent='Sin conexión';$('dot').className='dot bad';}
+  }catch(e){lvOK=false;lvTxt='';$('hs').textContent='Sin conexión';$('dot').className='dot bad';}
 }
 async function loadNodes(){
   try{nodes=await (await fetch('/api/nodes')).json();}catch(e){return;}
@@ -572,6 +589,40 @@ async function bleProvAll(){const todo=[];bdevs.forEach((d,i)=>{if(d.new&&d.stat
   if(!confirm(msg))return;
   let n=0;for(const i of todo){if(await bleProvOne(i))n++;}toast(n+' de '+todo.length+' enviados',n===todo.length);bleBuild();}
 
+/* Estado de la transmisión y vúmetros (consulta ligera /api/levels) */
+const CHS=['FL','FR','C','LFE','SL','SR','SBL','SBR','AXL','AXR'];
+const MDB=60;                                   // la escala va de −60 a 0 dBFS
+let lvOK=false,lastDraw=0,lvTxt='',holdV=new Array(10).fill(-90),holdT=new Array(10).fill(0),clipT=new Array(10).fill(0);
+const NSEG=20,SEGDB=MDB/NSEG;                  // 20 LED por canal, 3 dB cada uno
+const segCls=i=>{const top=-MDB+SEGDB*(i+1);return top<=-18?'g':top<=-6?'y':'r';};   // verde hasta −18 dB, amarillo hasta −6 dB, rojo por encima
+$('mb').innerHTML=CHS.map((c,i)=>'<div class="mc"><i class="cl" id="mcl'+i+'"></i><div class="bar" title="'+CH[i]+' · '+CHN[i]+'">'+Array.from({length:NSEG},(_,k)=>'<i class="seg '+segCls(k)+'"></i>').join('')+'</div><span class="lab">'+c+'</span></div>').join('');
+const SEGS=[...document.querySelectorAll('#mb .bar')].map(b=>[...b.children]),segIdx=db=>db<=-MDB?-1:Math.min(NSEG-1,Math.ceil((db+MDB)/SEGDB)-1);
+function setTx(dot,txt,title){const t=txt;if(t!==lvTxt){lvTxt=t;$('hs').textContent=t;}$('dot').className='dot '+dot;$('st').title=title||'';}
+function drawMeters(d){
+  const now=performance.now(),on=d.capturing,dt=Math.min(0.5,(now-lastDraw)/1000);
+  $('meters').classList.toggle('off',!on);
+  for(let i=0;i<10;i++){
+    const db=on?d.db[i]:-90;
+    if(db>=holdV[i]){holdV[i]=db;holdT[i]=now;}else if(now-holdT[i]>1200)holdV[i]=Math.max(db,holdV[i]-20*dt);   // el LED de pico se mantiene 1,2 s y baja a 20 dB/s
+    const lv=segIdx(db),pk=segIdx(holdV[i]),sg=SEGS[i];
+    for(let k=0;k<NSEG;k++){const on2=k<=lv||k===pk;if(sg[k].classList.contains('on')!==on2)sg[k].classList.toggle('on',on2);}
+    if(db>=-1)clipT[i]=now;$('mcl'+i).className='cl'+(now-clipT[i]<3000&&clipT[i]?' on':'');
+  }
+  lastDraw=now;
+  const mx=on?Math.max.apply(null,d.db):-90;
+  $('mtxt').textContent=!on?'Sin captura de la Traktor':mx<-70?'Silencio':'Pico '+mx.toFixed(1).replace('.',',')+' dBFS';
+}
+async function pollLevels(){
+  if(document.hidden)return;
+  try{const d=await (await fetch('/api/levels')).json();lvOK=true;drawMeters(d);
+    if(!d.capturing)setTx('bad','Sin captura de la Traktor','No llegan bloques de audio de la tarjeta (¿Traktor desconectada o ocupada?).');
+    else if(!d.signal)setTx('warn','Traktor conectada, sin señal','La tarjeta captura, pero todos los canales están en silencio (< −70 dBFS).');
+    else if(!d.sending)setTx('warn',d.nodes_online?'Hay señal, sin enviar':'Hay señal, ningún altavoz en línea',d.nodes_online?'No se están enviando paquetes.':'Enciende o conecta algún altavoz.');
+    else setTx('ok','Transmitiendo · '+d.nodes_online+(d.nodes_online===1?' altavoz':' altavoces'),d.pps+' paquetes de audio por segundo.');
+  }catch(e){lvOK=false;setTx('bad','Sin conexión con la Raspberry','');}
+}
+function lvLoop(){pollLevels().finally(()=>setTimeout(lvLoop,$('p_spk').hidden?1000:150));}
+
 /* Volumen maestro y enlaces */
 $('mvs').oninput=function(){$('mvd').textContent=this.value+'%';fillRng(this);clearTimeout(window._mv);window._mv=setTimeout(()=>J('/api/volume',{volume:+this.value/100}),120);};
 $('logclr').onclick=()=>{$('lb').innerHTML='';};
@@ -579,7 +630,7 @@ $('logclr').onclick=()=>{$('lb').innerHTML='';};
   $('lcal').href=b+'/calibrate';$('lcal2').href=b+'/calibrate';window._bleHref=b+'/ble';})();
 document.querySelectorAll('.rng').forEach(fillRng);
 const h0=(location.hash||'').slice(1);if(['spk','snd','lat','log'].includes(h0))showTab(h0);
-loadStatus().then(loadNodes);updLat();
+loadStatus().then(loadNodes);updLat();lvLoop();
 setInterval(loadStatus,5000);setInterval(loadNodes,2500);
 </script>
 </body></html>)HTML";

@@ -327,6 +327,7 @@ void WebServer::handleClient(int cfd, bool tls) {
 }
 std::string WebServer::handleGET(const std::string& p, int& code) {
     if (p == "/api/status") return getStatus();
+    if (p == "/api/levels") return getLevels();
     if (p == "/api/cal/status") {
         std::ostringstream o;
         o << "{" << jbool("running", streamer_.calRunning()) << ","
@@ -402,6 +403,23 @@ std::string WebServer::bleIdentify(const std::string& b) {
     std::string addr = jsonGet(b, "address");
     if (!BleManager::validAddress(addr)) return "{\"error\":\"dirección Bluetooth no válida\"}";
     return ble_.run("identify", "{" + jstr("address", addr) + "}", 30);
+}
+// Niveles de entrada por canal y estado de la transmisión (ligero: la UI lo consulta ~8 veces por segundo)
+std::string WebServer::getLevels() {
+    const int64_t sig = streamer_.signalAgeMs(), blk = streamer_.captureAgeMs();
+    const bool capturing = blk >= 0 && blk < 1000;                             // están llegando bloques de la tarjeta
+    const bool signal = capturing && sig >= 0 && sig < 2000;                     // algún canal > -70 dBFS en los últimos 2 s
+    int online = 0;
+    for (const auto& n : streamer_.getNodes()) if (n.enabled && n.online) online++;
+    const uint32_t pps = streamer_.packetsPerSec();
+    std::ostringstream o;
+    o << "{" << jbool("capturing", capturing) << "," << jbool("signal", signal) << ","
+      << jnum("signal_age_ms", (double)sig) << "," << jnum("pps", pps) << ","
+      << jbool("sending", capturing && online > 0 && pps > 0) << "," << jnum("nodes_online", online) << ",\"db\":[";
+    char b[16];
+    for (int c = 0; c < AUDIO_CHANNELS; c++) { snprintf(b, sizeof(b), "%s%.1f", c ? "," : "", streamer_.meterDb(c)); o << b; }
+    o << "]}";
+    return o.str();
 }
 std::string WebServer::getStatus() {
     const auto& c = capture_.config();

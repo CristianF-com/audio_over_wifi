@@ -33,6 +33,7 @@ private:
     std::string getLatency();
     std::string setLatency(const std::string& body);
     std::string calStart(const std::string& body);
+    std::string getLevels();
     std::string bleStatus();
     std::string bleWifi(const std::string& body);
     std::string bleScan(const std::string& body);
