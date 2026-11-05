@@ -1,5 +1,8 @@
 # SonosWiFi — Audio 7.1 inalámbrico (Traktor Audio 10 → RPi 400 → 5× XIAO ESP32-C5 + PCM5102A)
 
+> **Instalación paso a paso por consola (Raspberry y ESP32): [INSTALL.md](INSTALL.md).**
+
+
 ```
 Traktor Audio 10 (USB, S32_LE 10ch 48k)
         │ ALSA, hilo RT
