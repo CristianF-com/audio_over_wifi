@@ -55,7 +55,7 @@ El script hace, en orden:
 2. Compila en `rpi/build/` (Release) e instala `/usr/local/bin/sonos_wifi`.
 3. Copia el ayudante Bluetooth a `/usr/local/lib/sonos_wifi/sonos_ble_prov.py` y añade tu usuario al grupo `bluetooth`.
 4. Genera un certificado HTTPS autofirmado en `/etc/sonos_wifi/` (hace falta para el micrófono y Web Bluetooth del navegador).
-5. Crea y arranca el servicio `sonos_wifi` en systemd, con prioridad de tiempo real solo en los hilos de audio.
+5. Crea y arranca el servicio `sonos_wifi` en systemd, con prioridad de tiempo real (FIFO 50 para todo el proceso desde systemd; el programa sube a 80 el hilo de captura y a 60 el de control).
 
 Al terminar muestra las direcciones web. Si el script te añadió al grupo `audio` por primera vez, **cierra la sesión y vuelve a entrar** (o reinicia).
 
