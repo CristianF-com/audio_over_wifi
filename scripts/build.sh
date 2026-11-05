@@ -60,7 +60,11 @@ Restart=always
 RestartSec=3
 User=${REAL_USER}
 SupplementaryGroups=audio bluetooth
-# El propio programa pone SCHED_FIFO solo en los hilos de captura (80) y control (60).
+# Prioridad de tiempo real también desde systemd para todo el proceso (FIFO 50), como en el puente anterior que iba bien;
+# además el programa sube a FIFO 80 el hilo de captura y a 60 el de control.
+Nice=-10
+CPUSchedulingPolicy=fifo
+CPUSchedulingPriority=50
 AmbientCapabilities=CAP_SYS_NICE
 LimitRTPRIO=95
 LimitMEMLOCK=infinity
