@@ -245,7 +245,47 @@ void UdpStreamer::handleSync(const uint8_t* b, int n, const sockaddr_in& src, ui
 }
 
 // ─── Hot path ─────────────────────────────────────────────────────────────────
+static uint64_t rawNowUs() { timespec ts; clock_gettime(CLOCK_MONOTONIC_RAW, &ts); return (uint64_t)ts.tv_sec * 1000000ull + (uint64_t)ts.tv_nsec / 1000ull; }
+
+float UdpStreamer::meterDb(int ch) const {
+    if (ch < 0 || ch >= AUDIO_CHANNELS) return -90.0f;
+    const uint32_t v = meter_[ch].load(std::memory_order_relaxed);
+    if (v == 0) return -90.0f;
+    const float db = 20.0f * log10f((float)v / 2147483648.0f);
+    return db < -90.0f ? -90.0f : (db > 0.0f ? 0.0f : db);
+}
+int64_t UdpStreamer::signalAgeMs() const { const uint64_t t = last_signal_us_.load(std::memory_order_relaxed); return t ? (int64_t)((rawNowUs() - t) / 1000) : -1; }
+int64_t UdpStreamer::captureAgeMs() const { const uint64_t t = last_block_us_.load(std::memory_order_relaxed); return t ? (int64_t)((rawNowUs() - t) / 1000) : -1; }
+
 void UdpStreamer::pushFrames(const int32_t* s32, uint32_t frames, uint64_t capture_ts) {
+    {   // Medidores de entrada: pico por canal en este bloque; caída ~300 ms (exp(-t/0.3 s)) para que la web vea los picos entre consultas
+        static constexpr uint32_t SIGNAL_THRESH = 679000;   // ≈ -70 dBFS sobre 2^31
+        uint32_t pk[AUDIO_CHANNELS] = {0};
+        for (uint32_t f = 0; f < frames; f++) {
+            const int32_t* r = s32 + (size_t)f * AUDIO_CHANNELS;
+            for (int c = 0; c < AUDIO_CHANNELS; c++) {
+                const int64_t v = r[c];
+                const uint32_t a = (uint32_t)(v < 0 ? -v : v);
+                if (a > pk[c]) pk[c] = a;
+            }
+        }
+        const float decay = expf(-(float)frames / (float)AUDIO_SAMPLE_RATE / 0.3f);
+        bool sig = false;
+        for (int c = 0; c < AUDIO_CHANNELS; c++) {
+            const uint32_t held = (uint32_t)((float)meter_[c].load(std::memory_order_relaxed) * decay);
+            meter_[c].store(pk[c] > held ? pk[c] : held, std::memory_order_relaxed);
+            if (pk[c] > SIGNAL_THRESH) sig = true;
+        }
+        const uint64_t now = rawNowUs();
+        last_block_us_.store(now, std::memory_order_relaxed);
+        if (sig) last_signal_us_.store(now, std::memory_order_relaxed);
+        if (pps_t_ == 0) { pps_t_ = now; pps_n_ = pkts_sent_.load(std::memory_order_relaxed); }
+        else if (now - pps_t_ >= 1000000ull) {           // paquetes/s con ventana de ~1 s
+            const uint64_t n = pkts_sent_.load(std::memory_order_relaxed);
+            pps_.store((uint32_t)((n - pps_n_) * 1000000ull / (now - pps_t_)), std::memory_order_relaxed);
+            pps_t_ = now; pps_n_ = n;
+        }
+    }
     if (audio_sock_ < 0) return;
     const float mv = master_vol_.load(std::memory_order_relaxed);
 
@@ -416,6 +456,8 @@ void UdpStreamer::pushFrames(const int32_t* s32, uint32_t frames, uint64_t captu
                 if (sendto(audio_sock_, &tx.pkt, sizeof(tx.pkt), MSG_DONTWAIT,
                            (const sockaddr*)&rt[i].addr, sizeof(rt[i].addr)) < 0)
                     send_errors_.fetch_add(1, std::memory_order_relaxed);
+                else
+                    pkts_sent_.fetch_add(1, std::memory_order_relaxed);
                 tx.n = 0;
             }
         }

@@ -125,6 +125,12 @@ public:
 
     uint64_t sendErrors() const { return send_errors_.load(); }
 
+    // Medidores de la ENTRADA (antes de volumen/DSP). Los escribe el hilo de captura; la web los lee sin bloquear.
+    float    meterDb(int ch) const;               // pico por canal en dBFS (-90 = silencio), ataque instantáneo y caída ~300 ms
+    int64_t  signalAgeMs() const;                 // ms desde que algún canal superó -70 dBFS; -1 si nunca
+    int64_t  captureAgeMs() const;                // ms desde el último bloque de audio recibido de la tarjeta; -1 si nunca
+    uint32_t packetsPerSec() const { return pps_.load(std::memory_order_relaxed); }   // paquetes de audio enviados por segundo (todos los nodos)
+
 private:
     void controlLoop();                       // HELLO / REPORT / SYNC_REQ
     void markOffline();
@@ -172,6 +178,10 @@ private:
     uint64_t              last_save_us_ = 0;
     void sendConfig(const ESPNode& n);
     std::atomic<uint64_t> send_errors_{0};
+    std::array<std::atomic<uint32_t>, AUDIO_CHANNELS> meter_{};   // pico con caída, escala S32 (0..2^31)
+    std::atomic<uint64_t> last_signal_us_{0}, last_block_us_{0}, pkts_sent_{0};
+    std::atomic<uint32_t> pps_{0};
+    uint64_t              pps_t_ = 0, pps_n_ = 0;                // solo hilo de captura
 
     mutable std::mutex              nodes_mtx_;
     std::array<ESPNode, MAX_NODES>  nodes_;

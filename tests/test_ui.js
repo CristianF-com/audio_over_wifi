@@ -17,6 +17,24 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   const n=await p.locator('#spks .spk').count();ok('plano: un altavoz por nodo habilitado (5)',n===5,n);
   ok('plano: nodos en línea (punto verde)',await p.locator('#spks .st.on').count()===5);
   ok('estado: «5 de 5 en línea»',(await p.textContent('#onl')).includes('5 de 5'));
+  // Estado de transmisión y vúmetros (datos reales del arnés: ch0/1 −6 dBFS, ch2 y ch4 −12 dBFS, el resto en silencio)
+  ok('estado: «Transmitiendo · 5 altavoces»',await until(async()=>(await p.textContent('#hs')).includes('Transmitiendo · 5 altavoces')),await p.textContent('#hs'));
+  ok('estado: punto verde',(await p.getAttribute('#dot','class')).includes('ok'));
+  const hts=await p.evaluate(()=>[...document.querySelectorAll('#mb .fill')].map(f=>parseFloat(f.style.height)));
+  ok('vúmetros: 10 barras; FL/FR ≈ 90 %, C ≈ 80 %, canal 4 ≈ 80 %, LFE vacío',hts.length===10&&Math.abs(hts[0]-90)<4&&Math.abs(hts[1]-90)<4&&Math.abs(hts[2]-80)<5&&Math.abs(hts[4]-80)<8&&hts[3]===0,hts);
+  ok('vúmetros: texto de pico ≈ −6 dBFS',(await p.textContent('#mtxt')).includes('−')===false&&(await p.textContent('#mtxt')).includes('-6'),await p.textContent('#mtxt'));
+  const fake=async(o)=>{await p.route('**/api/levels',r=>r.fulfill({contentType:'application/json',body:JSON.stringify(Object.assign({capturing:true,signal:true,signal_age_ms:10,pps:900,sending:true,nodes_online:5,db:[-6,-6,-12,-90,-12,-90,-90,-90,-90,-90]},o))}));};
+  await fake({capturing:false,signal:false,sending:false,db:[-90,-90,-90,-90,-90,-90,-90,-90,-90,-90]});
+  ok('estado: sin captura -> «Sin captura de la Traktor» (rojo) y barras atenuadas',await until(async()=>(await p.textContent('#hs'))==='Sin captura de la Traktor'&&(await p.getAttribute('#dot','class')).includes('bad')&&(await p.getAttribute('#meters','class')).includes('off')));
+  await fake({signal:false,sending:false,db:[-90,-90,-90,-90,-90,-90,-90,-90,-90,-90]});
+  ok('estado: silencio -> «Traktor conectada, sin señal» (ámbar)',await until(async()=>(await p.textContent('#hs'))==='Traktor conectada, sin señal'&&(await p.getAttribute('#dot','class')).includes('warn')&&(await p.textContent('#mtxt'))==='Silencio'));
+  await fake({sending:false,nodes_online:0});
+  ok('estado: señal sin altavoces -> «Hay señal, ningún altavoz en línea»',await until(async()=>(await p.textContent('#hs'))==='Hay señal, ningún altavoz en línea'));
+  await fake({db:[-0.5,-6,-12,-90,-12,-90,-90,-90,-90,-90]});
+  ok('vúmetros: clip (≥ −1 dBFS) enciende el indicador del canal y pone la barra en rojo',await until(async()=>(await p.getAttribute('#mcl0','class')).includes('on')&&(await p.getAttribute('#mf0','class')).includes('clip')));
+  if(SHOTS)await p.screenshot({path:SHOTS+'/panel_vumetros_clip.png'});
+  await p.unroute('**/api/levels');
+  ok('estado: vuelve a «Transmitiendo» al restablecerse',await until(async()=>(await p.textContent('#hs')).startsWith('Transmitiendo')));
   if(SHOTS)await p.screenshot({path:SHOTS+'/panel_altavoces.png'});
   // Cajón con autoguardado
   await p.click('#spks .spk[data-id="1"]');await p.waitForSelector('#drawer.on');
