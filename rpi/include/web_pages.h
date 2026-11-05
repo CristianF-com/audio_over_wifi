@@ -143,17 +143,16 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 /* Vúmetros de entrada */
 .meters{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 14px 10px;margin-bottom:14px}
 .mh{display:flex;align-items:baseline;gap:10px;margin-bottom:8px}.mh b{font-weight:650}.mh .hint{margin-left:auto}
-.mb{display:grid;grid-template-columns:repeat(10,1fr);gap:8px;height:96px}
+.mb{display:grid;grid-template-columns:repeat(10,1fr);gap:8px}
 .mc{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
-.mc .bar{position:relative;flex:1;width:100%;max-width:34px;background:repeating-linear-gradient(to top,transparent 0 calc(20% - 1px),rgba(255,255,255,.09) calc(20% - 1px) 20%),var(--raise);border-radius:6px;overflow:hidden;border:1px solid var(--line)}
-.mc .fill{position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(to top,#2f7fd6,var(--ac));transition:height .1s linear}
-.mc .fill.hot{background:linear-gradient(to top,#2f7fd6,var(--ac) 55%,var(--warn))}
-.mc .fill.clip{background:linear-gradient(to top,#2f7fd6,var(--ac) 45%,var(--warn) 75%,var(--bad))}
-.mc .hold{position:absolute;left:0;right:0;height:2px;background:var(--fg);opacity:.85;bottom:0}
+.mc .bar{display:flex;flex-direction:column-reverse;gap:2px;width:100%;max-width:34px;padding:2px;background:#000;border:1px solid var(--line2);border-radius:0}
+.seg{display:block;height:5px;border-radius:0;background:var(--c);opacity:.16}   /* LED apagado: el mismo color, muy tenue */
+.seg.on{opacity:1}
+.seg.g{--c:#30d158}.seg.y{--c:#ffd60a}.seg.r{--c:#ff453a}
 .mc .lab{font-size:.68rem;color:var(--mut);line-height:1}
-.mc .cl{width:7px;height:7px;border-radius:50%;background:var(--line2)}.mc .cl.on{background:var(--bad)}
+.mc .cl{width:8px;height:8px;border-radius:0;background:#3a1512}.mc .cl.on{background:#ff453a}
 .ms{color:var(--mut);font-size:.74rem;margin-top:8px}
-.meters.off .fill,.meters.off .hold{opacity:.25}
+.meters.off .seg.on{opacity:.16}
 /* Cajón del altavoz */
 .scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40;opacity:0;pointer-events:none;transition:opacity .18s}
 .scrim.on{opacity:1;pointer-events:auto}
@@ -256,7 +255,7 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   <div class="meters" id="meters" role="group" aria-label="Niveles de entrada por canal">
     <div class="mh"><b>Entrada</b><span class="hint" id="mtxt">Esperando datos…</span></div>
     <div class="mb" id="mb"></div>
-    <div class="ms">Escala de −60 a 0 dBFS; cada línea marca 12 dB. La marca blanca es el pico reciente.</div>
+    <div class="ms">Cada LED son 3 dB (de −60 a 0 dBFS): verde hasta −18, amarillo hasta −6 y rojo por encima. El LED suelto por encima de la barra es el pico reciente.</div>
   </div>
   <div class="room" id="room" aria-label="Plano de la sala con los altavoces">
     <svg class="lines" id="lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
@@ -594,16 +593,19 @@ async function bleProvAll(){const todo=[];bdevs.forEach((d,i)=>{if(d.new&&d.stat
 const CHS=['FL','FR','C','LFE','SL','SR','SBL','SBR','AXL','AXR'];
 const MDB=60;                                   // la escala va de −60 a 0 dBFS
 let lvOK=false,lastDraw=0,lvTxt='',holdV=new Array(10).fill(-90),holdT=new Array(10).fill(0),clipT=new Array(10).fill(0);
-$('mb').innerHTML=CHS.map((c,i)=>'<div class="mc"><i class="cl" id="mcl'+i+'"></i><div class="bar" title="'+CH[i]+' · '+CHN[i]+'"><div class="fill" id="mf'+i+'"></div><div class="hold" id="mh'+i+'"></div></div><span class="lab">'+c+'</span></div>').join('');
+const NSEG=20,SEGDB=MDB/NSEG;                  // 20 LED por canal, 3 dB cada uno
+const segCls=i=>{const top=-MDB+SEGDB*(i+1);return top<=-18?'g':top<=-6?'y':'r';};   // verde hasta −18 dB, amarillo hasta −6 dB, rojo por encima
+$('mb').innerHTML=CHS.map((c,i)=>'<div class="mc"><i class="cl" id="mcl'+i+'"></i><div class="bar" title="'+CH[i]+' · '+CHN[i]+'">'+Array.from({length:NSEG},(_,k)=>'<i class="seg '+segCls(k)+'"></i>').join('')+'</div><span class="lab">'+c+'</span></div>').join('');
+const SEGS=[...document.querySelectorAll('#mb .bar')].map(b=>[...b.children]),segIdx=db=>db<=-MDB?-1:Math.min(NSEG-1,Math.ceil((db+MDB)/SEGDB)-1);
 function setTx(dot,txt,title){const t=txt;if(t!==lvTxt){lvTxt=t;$('hs').textContent=t;}$('dot').className='dot '+dot;$('st').title=title||'';}
 function drawMeters(d){
   const now=performance.now(),on=d.capturing,dt=Math.min(0.5,(now-lastDraw)/1000);
   $('meters').classList.toggle('off',!on);
   for(let i=0;i<10;i++){
-    const db=on?d.db[i]:-90,h=Math.max(0,Math.min(1,(db+MDB)/MDB));
-    const f=$('mf'+i);f.style.height=(h*100)+'%';f.className='fill'+(db>=-1?' clip':db>=-9?' hot':'');
-    if(db>=holdV[i]){holdV[i]=db;holdT[i]=now;}else if(now-holdT[i]>1200)holdV[i]=Math.max(db,holdV[i]-20*dt);   // la marca de pico se mantiene 1,2 s y cae a 20 dB/s
-    $('mh'+i).style.bottom='calc('+(Math.max(0,Math.min(1,(holdV[i]+MDB)/MDB))*100)+'% - 2px)';
+    const db=on?d.db[i]:-90;
+    if(db>=holdV[i]){holdV[i]=db;holdT[i]=now;}else if(now-holdT[i]>1200)holdV[i]=Math.max(db,holdV[i]-20*dt);   // el LED de pico se mantiene 1,2 s y baja a 20 dB/s
+    const lv=segIdx(db),pk=segIdx(holdV[i]),sg=SEGS[i];
+    for(let k=0;k<NSEG;k++){const on2=k<=lv||k===pk;if(sg[k].classList.contains('on')!==on2)sg[k].classList.toggle('on',on2);}
     if(db>=-1)clipT[i]=now;$('mcl'+i).className='cl'+(now-clipT[i]<3000&&clipT[i]?' on':'');
   }
   lastDraw=now;

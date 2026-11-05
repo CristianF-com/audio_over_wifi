@@ -20,18 +20,24 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   // Estado de transmisión y vúmetros (datos reales del arnés: ch0/1 −6 dBFS, ch2 y ch4 −12 dBFS, el resto en silencio)
   ok('estado: «Transmitiendo · 5 altavoces»',await until(async()=>(await p.textContent('#hs')).includes('Transmitiendo · 5 altavoces')),await p.textContent('#hs'));
   ok('estado: punto verde',(await p.getAttribute('#dot','class')).includes('ok'));
-  const hts=await p.evaluate(()=>[...document.querySelectorAll('#mb .fill')].map(f=>parseFloat(f.style.height)));
-  ok('vúmetros: 10 barras; FL/FR ≈ 90 %, C ≈ 80 %, canal 4 ≈ 80 %, LFE vacío',hts.length===10&&Math.abs(hts[0]-90)<4&&Math.abs(hts[1]-90)<4&&Math.abs(hts[2]-80)<5&&Math.abs(hts[4]-80)<8&&hts[3]===0,hts);
+  const lit=await p.evaluate(()=>[...document.querySelectorAll('#mb .bar')].map(b=>b.querySelectorAll('.seg.on').length));
+  ok('vúmetros LED: 10 canales x 20 segmentos',await p.evaluate(()=>[...document.querySelectorAll('#mb .bar')].every(b=>b.children.length===20))&&lit.length===10);
+  ok('vúmetros LED: FL/FR ≈ 18 LED (−6 dBFS), C y canal 4 ≈ 16 (−12 dBFS), LFE apagado',Math.abs(lit[0]-18)<=1&&Math.abs(lit[1]-18)<=1&&Math.abs(lit[2]-16)<=1&&lit[4]>=15&&lit[4]<=17&&lit[3]===0,lit);
+  const cs=await p.evaluate(()=>{const b=document.querySelector('#mb .bar'),sg=b.children[0],bs=getComputedStyle(b),ss=getComputedStyle(sg);
+    return {cls:[...b.children].map(x=>x.className.split(' ')[1]).join(''),rb:bs.borderRadius,rs:ss.borderRadius,bg:ss.backgroundImage,cl:getComputedStyle(document.getElementById('mcl0')).borderRadius,
+      col:[...b.children].filter((x,i)=>[0,14,18].includes(i)).map(x=>getComputedStyle(x).backgroundColor)};});
+  ok('vúmetros LED: 14 verdes (hasta −18 dB), 4 amarillos (hasta −6 dB), 2 rojos',cs.cls==='g'.repeat(14)+'y'.repeat(4)+'r'.repeat(2),cs.cls);
+  ok('vúmetros LED: colores estándar verde/amarillo/rojo, planos (sin degradado) y sin esquinas redondeadas',cs.col.join('|')==='rgb(48, 209, 88)|rgb(255, 214, 10)|rgb(255, 69, 58)'&&cs.bg==='none'&&cs.rb==='0px'&&cs.rs==='0px'&&cs.cl==='0px',cs);
   ok('vúmetros: texto de pico ≈ −6 dBFS',(await p.textContent('#mtxt')).includes('−')===false&&(await p.textContent('#mtxt')).includes('-6'),await p.textContent('#mtxt'));
   const fake=async(o)=>{await p.route('**/api/levels',r=>r.fulfill({contentType:'application/json',body:JSON.stringify(Object.assign({capturing:true,signal:true,signal_age_ms:10,pps:900,sending:true,nodes_online:5,db:[-6,-6,-12,-90,-12,-90,-90,-90,-90,-90]},o))}));};
   await fake({capturing:false,signal:false,sending:false,db:[-90,-90,-90,-90,-90,-90,-90,-90,-90,-90]});
-  ok('estado: sin captura -> «Sin captura de la Traktor» (rojo) y barras atenuadas',await until(async()=>(await p.textContent('#hs'))==='Sin captura de la Traktor'&&(await p.getAttribute('#dot','class')).includes('bad')&&(await p.getAttribute('#meters','class')).includes('off')));
+  ok('estado: sin captura -> «Sin captura de la Traktor» (rojo) y barras atenuadas',await until(async()=>(await p.textContent('#hs'))==='Sin captura de la Traktor'&&(await p.getAttribute('#dot','class')).includes('bad')&&(await p.getAttribute('#meters','class')).includes('off')&&(await p.locator('#mb .seg.on').count())===0));
   await fake({signal:false,sending:false,db:[-90,-90,-90,-90,-90,-90,-90,-90,-90,-90]});
   ok('estado: silencio -> «Traktor conectada, sin señal» (ámbar)',await until(async()=>(await p.textContent('#hs'))==='Traktor conectada, sin señal'&&(await p.getAttribute('#dot','class')).includes('warn')&&(await p.textContent('#mtxt'))==='Silencio'));
   await fake({sending:false,nodes_online:0});
   ok('estado: señal sin altavoces -> «Hay señal, ningún altavoz en línea»',await until(async()=>(await p.textContent('#hs'))==='Hay señal, ningún altavoz en línea'));
   await fake({db:[-0.5,-6,-12,-90,-12,-90,-90,-90,-90,-90]});
-  ok('vúmetros: clip (≥ −1 dBFS) enciende el indicador del canal y pone la barra en rojo',await until(async()=>(await p.getAttribute('#mcl0','class')).includes('on')&&(await p.getAttribute('#mf0','class')).includes('clip')));
+  ok('vúmetros: clip (≥ −1 dBFS) enciende el indicador del canal y los 2 LED rojos',await until(async()=>(await p.getAttribute('#mcl0','class')).includes('on')&&(await p.locator('#mb .bar').first().locator('.seg.r.on').count())===2));
   if(SHOTS)await p.screenshot({path:SHOTS+'/panel_vumetros_clip.png'});
   await p.unroute('**/api/levels');
   ok('estado: vuelve a «Transmitiendo» al restablecerse',await until(async()=>(await p.textContent('#hs')).startsWith('Transmitiendo')));
