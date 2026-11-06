@@ -200,6 +200,7 @@ async def provision(req):
     if not 1 <= len(ssid.encode()) <= 32: return {"error": "SSID vacío o de más de 32 bytes"}
     if pw and not 8 <= len(pw.encode()) <= 63: return {"error": "La contraseña debe tener entre 8 y 63 caracteres"}
     perr = None
+    applied = False                                   # «apply» enviado: el ESP guarda y se reinicia, así que cualquier corte posterior es normal
     try:
         async with pairing_agent() as ag:
             await ag.forget(addr)
@@ -209,11 +210,11 @@ async def provision(req):
                 await write(c, C_SSID, ssid.encode())
                 if rpi: await write(c, C_RPI, rpi.encode())
                 if pw: await write(c, C_PASS, pw.encode())
-                try:
-                    await write(c, C_CMD, b"apply")   # el ESP se reinicia y puede cortar la conexión antes de responder
-                except Exception as e:
-                    if "disconnect" not in str(e).lower() and "not connected" not in str(e).lower(): raise
+                applied = True
+                with contextlib.suppress(Exception):  # el reinicio corta la conexión antes de responder (BlueZ usa textos muy variados)
+                    await write(c, C_CMD, b"apply")
     except Exception as e:
+        if applied: return {"ok": True}               # también si falla al cerrar la conexión, que el ESP ya reinició
         return {"error": "No se pudo configurar: %s" % _with_pair_error(e, perr)}
     return {"ok": True}
 
