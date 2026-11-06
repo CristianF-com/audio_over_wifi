@@ -25,6 +25,7 @@ int main() {
         CHECK("setNodePos válida", a.setNodePos(3, 12.5f, 80.0f));
         CHECK("setNodePos fuera de rango/NaN/id inválido rechazada", !a.setNodePos(3, 101, 5) && !a.setNodePos(3, 5, -2) && !a.setNodePos(3, NAN, 5) && !a.setNodePos(10, 5, 5) && a.getNodes()[3].pos_x == 12.5f);
         CHECK("posición por defecto automática", a.getNodes()[4].pos_x < 0 && a.getNodes()[4].pos_y < 0);
+        CHECK("setNodePos canal derecho (pos2) independiente", a.setNodePos(3, 70, 20, 1) && a.getNodes()[3].pos2_x == 70.0f && a.getNodes()[3].pos_x == 12.5f && !a.setNodePos(3, 5, 5, 2));
         a.setNodePos(5, 40, 30); a.setNodePos(5, -1, -1);
         CHECK("setNodePos(-1,-1) vuelve a automática", a.getNodes()[5].pos_x < 0 && a.getNodes()[5].pos_y < 0);
         a.setNodeConfig(7, 3, 9, 90, 200, true, true);          // mono: ch_right=ch_left, vol_r=vol_l
@@ -46,7 +47,7 @@ int main() {
         CHECK("nodo 7 mono persistido (canal 3, vol 90, habilitado)", n[7].mono && n[7].ch_left == 3 && n[7].ch_right == 3 && n[7].volume_l == 90 && n[7].volume_r == 90 && n[7].enabled);
         CHECK("layout personalizada persistida", b.layout() == LAYOUT_CUSTOM);
         CHECK("roles persistidos (nodo 2 sub, nodo 4 satélite, resto completo)", n[2].role == ROLE_SUB && n[4].role == ROLE_SAT && n[0].role == ROLE_FULL);
-        CHECK("posición persistida (nodo 3 = 12.5, 80); el resto sigue automático", n[3].pos_x == 12.5f && n[3].pos_y == 80.0f && n[0].pos_x < 0 && n[5].pos_x < 0);
+        CHECK("posición persistida (nodo 3 = 12.5, 80); el resto sigue automático", n[3].pos_x == 12.5f && n[3].pos_y == 80.0f && n[3].pos2_x == 70.0f && n[3].pos2_y == 20.0f && n[0].pos2_x < 0 && n[0].pos_x < 0 && n[5].pos_x < 0);
         CHECK("EQ persistido (nodo 3)", n[3].eq_db[0] == 1.5f && n[3].eq_db[1] == -2.25f && n[3].eq_db[4] == 6.0f && n[3].eq_db[5] == -12.0f && n[0].eq_db[0] == 0);
         CHECK("flags de procesado persistidos (crossover y EQ activos)", b.xoverOn() && b.eqOn());
         CHECK("crossover persistido (110 Hz) y extra lip-sync (−7 ms)", b.xoverHz() == 110.0f && b.lipsyncExtraMs() == -7);

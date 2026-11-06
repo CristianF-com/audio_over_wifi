@@ -15,12 +15,14 @@ static const char PAGE_PANEL[] = R"HTML(<!DOCTYPE html>
 <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
 <script>if('serviceWorker' in navigator&&window.isSecureContext)addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});</script>
-<script>/* Tema de la interfaz: «dark» (por defecto), «light» o «auto» (sigue al sistema). Se guarda en localStorage (por navegador).
-   Se ejecuta en el <head> (antes de pintar) para que no haya destello; los botones [data-theme-btn] rotan Oscuro → Claro → Automático. */
+<script>/* Tema de la interfaz: «dark» (por defecto), «graphite», «light» o «auto» (sigue al sistema; resuelve a dark o light). Se guarda en localStorage (por navegador).
+   Se ejecuta en el <head> (antes de pintar) para que no haya destello; los botones [data-theme-btn] rotan Oscuro → Grafito → Claro → Automático. */
 (function () {
-  var KEY = 'sonos_theme', ORDER = ['dark', 'light', 'auto'], NAME = { dark: 'Oscuro', light: 'Claro', auto: 'Automático' };
+  var KEY = 'sonos_theme', ORDER = ['dark', 'graphite', 'light', 'auto'], NAME = { dark: 'Oscuro', graphite: 'Grafito', light: 'Claro', auto: 'Automático' };
+  var META = { dark: '#000000', graphite: '#1c1c1e', light: '#d5d9e0' };
   var ICON = {
     dark: '<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>',
+    graphite: '<rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="M3.5 14h17" /><path d="M3.5 14v2a3 3 0 0 0 3 3h11a3 3 0 0 0 3-3v-2z" fill="currentColor"/>',
     light: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
     auto: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor"/>'
   };
@@ -29,7 +31,7 @@ static const char PAGE_PANEL[] = R"HTML(<!DOCTYPE html>
   function apply() {
     var p = pref(), t = p === 'auto' ? (mq && mq.matches ? 'light' : 'dark') : p;
     document.documentElement.setAttribute('data-theme', t);
-    var m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', t === 'light' ? '#f3f5f9' : '#000000');
+    var m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', META[t]);
     var bs = document.querySelectorAll('[data-theme-btn]');
     for (var i = 0; i < bs.length; i++) {
       var b = bs[i];
@@ -64,18 +66,27 @@ static const char PAGE_PANEL[] = R"HTML(<!DOCTYPE html>
   --led-g:#30d158; --led-y:#ffd60a; --led-r:#ff453a;
   color-scheme:dark;
 }
-/* Tema claro (se activa con data-theme="light" en <html>; el script del <head> resuelve «Automático» según el sistema) */
+/* Temas alternativos: data-theme="graphite" (gris grafito, de bajo brillo) y "light" (claro suave, sin blanco puro).
+   El script del <head> (theme.js) resuelve «Automático» según el sistema. */
+html[data-theme=graphite]{
+  --bg:#1c1c1e; --panel:#2b2b2d; --raise:#363639; --line:#3d3d41; --line2:#4c4c51;
+  --fg:#e9e9ec; --mut:#a3a3aa; --ac:#5aaeff; --ac-bg:rgba(90,174,255,.15); --ac-ln:rgba(90,174,255,.55);
+  --ctl:#8a8a91; --ok:#46d39a; --warn:#f0b64a; --bad:#ff7b72;
+  --on-ac:#06121f; --ac-hi:#a5d3ff; --ac-lo:#3478b8; --bad-fg:#ffb4ae; --bad-ln:rgba(255,123,114,.5); --warn-ln:rgba(240,182,74,.45);
+  --top-bg:rgba(28,28,30,.9); --top-solid:#1c1c1e; --tabs-bg:rgba(43,43,45,.95); --scrim:rgba(0,0,0,.5); --code-bg:#1f1f21; --bar-bg:#18181a; --cl-off:#4a2a28;
+  --thumb:#f2f2f4; --thumb-ring:rgba(90,174,255,.4); --cap-bg:rgba(28,28,30,.78); --glow:rgba(90,174,255,.07); --orb-glow:rgba(90,174,255,.35);
+  --led-g:#34c759; --led-y:#ffd60a; --led-r:#ff5a50;
+  color-scheme:dark;
+}
 html[data-theme=light]{
-  --bg:#f3f5f9; --panel:#ffffff; --raise:#eef1f6; --line:#dfe4ec; --line2:#c5cddb;
-  --fg:#10151d; --mut:#556072; --ac:#0a60bf; --ac-bg:rgba(10,96,191,.10); --ac-ln:rgba(10,96,191,.45);
-  --ctl:#7b879c; --ok:#136f46; --warn:#8f5700; --bad:#c4302b;
-  --on-ac:#ffffff; --ac-hi:#4aa3ff; --ac-lo:#7fb4ec; --bad-fg:#9b1c18; --bad-ln:rgba(196,48,43,.5); --warn-ln:rgba(154,93,0,.45);
-  --top-bg:rgba(243,245,249,.9); --top-solid:#f3f5f9; --tabs-bg:rgba(255,255,255,.94); --scrim:rgba(16,21,29,.35); --code-bg:#e9edf4; --bar-bg:#0b0e14; --cl-off:#e8c9c7;
-  --thumb:#fff; --thumb-ring:rgba(10,96,191,.35); --cap-bg:rgba(255,255,255,.85); --glow:rgba(11,111,216,.07); --orb-glow:rgba(11,111,216,.3);
+  --bg:#d5d9e0; --panel:#e4e7ec; --raise:#d9dde4; --line:#c3c8d1; --line2:#aab1bd;
+  --fg:#1a1f27; --mut:#4b5465; --ac:#0a58ac; --ac-bg:rgba(10,88,172,.11); --ac-ln:rgba(10,88,172,.45);
+  --ctl:#667184; --ok:#0f6240; --warn:#7a4a00; --bad:#a82620;
+  --on-ac:#ffffff; --ac-hi:#4aa3ff; --ac-lo:#7fa9d6; --bad-fg:#8f1a16; --bad-ln:rgba(179,42,37,.5); --warn-ln:rgba(138,83,0,.45);
+  --top-bg:rgba(213,217,224,.92); --top-solid:#d5d9e0; --tabs-bg:rgba(228,231,236,.95); --scrim:rgba(26,31,39,.35); --code-bg:#cfd4dc; --bar-bg:#0b0e14; --cl-off:#e0c3c1;
+  --thumb:#f4f5f8; --thumb-ring:rgba(10,88,172,.35); --cap-bg:rgba(228,231,236,.88); --glow:rgba(10,88,172,.06); --orb-glow:rgba(10,88,172,.3);
   --led-g:#1fa84a; --led-y:#d9a400; --led-r:#e0342b;
   color-scheme:light;
-}
-  --font:system-ui,-apple-system,"Segoe UI Variable Text","Segoe UI","Helvetica Neue",Roboto,sans-serif;   /* tipografía del sistema (SF en Apple) */
 }
 *{box-sizing:border-box;margin:0}
 html{font-size:106.25%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
@@ -92,9 +103,9 @@ h2{font-size:1.02rem;font-weight:650}
 .mut{color:var(--mut)}
 .small{font-size:.86rem}
 
-.btn{appearance:none;border:0;background:var(--ac);color:var(--on-ac);font-weight:650;padding:10px 18px;border-radius:10px;min-height:42px;
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;line-height:1.2;font-family:inherit;appearance:none;border:0;background:var(--ac);color:var(--on-ac);font-weight:650;padding:10px 18px;border-radius:10px;min-height:42px;
   transition:filter .12s,transform .06s}
-.btn:hover{filter:brightness(1.1)}.btn:active{transform:translateY(1px)}
+.btn:hover{filter:brightness(1.1);text-decoration:none}.btn:active{transform:translateY(1px)}
 .btn.ghost{background:var(--raise);color:var(--fg);border:1px solid var(--ctl);font-weight:550}
 .btn.danger{background:transparent;color:var(--bad);border:1px solid var(--bad-ln);font-weight:550}
 .btn.sm{padding:6px 12px;min-height:34px;font-size:.88rem;border-radius:8px}
@@ -168,7 +179,8 @@ label,.lbl{display:block;color:var(--mut);font-size:.86rem;margin-bottom:5px}
 /* Ajustes de accesibilidad del sistema */
 @media (prefers-contrast:more){
   :root{--mut:#b4bccc;--ctl:#8d9ab3;--line2:#6b7a96;--ac:#7ec0ff;--ac-ln:rgba(126,192,255,.8)}
-  html[data-theme=light]{--mut:#3b4556;--ctl:#566176;--line2:#8a95a8;--ac:#0a5cb5;--ac-ln:rgba(10,92,181,.8)}
+  html[data-theme=light]{--mut:#323b4a;--ctl:#4a5468;--line2:#7d8798;--ac:#0a4f99;--ac-ln:rgba(10,79,153,.8)}
+  html[data-theme=graphite]{--mut:#c6c6cc;--ctl:#a8a8af;--line2:#7d7d84;--ac:#8cc6ff;--ac-ln:rgba(140,198,255,.8)}
 }
 @media (prefers-reduced-transparency:reduce){
   .top{background:var(--top-solid);backdrop-filter:none;-webkit-backdrop-filter:none}
@@ -189,46 +201,43 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 .head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 .head h1{margin-right:auto}
 
-/* Plano de sala */
+/* Plano de sala: cada canal es un altavoz dibujado; se coloca donde está en la sala */
 .roombar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .roombar .hint{margin-right:auto;min-width:200px;flex:1}
-.room{user-select:none;-webkit-user-select:none;position:relative;width:100%;aspect-ratio:16/9;min-height:340px;border:1px solid var(--line);border-radius:20px;overflow:hidden;
+.room{--hw:64px;--ht:80px;--hb:58px;user-select:none;-webkit-user-select:none;position:relative;width:100%;aspect-ratio:16/9;min-height:360px;border:1px solid var(--line);border-radius:20px;overflow:hidden;
   background:
     linear-gradient(var(--line) 1px,transparent 1px) 0 0/10% 12.5%,linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/10% 12.5%,
     radial-gradient(ellipse 70% 60% at 50% 62%,var(--glow),transparent 70%),var(--panel)}
 .room>*{z-index:1}
 .dragging,.dragging *{user-select:none!important;-webkit-user-select:none!important}
 .room.edit{border-color:var(--ac-ln);box-shadow:0 0 0 3px var(--ac-bg)}
-.rl{position:absolute;font-size:.72rem;color:var(--mut);pointer-events:none;letter-spacing:.02em}
-.rl.back{left:12px;bottom:8px}
-.me small{position:absolute;top:calc(100% + 3px);left:50%;transform:translateX(-50%);font-size:.7rem;color:var(--mut);white-space:nowrap}
-.room.edit .spk{cursor:grab;touch-action:none}
-.room.edit .spk.drag{cursor:grabbing;z-index:5}
-.room.edit .spk .orb{border-style:dashed;border-color:var(--ac)}
-.room.edit .spk.drag .orb{transform:scale(1.12);box-shadow:0 0 0 5px var(--ac-bg),0 0 26px var(--orb-glow)}
-.room svg.lines{position:absolute;inset:0;width:100%;height:100%}
-.room .ring{fill:none;stroke:var(--line);stroke-width:1;vector-effect:non-scaling-stroke}
-.room .ln{stroke:var(--ac);stroke-opacity:.22;stroke-width:1;stroke-dasharray:3 5;vector-effect:non-scaling-stroke}
-.room .ln.pair{stroke-opacity:.35;stroke-dasharray:none}
-.gd{position:absolute;transform:translate(-50%,-50%);font-size:.7rem;color:var(--ac);border:1px solid var(--ac-ln);background:var(--ac-bg);border-radius:8px;padding:1px 6px;z-index:1}
-.gd.off{color:var(--mut);border-color:var(--line2);background:transparent}
-.room .ln.off{stroke:var(--line2);stroke-opacity:.5}
-.me{position:absolute;left:50%;top:76%;transform:translate(-50%,-50%);width:46px;height:46px;border-radius:50%;border:1px solid var(--line2);background:var(--raise);
+.rl{position:absolute;font-size:.72rem;color:var(--mut);pointer-events:none}
+.rl.back{left:50%;bottom:6px;transform:translateX(-50%)}
+.me{position:absolute;left:50%;top:78%;transform:translate(-50%,-50%);width:46px;height:46px;border-radius:50%;border:1px solid var(--line2);background:var(--raise);
   display:grid;place-items:center;color:var(--mut)}
 .me svg{width:22px;height:22px}
+.me small{position:absolute;top:calc(100% + 3px);left:50%;transform:translateX(-50%);font-size:.7rem;color:var(--mut);white-space:nowrap}
 .screen{position:absolute;left:30%;right:30%;top:1.5%;height:18px;border-radius:5px;background:var(--ctl);display:grid;place-items:center;font-size:.68rem;font-weight:600;color:var(--bg);letter-spacing:.03em}
-.spk{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:0;padding:0;color:var(--fg);z-index:2}
-.orb{position:relative;width:58px;height:58px;border-radius:50%;background:var(--raise);border:1.5px solid var(--ac-ln);display:grid;place-items:center;
-  font-weight:700;font-size:1.15rem;transition:transform .12s,border-color .12s,box-shadow .12s}
-.spk:hover .orb{transform:scale(1.06)}
-.spk[aria-expanded=true] .orb{border-color:var(--ac);box-shadow:0 0 0 4px var(--ac-bg),0 0 26px var(--orb-glow)}
-.spk.sub .orb{border-radius:16px}
-.spk.off .orb{border-style:dashed;border-color:var(--line2);color:var(--mut);background:transparent}
-.spk .st{position:absolute;right:-1px;top:-1px;width:13px;height:13px;border-radius:50%;border:2px solid var(--panel);background:var(--bad)}
+.spk{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:0;padding:4px 6px;color:var(--fg);z-index:2;border-radius:12px}
+.cab{position:relative;display:block;width:46px;height:62px;transition:transform .12s}
+.spk.sub .cab{width:56px;height:56px}
+.cab svg{width:100%;height:100%;display:block;overflow:visible}
+.cab .body{fill:var(--raise);stroke:var(--ac);stroke-width:1.6}
+.cab .tw{fill:var(--panel);stroke:var(--ctl);stroke-width:1.4}
+.cab .wf{fill:var(--panel);stroke:var(--ctl);stroke-width:1.6}
+.cab .cone{fill:var(--ctl)}
+.spk:hover .cab{transform:scale(1.05)}
+.spk[aria-expanded=true]{outline:2px solid var(--ac);outline-offset:0;background:var(--ac-bg)}
+.spk.off .cab{opacity:.5}
+.spk.off .cab .body{stroke:var(--ctl);stroke-dasharray:4 3}
+.spk .st{position:absolute;right:-5px;top:-5px;width:14px;height:14px;border-radius:50%;border:2px solid var(--panel);background:var(--bad)}
 .spk .st.on{background:var(--ok)}
-.spk .cap{font-size:.78rem;color:var(--mut);background:var(--cap-bg);padding:1px 7px;border-radius:6px;white-space:nowrap}
-.spk .lv{position:absolute;bottom:-1px;left:50%;transform:translateX(-50%);width:34px;height:3px;border-radius:2px;background:var(--line2);overflow:hidden}
-.spk .lv i{display:block;height:100%;background:var(--ac);width:0}
+.spk .ch{font-size:1.02rem;font-weight:700;letter-spacing:.01em;line-height:1.1}
+.spk .cap{display:flex;align-items:center;gap:5px;font-size:.72rem;color:var(--mut);background:var(--cap-bg);padding:1px 6px;border-radius:6px;white-space:nowrap}
+.spk .cap .dot{width:7px;height:7px}
+.room.edit .spk{cursor:grab;touch-action:none;outline:1.5px dashed var(--ac-ln);outline-offset:0}
+.room.edit .spk.drag{cursor:grabbing;z-index:5;outline:2px solid var(--ac);background:var(--ac-bg)}
+.room.edit .spk.drag .cab{transform:scale(1.1)}
 .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;color:var(--mut);font-size:.85rem}
 .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
 .chips button{appearance:none;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 14px 7px 11px;display:flex;align-items:center;gap:8px;min-height:38px}
@@ -328,8 +337,8 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   .top .in{padding:8px 12px;gap:8px}
   .mv{order:5;flex:1 1 100%;margin-left:0}
   .links{margin-left:auto}
-  .room{aspect-ratio:3/5;min-height:520px}
-  .orb{width:50px;height:50px;font-size:1rem}
+  .room{aspect-ratio:9/16;min-height:640px;--hw:54px;--ht:78px;--hb:56px}
+  .cab{width:40px;height:54px}.spk.sub .cab{width:48px;height:48px}.spk .ch{font-size:.92rem}.spk .cap{font-size:.66rem;padding:1px 4px}
   .tiles,.cards{grid-template-columns:1fr}
   .drawer{top:auto;width:100%;max-height:88vh;border-left:0;border-top:1px solid var(--line2);border-radius:20px 20px 0 0;transform:translateY(102%)}
   .drawer.on{transform:none}
@@ -373,14 +382,11 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
     <button class="btn ghost sm" id="mreset" hidden>Restablecer posiciones</button>
     <button class="btn ghost sm" id="medit" aria-pressed="false" aria-describedby="mhint">Mover altavoces</button></div>
   <div class="room" id="room" aria-label="Plano de la sala con los altavoces">
-    <svg class="lines" id="lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-      <ellipse class="ring" cx="50" cy="76" rx="22" ry="17"/><ellipse class="ring" cx="50" cy="76" rx="42" ry="30"/>
-    </svg>
     <div class="screen" title="Pantalla">Pantalla</div><span class="rl back">Atrás</span>
     <div class="me" title="Posición de escucha"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg><small>Escucha</small></div>
     <div id="spks"></div>
   </div>
-  <div class="legend"><span>Cuadrado = subwoofer</span><span>Punto verde = en línea</span><span>Línea = hacia la posición de escucha</span></div>
+  <div class="legend"><span>Cada altavoz muestra su canal, el ESP que lo maneja y su estado</span><span>Los graves (subwoofer) se dibujan como caja cuadrada</span></div>
   <div class="chips" id="chips"></div>
 </section>
 
@@ -458,12 +464,11 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
 <script>
 const CH=['FL','FR','C','LFE','SL','SR','SBL','SBR','AUX-L','AUX-R'];
 const CHN=['Frontal izq.','Frontal der.','Central','Graves (LFE)','Lateral izq.','Lateral der.','Trasero izq.','Trasero der.','Extra izq.','Extra der.'];
-const POS=[[15,13],[85,13],[50,9],[6,34],[9,58],[91,58],[18,91],[82,91],[24,40],[76,40]];
-const LY=76;
+const POS=[[15,20],[85,20],[50,17],[50,37],[10,60],[90,60],[18,88],[82,88],[20,42],[80,42]];
 const EQF=['354 Hz','707 Hz','1,4 kHz','2,8 kHz','5,7 kHz','9,8 kHz'];
 const ROLES=['Rango completo','Satélite','Subwoofer'];
 const LYN=['5 ESP estéreo','10 ESP mono (1 por canal)','Personalizada'];
-let nodes=[],layout=0,st={},openId=null,sig='',editRoom=false,drag=null;
+let nodes=[],layout=0,st={},openId=null,sig='',editRoom=false,drag=null;const pend=new Set();
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pct=v=>Math.round(v/2.55);
@@ -521,10 +526,10 @@ async function loadStatus(){
   }catch(e){lvOK=false;lvTxt='';$('hs').textContent='Sin conexión';$('dot').className='dot bad';}
 }
 async function loadNodes(){
-  if(drag)return;
+  if(drag||pend.size)return;                                  // no pisar una posición recién movida que aún no se guardó
   try{nodes=await (await fetch('/api/nodes')).json();}catch(e){return;}
   const vis=nodes.filter(n=>n.enabled||n.online||layout!==0);
-  const s=JSON.stringify(vis.map(n=>[n.id,n.enabled,n.online,n.ch_left,n.ch_right,n.mono,n.role,n.ip,n.pos_x,n.pos_y]))+openId+layout+editRoom;
+  const s=JSON.stringify(vis.map(n=>[n.id,n.enabled,n.online,n.ch_left,n.ch_right,n.mono,n.role,n.ip,n.pos_x,n.pos_y,n.pos2_x,n.pos2_y]))+openId+layout+editRoom;
   if(s!==sig){sig=s;drawRoom();}
   else vis.forEach(n=>{const l=document.querySelector('#spks [data-id="'+n.id+'"] .lv i');if(l)l.style.width=Math.max(0,Math.min(100,n.fill_pct||0))+'%';});
   const on=nodes.filter(n=>n.enabled&&n.online).length,tot=nodes.filter(n=>n.enabled).length;
@@ -532,35 +537,61 @@ async function loadNodes(){
   drawHealth();drawSound();if(openId!==null)updDrawerStats();
 }
 const find=id=>nodes.find(n=>n.id===id);
-const hasPos=n=>n.pos_x>=0&&n.pos_y>=0;
-function nodePos(n){if(hasPos(n))return [n.pos_x,n.pos_y];const a=POS[n.ch_left]||[50,50],b=POS[n.ch_right]||a;return n.mono||n.ch_left===n.ch_right?a:[(a[0]+b[0])/2,(a[1]+b[1])/2];}
+/* Un nodo estéreo son dos altavoces (canal izquierdo y derecho); un nodo mono, uno. Cada uno tiene su propia posición. */
+const hasPos=(n,side)=>side?(n.pos2_x>=0&&n.pos2_y>=0):(n.pos_x>=0&&n.pos_y>=0);
+function units(n){
+  const u=[{n,side:0,ch:n.ch_left}];
+  if(!(n.mono||n.ch_left===n.ch_right))u.push({n,side:1,ch:n.ch_right});
+  return u;
+}
+function unitPos(u){
+  const n=u.n;
+  if(hasPos(n,u.side))return u.side?[n.pos2_x,n.pos2_y]:[n.pos_x,n.pos_y];
+  return POS[u.ch]||[50,50];
+}
 function nodeLabel(n){return n.mono||n.ch_left===n.ch_right?CH[n.ch_left]:CH[n.ch_left]+' + '+CH[n.ch_right];}
+const posCss=(x,y)=>'left:clamp(var(--hw),'+x+'%,calc(100% - var(--hw)));top:clamp(var(--ht),'+y+'%,calc(100% - var(--hb)))';
+function clampPos(x,y){   // el altavoz entero (dibujo + etiquetas) debe quedar dentro del plano
+  const r=$('room').getBoundingClientRect(),cs=getComputedStyle($('room')),g=k=>parseFloat(cs.getPropertyValue(k))||60;
+  const hw=g('--hw')/r.width*100,ht=g('--ht')/r.height*100,hb=g('--hb')/r.height*100;
+  return [clampN(x,hw,100-hw),clampN(y,ht,100-hb)];
+}
+const spkSvg=sub=>sub
+  ?'<svg viewBox="0 0 56 56" aria-hidden="true"><rect class="body" x="2" y="2" width="52" height="52" rx="8"/><circle class="wf" cx="28" cy="28" r="19"/><circle class="cone" cx="28" cy="28" r="7"/></svg>'
+  :'<svg viewBox="0 0 46 62" aria-hidden="true"><rect class="body" x="2" y="2" width="42" height="58" rx="8"/><circle class="tw" cx="23" cy="17" r="6"/><circle class="wf" cx="23" cy="42" r="13"/><circle class="cone" cx="23" cy="42" r="4.5"/></svg>';
 
 function drawRoom(){
+  const ae=document.activeElement,fk=ae&&ae.closest&&ae.closest('#spks .spk')?[ae.dataset.id,ae.dataset.side]:null;   // conserva el foco del teclado al redibujar
   const vis=nodes.filter(n=>n.enabled||n.online||layout!==0);
-  const used={};let h='',ln='';
-  let gh='';
-  vis.forEach(n=>{if(!n.enabled)return;let [x,y]=nodePos(n);const own=hasPos(n);
-    if(!own){const k=Math.round(x)+','+Math.round(y);used[k]=(used[k]||0)+1;x+=(used[k]-1)*5;y+=(used[k]-1)*7;}
-    ln+='<line class="ln'+(n.online?'':' off')+'" data-lid="'+n.id+'" x1="50" y1="'+LY+'" x2="'+x+'" y2="'+y+'"/>';
-    if(!own&&!(n.mono||n.ch_left===n.ch_right))[n.ch_left,n.ch_right].forEach(c=>{const g=POS[c]||[50,50];
-      ln+='<line class="ln pair" x1="'+x+'" y1="'+y+'" x2="'+g[0]+'" y2="'+g[1]+'"/>';
-      gh+='<span class="gd'+(n.online?'':' off')+'" style="left:'+g[0]+'%;top:'+g[1]+'%" title="'+CHN[c]+'">'+CH[c]+'</span>';});
-    h+='<button class="spk'+(n.role===2?' sub':'')+(n.online?'':' off')+'" data-id="'+n.id+'" aria-expanded="'+(openId===n.id)+'" style="left:'+x+'%;top:'+y+'%" aria-label="Altavoz '+n.id+', '+nodeLabel(n)+(editRoom?'. Mover con las flechas del teclado':'')+'">'+
-      '<span class="orb">'+n.id+'<i class="st'+(n.online?' on':'')+'"></i><span class="lv"><i style="width:'+Math.min(100,n.fill_pct||0)+'%"></i></span></span><span class="cap">'+nodeLabel(n)+(n.role===2?' · sub':n.role===1?' · sat':'')+'</span></button>';});
-  $('spks').innerHTML=gh+h||'<div class="empty" style="position:absolute;inset:0;display:grid;place-items:center">Aún no hay altavoces. Enciende un ESP32 o añádelo con «Añadir altavoz».</div>';
-  document.querySelectorAll('#lines .ln').forEach(e=>e.remove());$('lines').insertAdjacentHTML('beforeend',ln);
-  $('chips').innerHTML=vis.map(n=>'<button data-id="'+n.id+'" aria-expanded="'+(openId===n.id)+'"><i class="dot '+(n.online?'ok':'bad')+'"></i>#'+n.id+' · '+nodeLabel(n)+(n.enabled?'':' · apagado')+'</button>').join('');
+  const used={};let h='';
+  vis.forEach(n=>{if(!n.enabled)return;
+    units(n).forEach(u=>{
+      let [x,y]=unitPos(u);
+      if(!hasPos(n,u.side)){const k=Math.round(x)+','+Math.round(y);used[k]=(used[k]||0)+1;x+=(used[k]-1)*7;y+=(used[k]-1)*9;}
+      const nm=CH[u.ch],sub=n.role===2,state=n.online?'En línea':'Sin conexión';
+      h+='<button class="spk'+(sub?' sub':'')+(n.online?'':' off')+'" data-id="'+n.id+'" data-side="'+u.side+'" aria-expanded="'+(openId===n.id)+'" style="'+posCss(x,y)+'" '+
+        'aria-label="Altavoz '+nm+' ('+CHN[u.ch]+'), ESP '+n.id+', '+state.toLowerCase()+(editRoom?'. Mover con las flechas del teclado':'. Pulsa para ajustarlo')+'">'+
+        '<span class="cab">'+spkSvg(sub)+'<i class="st'+(n.online?' on':'')+'"></i></span>'+
+        '<b class="ch">'+nm+'</b><span class="cap"><i class="dot '+(n.online?'ok':'bad')+'"></i>ESP '+n.id+' · '+state+'</span></button>';
+    });
+  });
+  $('spks').innerHTML=h||'<div class="empty" style="position:absolute;inset:0;display:grid;place-items:center">Aún no hay altavoces. Enciende un ESP32 o añádelo con «Añadir altavoz».</div>';
+  $('chips').innerHTML=vis.map(n=>'<button data-id="'+n.id+'" aria-expanded="'+(openId===n.id)+'"><i class="dot '+(n.online?'ok':'bad')+'"></i>ESP '+n.id+' · '+nodeLabel(n)+(n.enabled?'':' · apagado')+'</button>').join('');
+  if(fk){const f=unitEl(+fk[0],+fk[1]);if(f)f.focus({preventScroll:true});}
   document.querySelectorAll('#spks .spk,#chips button').forEach(b=>b.onclick=()=>{if(editRoom&&b.classList.contains('spk'))return;openDrawer(+b.dataset.id);});
 }
 
-/* Colocar los altavoces en el plano: modo «Mover altavoces». La posición se guarda en la Raspberry (la ven todos los dispositivos). */
+/* Colocar los altavoces en el plano: modo «Mover altavoces». Cada altavoz (canal) se guarda por separado en la Raspberry. */
 const clampN=(v,a,b)=>Math.max(a,Math.min(b,v));
 const r1=v=>Math.round(v*10)/10;
-async function savePos(n){
-  const r=await J('/api/node',{id:n.id,pos_x:r1(n.pos_x),pos_y:r1(n.pos_y)});
+const posBody=(n,side,x,y)=>side?{id:n.id,pos2_x:r1(x),pos2_y:r1(y)}:{id:n.id,pos_x:r1(x),pos_y:r1(y)};
+const setLocal=(n,side,x,y)=>{if(side){n.pos2_x=x;n.pos2_y=y;}else{n.pos_x=x;n.pos_y=y;}};
+async function savePos(n,side){
+  const x=side?n.pos2_x:n.pos_x,y=side?n.pos2_y:n.pos_y;
+  const r=await J('/api/node',posBody(n,side,x,y));
   if(!r.ok){toast('No se pudo guardar la posición. Comprueba la conexión con la Raspberry.',false);sig='';loadNodes();}
 }
+const unitEl=(id,side)=>document.querySelector('#spks .spk[data-id="'+id+'"][data-side="'+side+'"]');
 function setEdit(on){
   editRoom=on;$('room').classList.toggle('edit',on);$('medit').setAttribute('aria-pressed',on);$('medit').textContent=on?'Listo':'Mover altavoces';
   $('mreset').hidden=!on;
@@ -570,27 +601,26 @@ function setEdit(on){
 }
 $('medit').onclick=()=>setEdit(!editRoom);
 $('mreset').onclick=async()=>{
-  const rs=await Promise.all(nodes.filter(n=>hasPos(n)).map(n=>J('/api/node',{id:n.id,pos_auto:true})));
+  const rs=await Promise.all(nodes.filter(n=>hasPos(n,0)||hasPos(n,1)).map(n=>J('/api/node',{id:n.id,pos_auto:true})));
   toast(rs.every(r=>r.ok)?'Posiciones restablecidas: cada altavoz vuelve al lugar de su canal':'No se pudieron restablecer todas las posiciones',rs.every(r=>r.ok));
   sig='';await loadNodes();
 };
 $('spks').addEventListener('pointerdown',e=>{
   if(!editRoom)return;const b=e.target.closest('.spk');if(!b)return;
   e.preventDefault();b.setPointerCapture(e.pointerId);b.classList.add('drag');document.body.classList.add('dragging');if(getSelection)getSelection().removeAllRanges();
-  const n=find(+b.dataset.id),r=$('room').getBoundingClientRect(),bb=b.getBoundingClientRect();
-  drag={id:n.id,b,pid:e.pointerId,moved:false,dx:(bb.left+bb.width/2-e.clientX),dy:(bb.top+bb.height/2-e.clientY)};
+  const bb=b.getBoundingClientRect();
+  drag={id:+b.dataset.id,side:+b.dataset.side,b,pid:e.pointerId,moved:false,dx:(bb.left+bb.width/2-e.clientX),dy:(bb.top+bb.height/2-e.clientY)};
 });
 $('spks').addEventListener('pointermove',e=>{
   if(!drag||e.pointerId!==drag.pid)return;
   const r=$('room').getBoundingClientRect(),n=find(drag.id);
-  n.pos_x=clampN((e.clientX+drag.dx-r.left)/r.width*100,4,96);n.pos_y=clampN((e.clientY+drag.dy-r.top)/r.height*100,7,93);drag.moved=true;
-  drag.b.style.left=n.pos_x+'%';drag.b.style.top=n.pos_y+'%';
-  const l=document.querySelector('#lines .ln[data-lid="'+n.id+'"]');if(l){l.setAttribute('x2',n.pos_x);l.setAttribute('y2',n.pos_y);}
+  const [x,y]=clampPos((e.clientX+drag.dx-r.left)/r.width*100,(e.clientY+drag.dy-r.top)/r.height*100);
+  setLocal(n,drag.side,x,y);drag.moved=true;drag.b.style.cssText=posCss(x,y);
 });
 const endDrag=async e=>{
   if(!drag||e.pointerId!==drag.pid)return;
   const d=drag;d.b.classList.remove('drag');document.body.classList.remove('dragging');
-  if(d.moved){await savePos(find(d.id));}
+  if(d.moved){await savePos(find(d.id),d.side);}
   drag=null;sig='';drawRoom();
 };
 $('spks').addEventListener('pointerup',endDrag);$('spks').addEventListener('pointercancel',endDrag);
@@ -598,10 +628,10 @@ const posT={};
 $('spks').addEventListener('keydown',e=>{
   if(!editRoom)return;const b=e.target.closest('.spk');if(!b)return;
   const k={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key];if(!k)return;
-  e.preventDefault();const n=find(+b.dataset.id),p=nodePos(n),s=e.shiftKey?5:1;
-  n.pos_x=clampN(p[0]+k[0]*s,4,96);n.pos_y=clampN(p[1]+k[1]*s,7,93);
-  drawRoom();const f=document.querySelector('#spks .spk[data-id="'+n.id+'"]');if(f)f.focus();
-  clearTimeout(posT[n.id]);posT[n.id]=setTimeout(()=>savePos(n),400);
+  e.preventDefault();const n=find(+b.dataset.id),side=+b.dataset.side,u=units(n)[side]||units(n)[0],p=unitPos(u),s=e.shiftKey?5:1;
+  setLocal(n,side,...clampPos(p[0]+k[0]*s,p[1]+k[1]*s));
+  drawRoom();const f=unitEl(n.id,side);if(f)f.focus();
+  const key=n.id+'_'+side;pend.add(key);clearTimeout(posT[key]);posT[key]=setTimeout(async()=>{await savePos(n,side);pend.delete(key);},400);
 });
 
 /* Cajón */
@@ -843,12 +873,14 @@ static const char PAGE_CAL[] = R"HTML(<!DOCTYPE html>
 <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
 <script>if('serviceWorker' in navigator&&window.isSecureContext)addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});</script>
-<script>/* Tema de la interfaz: «dark» (por defecto), «light» o «auto» (sigue al sistema). Se guarda en localStorage (por navegador).
-   Se ejecuta en el <head> (antes de pintar) para que no haya destello; los botones [data-theme-btn] rotan Oscuro → Claro → Automático. */
+<script>/* Tema de la interfaz: «dark» (por defecto), «graphite», «light» o «auto» (sigue al sistema; resuelve a dark o light). Se guarda en localStorage (por navegador).
+   Se ejecuta en el <head> (antes de pintar) para que no haya destello; los botones [data-theme-btn] rotan Oscuro → Grafito → Claro → Automático. */
 (function () {
-  var KEY = 'sonos_theme', ORDER = ['dark', 'light', 'auto'], NAME = { dark: 'Oscuro', light: 'Claro', auto: 'Automático' };
+  var KEY = 'sonos_theme', ORDER = ['dark', 'graphite', 'light', 'auto'], NAME = { dark: 'Oscuro', graphite: 'Grafito', light: 'Claro', auto: 'Automático' };
+  var META = { dark: '#000000', graphite: '#1c1c1e', light: '#d5d9e0' };
   var ICON = {
     dark: '<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>',
+    graphite: '<rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="M3.5 14h17" /><path d="M3.5 14v2a3 3 0 0 0 3 3h11a3 3 0 0 0 3-3v-2z" fill="currentColor"/>',
     light: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
     auto: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor"/>'
   };
@@ -857,7 +889,7 @@ static const char PAGE_CAL[] = R"HTML(<!DOCTYPE html>
   function apply() {
     var p = pref(), t = p === 'auto' ? (mq && mq.matches ? 'light' : 'dark') : p;
     document.documentElement.setAttribute('data-theme', t);
-    var m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', t === 'light' ? '#f3f5f9' : '#000000');
+    var m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', META[t]);
     var bs = document.querySelectorAll('[data-theme-btn]');
     for (var i = 0; i < bs.length; i++) {
       var b = bs[i];
@@ -892,18 +924,27 @@ static const char PAGE_CAL[] = R"HTML(<!DOCTYPE html>
   --led-g:#30d158; --led-y:#ffd60a; --led-r:#ff453a;
   color-scheme:dark;
 }
-/* Tema claro (se activa con data-theme="light" en <html>; el script del <head> resuelve «Automático» según el sistema) */
+/* Temas alternativos: data-theme="graphite" (gris grafito, de bajo brillo) y "light" (claro suave, sin blanco puro).
+   El script del <head> (theme.js) resuelve «Automático» según el sistema. */
+html[data-theme=graphite]{
+  --bg:#1c1c1e; --panel:#2b2b2d; --raise:#363639; --line:#3d3d41; --line2:#4c4c51;
+  --fg:#e9e9ec; --mut:#a3a3aa; --ac:#5aaeff; --ac-bg:rgba(90,174,255,.15); --ac-ln:rgba(90,174,255,.55);
+  --ctl:#8a8a91; --ok:#46d39a; --warn:#f0b64a; --bad:#ff7b72;
+  --on-ac:#06121f; --ac-hi:#a5d3ff; --ac-lo:#3478b8; --bad-fg:#ffb4ae; --bad-ln:rgba(255,123,114,.5); --warn-ln:rgba(240,182,74,.45);
+  --top-bg:rgba(28,28,30,.9); --top-solid:#1c1c1e; --tabs-bg:rgba(43,43,45,.95); --scrim:rgba(0,0,0,.5); --code-bg:#1f1f21; --bar-bg:#18181a; --cl-off:#4a2a28;
+  --thumb:#f2f2f4; --thumb-ring:rgba(90,174,255,.4); --cap-bg:rgba(28,28,30,.78); --glow:rgba(90,174,255,.07); --orb-glow:rgba(90,174,255,.35);
+  --led-g:#34c759; --led-y:#ffd60a; --led-r:#ff5a50;
+  color-scheme:dark;
+}
 html[data-theme=light]{
-  --bg:#f3f5f9; --panel:#ffffff; --raise:#eef1f6; --line:#dfe4ec; --line2:#c5cddb;
-  --fg:#10151d; --mut:#556072; --ac:#0a60bf; --ac-bg:rgba(10,96,191,.10); --ac-ln:rgba(10,96,191,.45);
-  --ctl:#7b879c; --ok:#136f46; --warn:#8f5700; --bad:#c4302b;
-  --on-ac:#ffffff; --ac-hi:#4aa3ff; --ac-lo:#7fb4ec; --bad-fg:#9b1c18; --bad-ln:rgba(196,48,43,.5); --warn-ln:rgba(154,93,0,.45);
-  --top-bg:rgba(243,245,249,.9); --top-solid:#f3f5f9; --tabs-bg:rgba(255,255,255,.94); --scrim:rgba(16,21,29,.35); --code-bg:#e9edf4; --bar-bg:#0b0e14; --cl-off:#e8c9c7;
-  --thumb:#fff; --thumb-ring:rgba(10,96,191,.35); --cap-bg:rgba(255,255,255,.85); --glow:rgba(11,111,216,.07); --orb-glow:rgba(11,111,216,.3);
+  --bg:#d5d9e0; --panel:#e4e7ec; --raise:#d9dde4; --line:#c3c8d1; --line2:#aab1bd;
+  --fg:#1a1f27; --mut:#4b5465; --ac:#0a58ac; --ac-bg:rgba(10,88,172,.11); --ac-ln:rgba(10,88,172,.45);
+  --ctl:#667184; --ok:#0f6240; --warn:#7a4a00; --bad:#a82620;
+  --on-ac:#ffffff; --ac-hi:#4aa3ff; --ac-lo:#7fa9d6; --bad-fg:#8f1a16; --bad-ln:rgba(179,42,37,.5); --warn-ln:rgba(138,83,0,.45);
+  --top-bg:rgba(213,217,224,.92); --top-solid:#d5d9e0; --tabs-bg:rgba(228,231,236,.95); --scrim:rgba(26,31,39,.35); --code-bg:#cfd4dc; --bar-bg:#0b0e14; --cl-off:#e0c3c1;
+  --thumb:#f4f5f8; --thumb-ring:rgba(10,88,172,.35); --cap-bg:rgba(228,231,236,.88); --glow:rgba(10,88,172,.06); --orb-glow:rgba(10,88,172,.3);
   --led-g:#1fa84a; --led-y:#d9a400; --led-r:#e0342b;
   color-scheme:light;
-}
-  --font:system-ui,-apple-system,"Segoe UI Variable Text","Segoe UI","Helvetica Neue",Roboto,sans-serif;   /* tipografía del sistema (SF en Apple) */
 }
 *{box-sizing:border-box;margin:0}
 html{font-size:106.25%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
@@ -920,9 +961,9 @@ h2{font-size:1.02rem;font-weight:650}
 .mut{color:var(--mut)}
 .small{font-size:.86rem}
 
-.btn{appearance:none;border:0;background:var(--ac);color:var(--on-ac);font-weight:650;padding:10px 18px;border-radius:10px;min-height:42px;
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;line-height:1.2;font-family:inherit;appearance:none;border:0;background:var(--ac);color:var(--on-ac);font-weight:650;padding:10px 18px;border-radius:10px;min-height:42px;
   transition:filter .12s,transform .06s}
-.btn:hover{filter:brightness(1.1)}.btn:active{transform:translateY(1px)}
+.btn:hover{filter:brightness(1.1);text-decoration:none}.btn:active{transform:translateY(1px)}
 .btn.ghost{background:var(--raise);color:var(--fg);border:1px solid var(--ctl);font-weight:550}
 .btn.danger{background:transparent;color:var(--bad);border:1px solid var(--bad-ln);font-weight:550}
 .btn.sm{padding:6px 12px;min-height:34px;font-size:.88rem;border-radius:8px}
@@ -996,7 +1037,8 @@ label,.lbl{display:block;color:var(--mut);font-size:.86rem;margin-bottom:5px}
 /* Ajustes de accesibilidad del sistema */
 @media (prefers-contrast:more){
   :root{--mut:#b4bccc;--ctl:#8d9ab3;--line2:#6b7a96;--ac:#7ec0ff;--ac-ln:rgba(126,192,255,.8)}
-  html[data-theme=light]{--mut:#3b4556;--ctl:#566176;--line2:#8a95a8;--ac:#0a5cb5;--ac-ln:rgba(10,92,181,.8)}
+  html[data-theme=light]{--mut:#323b4a;--ctl:#4a5468;--line2:#7d8798;--ac:#0a4f99;--ac-ln:rgba(10,79,153,.8)}
+  html[data-theme=graphite]{--mut:#c6c6cc;--ctl:#a8a8af;--line2:#7d7d84;--ac:#8cc6ff;--ac-ln:rgba(140,198,255,.8)}
 }
 @media (prefers-reduced-transparency:reduce){
   .top{background:var(--top-solid);backdrop-filter:none;-webkit-backdrop-filter:none}
@@ -1311,12 +1353,14 @@ static const char PAGE_BLE[] = R"HTML(<!DOCTYPE html>
 <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
 <script>if('serviceWorker' in navigator&&window.isSecureContext)addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});</script>
-<script>/* Tema de la interfaz: «dark» (por defecto), «light» o «auto» (sigue al sistema). Se guarda en localStorage (por navegador).
-   Se ejecuta en el <head> (antes de pintar) para que no haya destello; los botones [data-theme-btn] rotan Oscuro → Claro → Automático. */
+<script>/* Tema de la interfaz: «dark» (por defecto), «graphite», «light» o «auto» (sigue al sistema; resuelve a dark o light). Se guarda en localStorage (por navegador).
+   Se ejecuta en el <head> (antes de pintar) para que no haya destello; los botones [data-theme-btn] rotan Oscuro → Grafito → Claro → Automático. */
 (function () {
-  var KEY = 'sonos_theme', ORDER = ['dark', 'light', 'auto'], NAME = { dark: 'Oscuro', light: 'Claro', auto: 'Automático' };
+  var KEY = 'sonos_theme', ORDER = ['dark', 'graphite', 'light', 'auto'], NAME = { dark: 'Oscuro', graphite: 'Grafito', light: 'Claro', auto: 'Automático' };
+  var META = { dark: '#000000', graphite: '#1c1c1e', light: '#d5d9e0' };
   var ICON = {
     dark: '<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>',
+    graphite: '<rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="M3.5 14h17" /><path d="M3.5 14v2a3 3 0 0 0 3 3h11a3 3 0 0 0 3-3v-2z" fill="currentColor"/>',
     light: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
     auto: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor"/>'
   };
@@ -1325,7 +1369,7 @@ static const char PAGE_BLE[] = R"HTML(<!DOCTYPE html>
   function apply() {
     var p = pref(), t = p === 'auto' ? (mq && mq.matches ? 'light' : 'dark') : p;
     document.documentElement.setAttribute('data-theme', t);
-    var m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', t === 'light' ? '#f3f5f9' : '#000000');
+    var m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', META[t]);
     var bs = document.querySelectorAll('[data-theme-btn]');
     for (var i = 0; i < bs.length; i++) {
       var b = bs[i];
@@ -1360,18 +1404,27 @@ static const char PAGE_BLE[] = R"HTML(<!DOCTYPE html>
   --led-g:#30d158; --led-y:#ffd60a; --led-r:#ff453a;
   color-scheme:dark;
 }
-/* Tema claro (se activa con data-theme="light" en <html>; el script del <head> resuelve «Automático» según el sistema) */
+/* Temas alternativos: data-theme="graphite" (gris grafito, de bajo brillo) y "light" (claro suave, sin blanco puro).
+   El script del <head> (theme.js) resuelve «Automático» según el sistema. */
+html[data-theme=graphite]{
+  --bg:#1c1c1e; --panel:#2b2b2d; --raise:#363639; --line:#3d3d41; --line2:#4c4c51;
+  --fg:#e9e9ec; --mut:#a3a3aa; --ac:#5aaeff; --ac-bg:rgba(90,174,255,.15); --ac-ln:rgba(90,174,255,.55);
+  --ctl:#8a8a91; --ok:#46d39a; --warn:#f0b64a; --bad:#ff7b72;
+  --on-ac:#06121f; --ac-hi:#a5d3ff; --ac-lo:#3478b8; --bad-fg:#ffb4ae; --bad-ln:rgba(255,123,114,.5); --warn-ln:rgba(240,182,74,.45);
+  --top-bg:rgba(28,28,30,.9); --top-solid:#1c1c1e; --tabs-bg:rgba(43,43,45,.95); --scrim:rgba(0,0,0,.5); --code-bg:#1f1f21; --bar-bg:#18181a; --cl-off:#4a2a28;
+  --thumb:#f2f2f4; --thumb-ring:rgba(90,174,255,.4); --cap-bg:rgba(28,28,30,.78); --glow:rgba(90,174,255,.07); --orb-glow:rgba(90,174,255,.35);
+  --led-g:#34c759; --led-y:#ffd60a; --led-r:#ff5a50;
+  color-scheme:dark;
+}
 html[data-theme=light]{
-  --bg:#f3f5f9; --panel:#ffffff; --raise:#eef1f6; --line:#dfe4ec; --line2:#c5cddb;
-  --fg:#10151d; --mut:#556072; --ac:#0a60bf; --ac-bg:rgba(10,96,191,.10); --ac-ln:rgba(10,96,191,.45);
-  --ctl:#7b879c; --ok:#136f46; --warn:#8f5700; --bad:#c4302b;
-  --on-ac:#ffffff; --ac-hi:#4aa3ff; --ac-lo:#7fb4ec; --bad-fg:#9b1c18; --bad-ln:rgba(196,48,43,.5); --warn-ln:rgba(154,93,0,.45);
-  --top-bg:rgba(243,245,249,.9); --top-solid:#f3f5f9; --tabs-bg:rgba(255,255,255,.94); --scrim:rgba(16,21,29,.35); --code-bg:#e9edf4; --bar-bg:#0b0e14; --cl-off:#e8c9c7;
-  --thumb:#fff; --thumb-ring:rgba(10,96,191,.35); --cap-bg:rgba(255,255,255,.85); --glow:rgba(11,111,216,.07); --orb-glow:rgba(11,111,216,.3);
+  --bg:#d5d9e0; --panel:#e4e7ec; --raise:#d9dde4; --line:#c3c8d1; --line2:#aab1bd;
+  --fg:#1a1f27; --mut:#4b5465; --ac:#0a58ac; --ac-bg:rgba(10,88,172,.11); --ac-ln:rgba(10,88,172,.45);
+  --ctl:#667184; --ok:#0f6240; --warn:#7a4a00; --bad:#a82620;
+  --on-ac:#ffffff; --ac-hi:#4aa3ff; --ac-lo:#7fa9d6; --bad-fg:#8f1a16; --bad-ln:rgba(179,42,37,.5); --warn-ln:rgba(138,83,0,.45);
+  --top-bg:rgba(213,217,224,.92); --top-solid:#d5d9e0; --tabs-bg:rgba(228,231,236,.95); --scrim:rgba(26,31,39,.35); --code-bg:#cfd4dc; --bar-bg:#0b0e14; --cl-off:#e0c3c1;
+  --thumb:#f4f5f8; --thumb-ring:rgba(10,88,172,.35); --cap-bg:rgba(228,231,236,.88); --glow:rgba(10,88,172,.06); --orb-glow:rgba(10,88,172,.3);
   --led-g:#1fa84a; --led-y:#d9a400; --led-r:#e0342b;
   color-scheme:light;
-}
-  --font:system-ui,-apple-system,"Segoe UI Variable Text","Segoe UI","Helvetica Neue",Roboto,sans-serif;   /* tipografía del sistema (SF en Apple) */
 }
 *{box-sizing:border-box;margin:0}
 html{font-size:106.25%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
@@ -1388,9 +1441,9 @@ h2{font-size:1.02rem;font-weight:650}
 .mut{color:var(--mut)}
 .small{font-size:.86rem}
 
-.btn{appearance:none;border:0;background:var(--ac);color:var(--on-ac);font-weight:650;padding:10px 18px;border-radius:10px;min-height:42px;
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;line-height:1.2;font-family:inherit;appearance:none;border:0;background:var(--ac);color:var(--on-ac);font-weight:650;padding:10px 18px;border-radius:10px;min-height:42px;
   transition:filter .12s,transform .06s}
-.btn:hover{filter:brightness(1.1)}.btn:active{transform:translateY(1px)}
+.btn:hover{filter:brightness(1.1);text-decoration:none}.btn:active{transform:translateY(1px)}
 .btn.ghost{background:var(--raise);color:var(--fg);border:1px solid var(--ctl);font-weight:550}
 .btn.danger{background:transparent;color:var(--bad);border:1px solid var(--bad-ln);font-weight:550}
 .btn.sm{padding:6px 12px;min-height:34px;font-size:.88rem;border-radius:8px}
@@ -1464,7 +1517,8 @@ label,.lbl{display:block;color:var(--mut);font-size:.86rem;margin-bottom:5px}
 /* Ajustes de accesibilidad del sistema */
 @media (prefers-contrast:more){
   :root{--mut:#b4bccc;--ctl:#8d9ab3;--line2:#6b7a96;--ac:#7ec0ff;--ac-ln:rgba(126,192,255,.8)}
-  html[data-theme=light]{--mut:#3b4556;--ctl:#566176;--line2:#8a95a8;--ac:#0a5cb5;--ac-ln:rgba(10,92,181,.8)}
+  html[data-theme=light]{--mut:#323b4a;--ctl:#4a5468;--line2:#7d8798;--ac:#0a4f99;--ac-ln:rgba(10,79,153,.8)}
+  html[data-theme=graphite]{--mut:#c6c6cc;--ctl:#a8a8af;--line2:#7d7d84;--ac:#8cc6ff;--ac-ln:rgba(140,198,255,.8)}
 }
 @media (prefers-reduced-transparency:reduce){
   .top{background:var(--top-solid);backdrop-filter:none;-webkit-backdrop-filter:none}
@@ -1639,8 +1693,8 @@ static const char PWA_MANIFEST[] = R"HTML({
 static const char PWA_SW[] = R"HTML(/* Service worker de SonosWiFi. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * 4a62b7a280 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-4a62b7a280';
+ * 604a61fa55 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-604a61fa55';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png'];
 
 self.addEventListener('install', e => {

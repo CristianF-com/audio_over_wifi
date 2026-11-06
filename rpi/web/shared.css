@@ -10,18 +10,27 @@
   --led-g:#30d158; --led-y:#ffd60a; --led-r:#ff453a;
   color-scheme:dark;
 }
-/* Tema claro (se activa con data-theme="light" en <html>; el script del <head> resuelve «Automático» según el sistema) */
+/* Temas alternativos: data-theme="graphite" (gris grafito, de bajo brillo) y "light" (claro suave, sin blanco puro).
+   El script del <head> (theme.js) resuelve «Automático» según el sistema. */
+html[data-theme=graphite]{
+  --bg:#1c1c1e; --panel:#2b2b2d; --raise:#363639; --line:#3d3d41; --line2:#4c4c51;
+  --fg:#e9e9ec; --mut:#a3a3aa; --ac:#5aaeff; --ac-bg:rgba(90,174,255,.15); --ac-ln:rgba(90,174,255,.55);
+  --ctl:#8a8a91; --ok:#46d39a; --warn:#f0b64a; --bad:#ff7b72;
+  --on-ac:#06121f; --ac-hi:#a5d3ff; --ac-lo:#3478b8; --bad-fg:#ffb4ae; --bad-ln:rgba(255,123,114,.5); --warn-ln:rgba(240,182,74,.45);
+  --top-bg:rgba(28,28,30,.9); --top-solid:#1c1c1e; --tabs-bg:rgba(43,43,45,.95); --scrim:rgba(0,0,0,.5); --code-bg:#1f1f21; --bar-bg:#18181a; --cl-off:#4a2a28;
+  --thumb:#f2f2f4; --thumb-ring:rgba(90,174,255,.4); --cap-bg:rgba(28,28,30,.78); --glow:rgba(90,174,255,.07); --orb-glow:rgba(90,174,255,.35);
+  --led-g:#34c759; --led-y:#ffd60a; --led-r:#ff5a50;
+  color-scheme:dark;
+}
 html[data-theme=light]{
-  --bg:#f3f5f9; --panel:#ffffff; --raise:#eef1f6; --line:#dfe4ec; --line2:#c5cddb;
-  --fg:#10151d; --mut:#556072; --ac:#0a60bf; --ac-bg:rgba(10,96,191,.10); --ac-ln:rgba(10,96,191,.45);
-  --ctl:#7b879c; --ok:#136f46; --warn:#8f5700; --bad:#c4302b;
-  --on-ac:#ffffff; --ac-hi:#4aa3ff; --ac-lo:#7fb4ec; --bad-fg:#9b1c18; --bad-ln:rgba(196,48,43,.5); --warn-ln:rgba(154,93,0,.45);
-  --top-bg:rgba(243,245,249,.9); --top-solid:#f3f5f9; --tabs-bg:rgba(255,255,255,.94); --scrim:rgba(16,21,29,.35); --code-bg:#e9edf4; --bar-bg:#0b0e14; --cl-off:#e8c9c7;
-  --thumb:#fff; --thumb-ring:rgba(10,96,191,.35); --cap-bg:rgba(255,255,255,.85); --glow:rgba(11,111,216,.07); --orb-glow:rgba(11,111,216,.3);
+  --bg:#d5d9e0; --panel:#e4e7ec; --raise:#d9dde4; --line:#c3c8d1; --line2:#aab1bd;
+  --fg:#1a1f27; --mut:#4b5465; --ac:#0a58ac; --ac-bg:rgba(10,88,172,.11); --ac-ln:rgba(10,88,172,.45);
+  --ctl:#667184; --ok:#0f6240; --warn:#7a4a00; --bad:#a82620;
+  --on-ac:#ffffff; --ac-hi:#4aa3ff; --ac-lo:#7fa9d6; --bad-fg:#8f1a16; --bad-ln:rgba(179,42,37,.5); --warn-ln:rgba(138,83,0,.45);
+  --top-bg:rgba(213,217,224,.92); --top-solid:#d5d9e0; --tabs-bg:rgba(228,231,236,.95); --scrim:rgba(26,31,39,.35); --code-bg:#cfd4dc; --bar-bg:#0b0e14; --cl-off:#e0c3c1;
+  --thumb:#f4f5f8; --thumb-ring:rgba(10,88,172,.35); --cap-bg:rgba(228,231,236,.88); --glow:rgba(10,88,172,.06); --orb-glow:rgba(10,88,172,.3);
   --led-g:#1fa84a; --led-y:#d9a400; --led-r:#e0342b;
   color-scheme:light;
-}
-  --font:system-ui,-apple-system,"Segoe UI Variable Text","Segoe UI","Helvetica Neue",Roboto,sans-serif;   /* tipografía del sistema (SF en Apple) */
 }
 *{box-sizing:border-box;margin:0}
 html{font-size:106.25%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
@@ -38,9 +47,9 @@ h2{font-size:1.02rem;font-weight:650}
 .mut{color:var(--mut)}
 .small{font-size:.86rem}
 
-.btn{appearance:none;border:0;background:var(--ac);color:var(--on-ac);font-weight:650;padding:10px 18px;border-radius:10px;min-height:42px;
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;line-height:1.2;font-family:inherit;appearance:none;border:0;background:var(--ac);color:var(--on-ac);font-weight:650;padding:10px 18px;border-radius:10px;min-height:42px;
   transition:filter .12s,transform .06s}
-.btn:hover{filter:brightness(1.1)}.btn:active{transform:translateY(1px)}
+.btn:hover{filter:brightness(1.1);text-decoration:none}.btn:active{transform:translateY(1px)}
 .btn.ghost{background:var(--raise);color:var(--fg);border:1px solid var(--ctl);font-weight:550}
 .btn.danger{background:transparent;color:var(--bad);border:1px solid var(--bad-ln);font-weight:550}
 .btn.sm{padding:6px 12px;min-height:34px;font-size:.88rem;border-radius:8px}
@@ -114,7 +123,8 @@ label,.lbl{display:block;color:var(--mut);font-size:.86rem;margin-bottom:5px}
 /* Ajustes de accesibilidad del sistema */
 @media (prefers-contrast:more){
   :root{--mut:#b4bccc;--ctl:#8d9ab3;--line2:#6b7a96;--ac:#7ec0ff;--ac-ln:rgba(126,192,255,.8)}
-  html[data-theme=light]{--mut:#3b4556;--ctl:#566176;--line2:#8a95a8;--ac:#0a5cb5;--ac-ln:rgba(10,92,181,.8)}
+  html[data-theme=light]{--mut:#323b4a;--ctl:#4a5468;--line2:#7d8798;--ac:#0a4f99;--ac-ln:rgba(10,79,153,.8)}
+  html[data-theme=graphite]{--mut:#c6c6cc;--ctl:#a8a8af;--line2:#7d7d84;--ac:#8cc6ff;--ac-ln:rgba(140,198,255,.8)}
 }
 @media (prefers-reduced-transparency:reduce){
   .top{background:var(--top-solid);backdrop-filter:none;-webkit-backdrop-filter:none}

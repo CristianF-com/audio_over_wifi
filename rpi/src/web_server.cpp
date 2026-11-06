@@ -473,6 +473,7 @@ std::string WebServer::getNodes() {
           << jbool("mono",    n.mono)     << ","
           << jnum("role",     n.role)     << ","
           << jnum("pos_x",    std::round(n.pos_x * 100.0) / 100.0) << "," << jnum("pos_y", std::round(n.pos_y * 100.0) / 100.0) << ","
+          << jnum("pos2_x", std::round(n.pos2_x * 100.0) / 100.0) << "," << jnum("pos2_y", std::round(n.pos2_y * 100.0) / 100.0) << ","
           << "\"eq\":[" ;
         for (int b = 0; b < EQ_BANDS; b++) o << (b ? "," : "") << std::round(n.eq_db[b] * 100.0) / 100.0;
         o << "],"
@@ -516,11 +517,17 @@ std::string WebServer::setNode(const std::string& b) {
     if (!streamer_.setNodeRole((uint8_t)id, (uint8_t)role)) return BAD;
     // Posición en el plano: «pos_x» y «pos_y» (0..100, % del plano) siempre juntos; «pos_auto»:true la devuelve a la posición según el canal.
     std::string sx = jsonGet(b, "pos_x"), sy = jsonGet(b, "pos_y"), sa = jsonGet(b, "pos_auto");
-    if (sa == "true" || sa == "1") { if (!streamer_.setNodePos((uint8_t)id, -1, -1)) return BAD; }
+    if (sa == "true" || sa == "1") { if (!streamer_.setNodePos((uint8_t)id, -1, -1, 0) || !streamer_.setNodePos((uint8_t)id, -1, -1, 1)) return BAD; }
     else if (!sx.empty() || !sy.empty()) {
         double px, py;
         if (!parseFloat(sx, 0, 100, px) || !parseFloat(sy, 0, 100, py)) return BAD;
-        if (!streamer_.setNodePos((uint8_t)id, (float)px, (float)py)) return BAD;
+        if (!streamer_.setNodePos((uint8_t)id, (float)px, (float)py, 0)) return BAD;
+    }
+    std::string tx = jsonGet(b, "pos2_x"), ty = jsonGet(b, "pos2_y");      // canal derecho (altavoz estéreo)
+    if (!tx.empty() || !ty.empty()) {
+        double qx, qy;
+        if (!parseFloat(tx, 0, 100, qx) || !parseFloat(ty, 0, 100, qy)) return BAD;
+        if (!streamer_.setNodePos((uint8_t)id, (float)qx, (float)qy, 1)) return BAD;
     }
     return "{\"ok\":true}";
 }

@@ -285,9 +285,14 @@ c, _ = http("POST", "/api/node", {"id": 0, "pos_x": 40});                check("
 c, _ = http("POST", "/api/node", {"id": 0, "pos_x": "abc", "pos_y": 5}); check("pos_x no numérico -> 400", c == 400, c)
 c, b2 = http("GET", "/api/nodes"); n0 = json.loads(b2)[0]
 check("las posiciones inválidas no modifican la guardada", (n0["pos_x"], n0["pos_y"]) == (12.5, 80.25), (n0["pos_x"], n0["pos_y"]))
+c, _ = http("POST", "/api/node", {"id": 0, "pos2_x": 77.5, "pos2_y": 33}); check("fijar posición del canal derecho -> 200", c == 200, c)
+c, b2 = http("GET", "/api/nodes"); n0 = json.loads(b2)[0]
+check("pos2 se devuelve y no toca la posición izquierda", (n0["pos2_x"], n0["pos2_y"], n0["pos_x"], n0["pos_y"]) == (77.5, 33, 12.5, 80.25), n0)
+c, _ = http("POST", "/api/node", {"id": 0, "pos2_x": 77.5});  check("pos2_x sin pos2_y -> 400", c == 400, c)
+c, _ = http("POST", "/api/node", {"id": 0, "pos2_x": 120, "pos2_y": 3}); check("pos2_x=120 -> 400", c == 400, c)
 c, _ = http("POST", "/api/node", {"id": 0, "pos_auto": True}); check("pos_auto -> 200", c == 200, c)
 c, b2 = http("GET", "/api/nodes"); n0 = json.loads(b2)[0]
-check("pos_auto devuelve la posición automática", n0["pos_x"] == -1 and n0["pos_y"] == -1, (n0["pos_x"], n0["pos_y"]))
+check("pos_auto devuelve la posición automática (ambos canales)", n0["pos_x"] == -1 and n0["pos_y"] == -1 and n0["pos2_x"] == -1 and n0["pos2_y"] == -1, (n0["pos_x"], n0["pos_y"]))
 
 # 11) REENVÍO (NACK) y límites
 print("\n-- reenvío de paquetes (NACK) --")

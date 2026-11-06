@@ -14,8 +14,8 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   await fetch(BASE+'/api/dsp',{method:'POST',body:JSON.stringify({xover:false,eq:false})});
   await fetch(BASE+'/api/layout',{method:'POST',body:JSON.stringify({layout:'stereo5'})});
   await p.goto(BASE+'/');await p.waitForSelector('#spks .spk');await sleep(1200);
-  const n=await p.locator('#spks .spk').count();ok('plano: un altavoz por nodo habilitado (5)',n===5,n);
-  ok('plano: nodos en línea (punto verde)',await p.locator('#spks .st.on').count()===5);
+  const n=await p.locator('#spks .spk').count();ok('plano: un altavoz dibujado por canal (5 ESP estéreo = 10)',n===10,n);
+  ok('plano: nodos en línea (punto verde)',await p.locator('#spks .st.on').count()===10);
   ok('estado: «5 de 5 en línea»',(await p.textContent('#onl')).includes('5 de 5'));
   // Estado de transmisión y vúmetros (datos reales del arnés: ch0/1 −6 dBFS, ch2 y ch4 −12 dBFS, el resto en silencio)
   ok('estado: «Transmitiendo · 5 altavoces»',await until(async()=>(await p.textContent('#hs')).includes('Transmitiendo · 5 altavoces')),await p.textContent('#hs'));
@@ -206,92 +206,114 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   await bp.fill('#pass','corta');await bp.click('#save');
   ok('BLE: valida la contraseña corta',(await bp.textContent('#res')).includes('8 y 63'));
   ok('BLE sin errores de JS',berr.length===0,berr);
-  // ── Tema claro / oscuro ──
+  // ── Temas: Oscuro, Grafito, Claro (suave) y Automático ──
   const lum=h=>{const m=h.match(/\d+/g).map(Number),f=v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4);};return .2126*f(m[0])+.7152*f(m[1])+.0722*f(m[2]);};
   const cr=(a,b)=>{const x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
-  const colors=()=>p.evaluate(()=>{const g=(el,pr)=>getComputedStyle(el)[pr];return {bg:g(document.body,'backgroundColor'),fg:g(document.body,'color'),
-    mut:g(document.querySelector('.hint'),'color'),panel:g(document.getElementById('room'),'backgroundColor'),
-    btn:g(document.querySelector('.btn:not(.ghost)')||document.body,'color'),theme:document.documentElement.dataset.theme,
-    meta:document.querySelector('meta[name=theme-color]').content,cs:getComputedStyle(document.documentElement).colorScheme};});
+  const rgbOf=hex=>{const h=hex.replace('#','');return 'rgb('+[0,2,4].map(i=>parseInt(h.substr(i,2),16)).join(',')+')';};
+  const colors=()=>p.evaluate(()=>{const g=(el,pr)=>getComputedStyle(el)[pr],v=k=>getComputedStyle(document.documentElement).getPropertyValue(k).trim();return {bg:g(document.body,'backgroundColor'),fg:g(document.body,'color'),
+    mut:g(document.querySelector('.hint'),'color'),panel:v('--panel'),ac:v('--ac'),ok:v('--ok'),bad:v('--bad'),warn:v('--warn'),onac:v('--on-ac'),
+    theme:document.documentElement.dataset.theme,meta:document.querySelector('meta[name=theme-color]').content,cs:getComputedStyle(document.documentElement).colorScheme};});
+  const setTheme=async t=>{await p.evaluate(t=>localStorage.setItem('sonos_theme',t),t);await p.reload();await p.waitForSelector('.spk');return colors();};
   await p.evaluate(()=>localStorage.removeItem('sonos_theme'));await p.reload();await p.waitForSelector('.spk');
   let c=await colors();
   ok('Tema: por defecto oscuro (fondo negro, theme-color #000000)',c.theme==='dark'&&c.bg==='rgb(0, 0, 0)'&&c.meta==='#000000'&&c.cs==='dark',c);
   ok('Tema: el botón existe y dice Oscuro',(await p.textContent('[data-theme-btn]')).includes('Oscuro'));
-  await p.click('[data-theme-btn]');c=await colors();
-  ok('Tema: un toque pasa a claro (fondo claro, texto oscuro, theme-color claro)',c.theme==='light'&&lum(c.bg)>.8&&lum(c.fg)<.1&&c.meta==='#f3f5f9'&&c.cs==='light',c);
-  ok('Tema claro: contraste texto/fondo ≥ 4,5 y texto atenuado ≥ 4,5',cr(c.fg,c.bg)>=4.5&&cr(c.mut,c.bg)>=4.5,[cr(c.fg,c.bg),cr(c.mut,c.bg)]);
-  ok('Tema claro: texto de botón primario sobre acento ≥ 4,5',await p.evaluate(()=>{const b=document.createElement('button');b.className='btn';document.body.appendChild(b);const s=getComputedStyle(b);const r=[s.color,s.backgroundColor];b.remove();return r;}).then(r=>cr(r[0],r[1])>=4.5));
-  ok('Tema claro: el acento (azul) sobre el fondo claro ≥ 4,5',await p.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--ac').trim()).then(v=>{const h=v.replace('#','');return cr('rgb('+[0,2,4].map(i=>parseInt(h.substr(i,2),16)).join(',')+')',c.bg)>=4.5;}));
-  ok('Tema claro: sin morado en los acentos',await p.evaluate(()=>['--ac','--bad','--ok','--warn'].every(k=>{const h=getComputedStyle(document.documentElement).getPropertyValue(k).trim().replace('#','');const r=parseInt(h.substr(0,2),16),g=parseInt(h.substr(2,2),16),b=parseInt(h.substr(4,2),16);return !(b>r&&r>g&&b>150&&r>100);})));
-  ok('Tema: guardado en localStorage',await p.evaluate(()=>localStorage.getItem('sonos_theme'))==='light');
-  if(SHOTS){await p.screenshot({path:SHOTS+'/tema_claro_panel.png',fullPage:false});}
-  await p.reload();await p.waitForSelector('.spk');c=await colors();
-  ok('Tema: persiste al recargar y sin destello (ya claro al cargar)',c.theme==='light');
-  await p.emulateMedia({colorScheme:'dark'});
-  await p.click('[data-theme-btn]');c=await colors();
-  ok('Tema: tercer toque = Automático; sigue al sistema (aquí oscuro)',(await p.textContent('[data-theme-btn]')).includes('Automático')&&c.theme==='dark',c);
+  const names=[];for(let i=0;i<4;i++){await p.click('[data-theme-btn]');names.push((await p.textContent('[data-theme-btn]')).trim());}
+  ok('Tema: el botón rota Grafito → Claro → Automático → Oscuro',JSON.stringify(names)==='["Grafito","Claro","Automático","Oscuro"]',names);
+  const noPurple=x=>['ac','bad','ok','warn'].every(k=>{const h=x[k].replace('#','');const r=parseInt(h.substr(0,2),16),g=parseInt(h.substr(2,2),16),b=parseInt(h.substr(4,2),16);return !(b>r&&r>g&&b>150&&r>100);});
+  for(const [t,meta,cs] of [['graphite','#1c1c1e','dark'],['light','#d5d9e0','light']]){
+    c=await setTheme(t);
+    ok('Tema '+t+': data-theme, theme-color y color-scheme correctos',c.theme===t&&c.meta===meta&&c.cs===cs,c);
+    ok('Tema '+t+': texto/fondo y texto atenuado ≥ 4,5:1',cr(c.fg,c.bg)>=4.5&&cr(c.mut,c.bg)>=4.5,[cr(c.fg,c.bg),cr(c.mut,c.bg)]);
+    ok('Tema '+t+': acento y estados (ok, aviso, error) ≥ 4,5:1 sobre el fondo',['ac','ok','warn','bad'].every(k=>cr(rgbOf(c[k]),c.bg)>=4.5),['ac','ok','warn','bad'].map(k=>[k,cr(rgbOf(c[k]),c.bg)]));
+    ok('Tema '+t+': texto del botón primario sobre el acento ≥ 4,5:1',cr(rgbOf(c.onac),rgbOf(c.ac))>=4.5,[c.onac,c.ac]);
+    ok('Tema '+t+': sin morado en los acentos',noPurple(c),c);
+    ok('Tema '+t+': persiste al recargar (sin destello)',await p.evaluate(()=>localStorage.getItem('sonos_theme'))===t&&c.theme===t);
+    if(SHOTS)await p.screenshot({path:SHOTS+'/tema_'+t+'_panel.png',fullPage:false});
+  }
+  c=await setTheme('light');
+  ok('Tema claro suave: ni el fondo ni las tarjetas son blanco (luminancia < 0,72 y < 0,80)',lum(c.bg)<0.72&&lum(rgbOf(c.panel))<0.80&&lum(c.bg)>0.4,[lum(c.bg),lum(rgbOf(c.panel))]);
+  c=await setTheme('graphite');
+  ok('Tema Grafito: gris, no negro puro (fondo entre 0,008 y 0,05 de luminancia)',lum(c.bg)>0.008&&lum(c.bg)<0.05,lum(c.bg));
+  await p.emulateMedia({colorScheme:'dark'});c=await setTheme('auto');
+  ok('Tema Automático: sigue al sistema (aquí oscuro)',(await p.textContent('[data-theme-btn]')).includes('Automático')&&c.theme==='dark',c);
   await p.emulateMedia({colorScheme:'light'});await sleep(200);c=await colors();
-  ok('Tema automático: cambia a claro cuando el sistema pasa a claro',c.theme==='light',c);
+  ok('Tema Automático: cambia a claro cuando el sistema pasa a claro',c.theme==='light',c);
   await p.emulateMedia({colorScheme:'dark'});await sleep(200);c=await colors();
-  ok('Tema automático: vuelve a oscuro',c.theme==='dark',c);
-  await p.click('[data-theme-btn]');ok('Tema: cuarto toque vuelve a oscuro',(await colors()).theme==='dark');
-  await p.evaluate(()=>localStorage.setItem('sonos_theme','light'));
-  for(const u of ['/calibrate','/ble']){const q=await ctx.newPage();await q.goto(BASE+u);ok('Tema claro compartido en '+u,await q.evaluate(()=>document.documentElement.dataset.theme)==='light'&&await q.locator('[data-theme-btn]').count()===1);await q.close();}
+  ok('Tema Automático: vuelve a oscuro',c.theme==='dark',c);
+  for(const u of ['/calibrate','/ble']){await p.evaluate(()=>localStorage.setItem('sonos_theme','graphite'));const q=await ctx.newPage();await q.goto(BASE+u);ok('Tema Grafito compartido en '+u,await q.evaluate(()=>document.documentElement.dataset.theme)==='graphite'&&await q.locator('[data-theme-btn]').count()===1);await q.close();}
+  // botones de cabecera: todos con la misma altura y alineados (antes «Calibrar» era un enlace desplazado)
   await p.evaluate(()=>localStorage.removeItem('sonos_theme'));await p.reload();await p.waitForSelector('.spk');
+  const hb=await p.evaluate(()=>['[data-theme-btn]','#lcal','#lble'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return [r.top,r.height];}));
+  ok('Cabecera: Calibrar, Añadir altavoces y Tema son botones alineados (misma altura y borde superior)',hb.every(x=>Math.abs(x[0]-hb[0][0])<1&&Math.abs(x[1]-hb[0][1])<1),hb);
+  ok('Cabecera: «Calibrar» no se subraya como enlace',await p.evaluate(()=>getComputedStyle(document.getElementById('lcal')).textDecorationLine)==='none');
 
-  // ── Plano de la sala: mover altavoces ──
-  const spkPos=async id=>p.evaluate(i=>{const e=document.querySelector('#spks .spk[data-id="'+i+'"]'),r=document.getElementById('room').getBoundingClientRect(),b=e.getBoundingClientRect();return [ (b.left+b.width/2-r.left)/r.width*100,(b.top+b.height/2-r.top)/r.height*100 ];},id);
-  ok('Plano: etiquetas Pantalla/Atrás/Escucha',(await p.textContent('.screen'))==='Pantalla'&&await p.locator('.rl.back').textContent()==='Atrás'&&(await p.textContent('.me small'))==='Escucha');
-  ok('Plano: fuera del modo mover, tocar un altavoz abre el cajón',await (async()=>{await p.click('#spks .spk[data-id="0"]');const o=await p.evaluate(()=>document.getElementById('drawer').classList.contains('on'));await p.click('#drawer .x');return o;})());
-  const before=await spkPos(0);const gd0=await p.locator('.gd').count();const vol00=(await J('/api/nodes'))[0].volume_l;
+  // ── Plano de la sala: un dibujo por altavoz (canal), con ESP, canal y estado; se mueven uno a uno ──
+  const spkPos=async(id,side)=>p.evaluate(([i,sd])=>{const e=document.querySelector('#spks .spk[data-id="'+i+'"][data-side="'+sd+'"]'),r=document.getElementById('room').getBoundingClientRect(),b=e.getBoundingClientRect();return [(b.left+b.width/2-r.left)/r.width*100,(b.top+b.height/2-r.top)/r.height*100];},[id,side]);
+  const U=(id,side)=>'#spks .spk[data-id="'+id+'"][data-side="'+side+'"]';
+  ok('Plano: pantalla, «Atrás» y «Escucha»',(await p.textContent('.screen'))==='Pantalla'&&(await p.textContent('.rl.back'))==='Atrás'&&(await p.textContent('.me small'))==='Escucha');
+  ok('Plano: 5 ESP estéreo = 10 altavoces dibujados (uno por canal)',await p.locator('#spks .spk').count()===10&&await p.locator('#spks .spk .cab svg').count()===10);
+  const lab=await p.evaluate(()=>[...document.querySelectorAll('#spks .spk')].map(e=>[e.dataset.id,e.dataset.side,e.querySelector('.ch').textContent,e.querySelector('.cap').textContent]));
+  ok('Plano: cada altavoz muestra su canal, el ESP y el estado (ESP 0: FL y FR, «En línea»)',lab.some(x=>x[0]==='0'&&x[1]==='0'&&x[2]==='FL'&&x[3]==='ESP 0 · En línea')&&lab.some(x=>x[0]==='0'&&x[1]==='1'&&x[2]==='FR'&&x[3]==='ESP 0 · En línea'),lab);
+  ok('Plano: sin líneas ni canales fantasma ni anillos',await p.locator('#room line,#room ellipse,#room .gd,#room .ln').count()===0);
+  ok('Plano: el estado no depende solo del color (punto + texto)',await p.locator('#spks .spk .cap .dot').count()===10&&lab.every(x=>/En línea|Sin conexión/.test(x[3])));
+  ok('Plano: fuera del modo mover, tocar un altavoz abre el cajón de su ESP',await (async()=>{await p.click(U(0,1));const o=await p.evaluate(()=>document.getElementById('drawer').classList.contains('on'));await p.click('#drawer .x');return o;})());
+  const before0=await spkPos(0,0),before1=await spkPos(0,1);const vol00=(await J('/api/nodes'))[0].volume_l;
   await p.click('#medit');
   ok('Plano: «Mover altavoces» activa el modo (aria-pressed, botón Listo, restablecer visible)',await p.getAttribute('#medit','aria-pressed')==='true'&&(await p.textContent('#medit'))==='Listo'&&await p.isVisible('#mreset'));
-  await p.click('#spks .spk[data-id="0"]',{force:true});
+  await p.click(U(0,1),{force:true});
   ok('Plano: en modo mover, tocar no abre el cajón',!(await p.evaluate(()=>document.getElementById('drawer').classList.contains('on'))));
   const rb=await p.locator('#room').boundingBox();
-  const b0=await p.locator('#spks .spk[data-id="0"] .orb').boundingBox();
-  const sx=b0.x+b0.width/2,sy=b0.y+b0.height/2,tx=rb.x+rb.width*0.30,ty=rb.y+rb.height*0.55;
-  await p.mouse.move(sx,sy);await p.mouse.down();await p.mouse.move((sx+tx)/2,(sy+ty)/2,{steps:6});await p.mouse.move(tx,ty,{steps:6});await p.mouse.up();
-  await until(async()=>(await J('/api/nodes'))[0].pos_x>=0);
-  let n0=(await J('/api/nodes'))[0],after=await spkPos(0);
-  ok('Plano: arrastrar guarda la posición en la Raspberry (≈30 %, 55 %)',Math.abs(n0.pos_x-30)<2&&Math.abs(n0.pos_y-55)<2,[n0.pos_x,n0.pos_y]);
-  ok('Plano: el altavoz queda donde se soltó',Math.abs(after[0]-30)<2&&Math.abs(after[1]-55)<2&&(Math.abs(after[0]-before[0])>5),[before,after]);
+  const drag1=async(sel,fx,fy)=>{const bb=await p.locator(sel+' .cab').boundingBox();const sx=bb.x+bb.width/2,sy=bb.y+bb.height/2,tx=rb.x+rb.width*fx,ty=rb.y+rb.height*fy;
+    await p.mouse.move(sx,sy);await p.mouse.down();await p.mouse.move((sx+tx)/2,(sy+ty)/2,{steps:6});await p.mouse.move(tx,ty,{steps:6});await p.mouse.up();};
+  await drag1(U(0,1),0.30,0.55);
+  await until(async()=>(await J('/api/nodes'))[0].pos2_x>=0);
+  let n0=(await J('/api/nodes'))[0];await sleep(300);const after1=await spkPos(0,1),after0=await spkPos(0,0);
+  ok('Plano: arrastrar el altavoz FR guarda su posición (pos2 ≈ 30 %, 55 %)',Math.abs(n0.pos2_x-30)<2.5&&Math.abs(n0.pos2_y-55)<6,[n0.pos2_x,n0.pos2_y]);
+  ok('Plano: el altavoz FL (mismo ESP) no se mueve y queda sin posición propia',n0.pos_x===-1&&Math.abs(after0[0]-before0[0])<1&&Math.abs(after0[1]-before0[1])<1,[n0.pos_x,before0,after0]);
+  ok('Plano: FR queda donde se soltó',Math.abs(after1[0]-30)<2.5&&Math.abs(after1[1]-55)<6&&Math.abs(after1[0]-before1[0])>5,[before1,after1]);
   ok('Plano: arrastrar no cambia canales ni volumen',n0.ch_left===0&&n0.ch_right===1&&n0.volume_l===vol00&&n0.volume_r===255,[n0,vol00]);
-  ok('Plano: ya no se dibujan los canales fantasma de ese altavoz',await until(async()=>await p.locator('.gd').count()===gd0-2));
+  await drag1(U(0,0),0.70,0.30);
+  await until(async()=>(await J('/api/nodes'))[0].pos_x>=0);
+  n0=(await J('/api/nodes'))[0];
+  ok('Plano: FL se mueve por separado y guarda su propia posición (≈ 70 %, 30 %); FR conserva la suya',Math.abs(n0.pos_x-70)<2.5&&Math.abs(n0.pos_y-30)<6&&Math.abs(n0.pos2_x-30)<2.5,[n0.pos_x,n0.pos_y,n0.pos2_x]);
   // límites: soltar fuera del plano se queda dentro
-  await p.waitForSelector('#spks .spk[data-id="0"] .orb');const b1=await p.locator('#spks .spk[data-id="0"] .orb').boundingBox();
-  await p.mouse.move(b1.x+b1.width/2,b1.y+b1.height/2);await p.mouse.down();await p.mouse.move(rb.x-300,rb.y-300,{steps:8});await p.mouse.up();
+  await sleep(300);const bb1=await p.locator(U(0,0)+' .cab').boundingBox();
+  await p.mouse.move(bb1.x+bb1.width/2,bb1.y+bb1.height/2);await p.mouse.down();await p.mouse.move(rb.x-300,rb.y-300,{steps:8});await p.mouse.up();
   await until(async()=>(await J('/api/nodes'))[0].pos_x<10);
   n0=(await J('/api/nodes'))[0];
-  ok('Plano: arrastrar fuera del plano se limita al borde (4–96 %, 7–93 %)',n0.pos_x>=3.9&&n0.pos_x<=96&&n0.pos_y>=6.9&&n0.pos_y<=93,[n0.pos_x,n0.pos_y]);
-  // teclado
-  await p.focus('#spks .spk[data-id="1"]');await p.keyboard.press('ArrowRight');await p.keyboard.press('ArrowDown');await p.keyboard.press('Shift+ArrowDown');
-  const k1=await until(async()=>{const n=(await J('/api/nodes'))[1];return n.pos_x>=0;},3000);
-  let n1=(await J('/api/nodes'))[1];const p1=await spkPos(1);
-  ok('Plano: las flechas del teclado mueven el altavoz y se guarda (y el foco se mantiene)',k1&&await p.evaluate(()=>document.activeElement.dataset.id)==='1'&&Math.abs(n1.pos_x-p1[0])<1.5&&Math.abs(n1.pos_y-p1[1])<1.5,[n1.pos_x,n1.pos_y,p1]);
+  ok('Plano: arrastrar fuera del plano deja el altavoz entero dentro (no se corta por los bordes)',await (async()=>{await sleep(300);const q=await p.evaluate(()=>{const r=document.getElementById('room').getBoundingClientRect(),b=document.querySelector('#spks .spk[data-id="0"][data-side="0"]').getBoundingClientRect();return [b.left>=r.left-1,b.top>=r.top-1,b.right<=r.right+1,b.bottom<=r.bottom+1];});return q.every(Boolean)&&n0.pos_x>=3&&n0.pos_y>=8;})(),[n0.pos_x,n0.pos_y]);
+  // teclado: ESP 1, canal derecho (SR... el altavoz 1 es C + LFE: lado 1 = LFE)
+  await p.focus(U(1,1));await p.keyboard.press('ArrowRight');await p.keyboard.press('ArrowDown');await p.keyboard.press('Shift+ArrowDown');
+  const k1=await until(async()=>(await J('/api/nodes'))[1].pos2_x>=0,3000);
+  const n1=(await J('/api/nodes'))[1];const p1=await spkPos(1,1);
+  ok('Plano: las flechas mueven el altavoz concreto (canal derecho del ESP 1), se guarda y el foco se mantiene',k1&&n1.pos_x===-1&&await p.evaluate(()=>[document.activeElement.dataset.id,document.activeElement.dataset.side].join())==='1,1'&&Math.abs(n1.pos2_x-p1[0])<1.5&&Math.abs(n1.pos2_y-p1[1])<1.5,[n1.pos2_x,n1.pos2_y,p1]);
   if(SHOTS)await p.screenshot({path:SHOTS+'/plano_mover.png',fullPage:true});
-  // recarga: la posición persiste
   await p.reload();await p.waitForSelector('.spk');
-  const rl=await spkPos(0);ok('Plano: tras recargar el altavoz sigue en su sitio',Math.abs(rl[0]-n0.pos_x)<1.5&&Math.abs(rl[1]-n0.pos_y)<1.5,[rl,n0.pos_x,n0.pos_y]);
-  // restablecer
+  const rl=await spkPos(0,0);ok('Plano: tras recargar el altavoz sigue en su sitio',Math.abs(rl[0]-n0.pos_x)<1.5&&Math.abs(rl[1]-n0.pos_y)<1.5,[rl,n0.pos_x,n0.pos_y]);
   await p.click('#medit');await p.click('#mreset');
-  await until(async()=>(await J('/api/nodes')).every(n=>n.pos_x<0));
-  ok('Plano: «Restablecer posiciones» devuelve todos al lugar de su canal',(await J('/api/nodes')).every(n=>n.pos_x<0&&n.pos_y<0));
+  await until(async()=>(await J('/api/nodes')).every(n=>n.pos_x<0&&n.pos2_x<0));
+  ok('Plano: «Restablecer posiciones» devuelve ambos canales de todos al lugar de su canal',(await J('/api/nodes')).every(n=>n.pos_x<0&&n.pos_y<0&&n.pos2_x<0&&n.pos2_y<0));
   await p.click('#medit');
   ok('Plano: «Listo» sale del modo mover',await p.getAttribute('#medit','aria-pressed')==='false'&&!(await p.isVisible('#mreset')));
-  // móvil: arrastre táctil (modo mover) y tema claro sin desbordes
+  // móvil: arrastre táctil, temas sin desbordes y botones alineados
   const ctx2=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
   const mp=await ctx2.newPage();await mp.goto(BASE+'/');await mp.waitForSelector('.spk');
-  await mp.evaluate(()=>localStorage.setItem('sonos_theme','light'));await mp.reload();await mp.waitForSelector('.spk');
-  ok('Móvil: tema claro sin desbordamiento horizontal',await mp.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+  for(const t of ['graphite','light']){await mp.evaluate(t=>localStorage.setItem('sonos_theme',t),t);await mp.reload();await mp.waitForSelector('.spk');
+    ok('Móvil: tema '+t+' sin desbordamiento horizontal',await mp.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));}
+  const mh=await mp.evaluate(()=>['[data-theme-btn]','#lcal','#lble'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return [r.top,r.height];}));
+  ok('Móvil: los botones de la cabecera están alineados',mh.every(x=>Math.abs(x[0]-mh[0][0])<1&&Math.abs(x[1]-mh[0][1])<1),mh);
+  ok('Móvil: los altavoces con posición automática no se solapan entre sí',await mp.evaluate(()=>{const bs=[...document.querySelectorAll('#spks .spk')].map(e=>e.getBoundingClientRect());let o=0;for(let i=0;i<bs.length;i++)for(let j=i+1;j<bs.length;j++){const a=bs[i],b=bs[j];if(a.left<b.right-4&&b.left<a.right-4&&a.top<b.bottom-4&&b.top<a.bottom-4)o++;}return o===0;}));
+  if(SHOTS){await mp.evaluate(()=>window.scrollTo(0,document.getElementById('room').getBoundingClientRect().top+scrollY-70));await mp.screenshot({path:SHOTS+'/movil_plano_auto.png'});}
   await mp.click('#medit');
   await mp.evaluate(()=>window.scrollTo(0,document.getElementById('room').getBoundingClientRect().top+scrollY-70));await sleep(200);const sy0=await mp.evaluate(()=>scrollY);
-  const mrb=await mp.locator('#room').boundingBox(),mb0=await mp.locator('#spks .spk[data-id="2"] .orb').boundingBox();
+  const mrb=await mp.locator('#room').boundingBox(),mb0=await mp.locator(U(2,0)+' .cab').boundingBox();
   const cdp=await ctx2.newCDPSession(mp);const sx2=mb0.x+mb0.width/2,sy2=mb0.y+mb0.height/2,tx2=mrb.x+mrb.width*0.7,ty2=mrb.y+mrb.height*0.45;
   const tp=(t,x,y)=>cdp.send('Input.dispatchTouchEvent',{type:t,touchPoints:t==='touchEnd'?[]:[{x,y,id:1}]});
   await tp('touchStart',sx2,sy2);for(let i=1;i<=8;i++)await tp('touchMove',sx2+(tx2-sx2)*i/8,sy2+(ty2-sy2)*i/8);await tp('touchEnd');
   const okT=await until(async()=>(await J('/api/nodes'))[2].pos_x>=0,3000);const m2=(await J('/api/nodes'))[2];
-  ok('Móvil: arrastre táctil mueve el altavoz (≈70 %, 45 %) sin desplazar la página',okT&&Math.abs(m2.pos_x-70)<4&&Math.abs(m2.pos_y-45)<4&&await mp.evaluate(()=>scrollY)===sy0,[m2.pos_x,m2.pos_y,sy0]);
+  ok('Móvil: arrastre táctil mueve el altavoz (≈70 %, 45 %) sin desplazar la página',okT&&Math.abs(m2.pos_x-70)<4&&Math.abs(m2.pos_y-45)<7&&await mp.evaluate(()=>scrollY)===sy0,[m2.pos_x,m2.pos_y,sy0]);
+  ok('Móvil: ningún altavoz se corta por los bordes del plano ni tapa la pantalla',await mp.evaluate(()=>{const r=document.getElementById('room').getBoundingClientRect(),sc=document.querySelector('.screen').getBoundingClientRect();return [...document.querySelectorAll('#spks .spk')].every(e=>{const b=e.getBoundingClientRect();return b.left>=r.left-1&&b.right<=r.right+1&&b.bottom<=r.bottom+1&&b.top>=sc.bottom-1;});}));
   if(SHOTS)await mp.screenshot({path:SHOTS+'/movil_claro_plano.png'});
   await fetch(BASE+'/api/node',{method:'POST',body:JSON.stringify({id:2,pos_auto:true})});
   await mp.close();
