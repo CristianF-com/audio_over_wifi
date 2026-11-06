@@ -480,7 +480,7 @@ std::string WebServer::getNodes() {
 }
 std::string WebServer::setNode(const std::string& b) {
     static const char* BAD = "{\"error\":\"invalid parameters\"}";
-    long id;
+    long id = 0;
     if (!parseInt(jsonGet(b, "id"), 0, MAX_NODES - 1, id)) return BAD;
     auto nodes = streamer_.getNodes();
     const ESPNode& cur = nodes[id];
