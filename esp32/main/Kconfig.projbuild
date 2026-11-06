@@ -28,6 +28,13 @@ menu "SonosWiFi receiver"
             bool "Solo 2.4 GHz"
     endchoice
 
+    config SONOS_WIFI_COUNTRY
+        string "Código de país del WiFi (ISO 3166, 2 letras)"
+        default "AR"
+        help
+            Define los canales y la potencia permitidos según la regulación del país. Por defecto
+            Argentina ("AR"). Se aplica fijo: no lo cambia el país que anuncie el router.
+
     config I2S_BCK_GPIO
         int "GPIO de BCK  -> PCM5102A BCK  (XIAO D8 = GPIO8)"
         default 8

@@ -77,6 +77,7 @@ Constantes clave (`protocol.h`): `FRAMES_PER_PACKET=120`, `PLAYOUT_DELAY_US=8000
 * Sin APLL → `I2S_CLK_SRC_DEFAULT`; el desvío de reloj se corrige por software (sección 4).
 * Pines I2S por defecto D8=GPIO8 (BCK), D9=GPIO9 (WS), D10=GPIO10 (DOUT); configurables por Kconfig. D2=GPIO25 y D3=GPIO7 son strapping (evitar). Pinout tomado del wiki de Seeed — **verificar contra esquemático**.
 * **Banda**: Kconfig `SONOS_WIFI_BAND` (5G por defecto / AUTO / 2G) → `apply_band_mode()` en `WIFI_EVENT_STA_START` antes de `esp_wifi_connect()` (la API exige llamarla tras `esp_wifi_start`; el C5 no hace dual-band simultáneo). `sae_pwe_h2e=WPA3_SAE_PWE_BOTH` para routers solo-WPA3. Canal/banda en el log y en el JSON BLE (`"ch"`).
+* **País WiFi**: Kconfig `SONOS_WIFI_COUNTRY` (por defecto "AR") → `apply_country()` con `esp_wifi_set_country_code(cc, false)` entre `esp_wifi_init` y `esp_wifi_start`. Sin probar en hardware.
 * `esp_wifi_set_ps(WIFI_PS_NONE)`, `WIFI_ALL_CHANNEL_SCAN`, reintento WiFi sin límite, `CONFIG_FREERTOS_HZ=1000`, `LWIP_UDP_RECVMBOX_SIZE=32`.
 * Target: `idf.py set-target esp32c5`. Si el compilador rechaza `auto_clear_after_cb` (IDF<5.4) usar `auto_clear`.
 

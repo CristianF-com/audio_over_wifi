@@ -206,6 +206,15 @@ static void apply_band_mode(void)
     else ESP_LOGI(TAG, "Banda WiFi: solo %s", n);
 }
 
+/* País regulatorio del WiFi (por defecto Argentina, "AR"): fija canales y potencia permitidos.
+ * ieee80211d=false: no lo cambia el país que anuncie el router. */
+static void apply_country(void)
+{
+    esp_err_t e = esp_wifi_set_country_code(CONFIG_SONOS_WIFI_COUNTRY, false);
+    if (e != ESP_OK) ESP_LOGW(TAG, "set_country_code(%s) falló: %d", CONFIG_SONOS_WIFI_COUNTRY, (int)e);
+    else ESP_LOGI(TAG, "País WiFi: %s", CONFIG_SONOS_WIFI_COUNTRY);
+}
+
 static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, void* data)
 {
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
@@ -260,6 +269,7 @@ static void wifi_start(void)
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    apply_country();                                     /* antes de esp_wifi_start() */
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
         WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler, NULL, NULL));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
