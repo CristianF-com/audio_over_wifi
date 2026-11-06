@@ -529,6 +529,16 @@ bool UdpStreamer::setNodeRole(uint8_t id, uint8_t role) {
     dirty_.store(true);
     return true;
 }
+bool UdpStreamer::setNodePos(uint8_t id, float x, float y) {
+    if (id >= MAX_NODES || !std::isfinite(x) || !std::isfinite(y)) return false;
+    const bool autopos = (x < 0 && y < 0);
+    if (!autopos && (x < 0 || x > 100 || y < 0 || y > 100)) return false;
+    std::lock_guard<std::mutex> lk(nodes_mtx_);
+    nodes_[id].pos_x = autopos ? -1.0f : x;
+    nodes_[id].pos_y = autopos ? -1.0f : y;
+    dirty_.store(true);
+    return true;
+}
 bool UdpStreamer::setNodeEq(uint8_t id, const float g[EQ_BANDS]) {
     if (id >= MAX_NODES) return false;
     for (int b = 0; b < EQ_BANDS; b++) if (!std::isfinite(g[b]) || std::fabs(g[b]) > EQ_MAX_DB) return false;
@@ -588,7 +598,7 @@ bool UdpStreamer::saveConfig() {
                 n.id, n.ch_left, n.id, n.ch_right, n.id, n.volume_l, n.id, n.volume_r,
                 n.id, n.enabled ? 1 : 0, n.id, n.mono ? 1 : 0, n.id, n.latency_offset_us);
     for (const auto& n : nodes) {
-        fprintf(f, "node%d.role=%d\n", n.id, n.role);
+        fprintf(f, "node%d.role=%d\nnode%d.pos_x=%.2f\nnode%d.pos_y=%.2f\n", n.id, n.role, n.id, n.pos_x, n.id, n.pos_y);
         for (int b = 0; b < EQ_BANDS; b++) fprintf(f, "node%d.eq%d=%.2f\n", n.id, b, n.eq_db[b]);
     }
     bool ok = (fflush(f) == 0) & (ferror(f) == 0);
@@ -627,6 +637,8 @@ bool UdpStreamer::loadConfig() {
         else if (!strcmp(field, "ch_right") && v >= 0 && v < AUDIO_CHANNELS) { n.ch_right = (uint8_t)v; applied++; }
         else if (!strcmp(field, "volume_l") && v >= 0 && v <= 255) { n.volume_l = (uint8_t)v; applied++; }
         else if (!strcmp(field, "volume_r") && v >= 0 && v <= 255) { n.volume_r = (uint8_t)v; applied++; }
+        else if (!strcmp(field, "pos_x") && dv >= -1 && dv <= 100) { n.pos_x = (float)dv; applied++; }
+        else if (!strcmp(field, "pos_y") && dv >= -1 && dv <= 100) { n.pos_y = (float)dv; applied++; }
         else if (!strcmp(field, "role") && v >= 0 && v <= ROLE_SUB) { n.role = (uint8_t)v; applied++; }
         else if (!strncmp(field, "eq", 2) && field[2] >= '0' && field[2] < '0' + EQ_BANDS && field[3] == 0 && std::fabs(dv) <= EQ_MAX_DB)
                                              { n.eq_db[field[2] - '0'] = (float)dv; applied++; }

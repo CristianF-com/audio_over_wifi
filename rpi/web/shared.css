@@ -4,10 +4,27 @@
   --fg:#e9edf5; --mut:#8a93a6; --ac:#4aa3ff; --ac-bg:rgba(74,163,255,.13); --ac-ln:rgba(74,163,255,.5);
   --ctl:#6b7a96;                                   /* borde de controles (campos, interruptor apagado): ≥3:1 sobre las superficies */
   --ok:#3ecf8e; --warn:#f5b84a; --bad:#ff6b6b;
+  --on-ac:#04121f; --ac-hi:#9ad0ff; --ac-lo:#2f6fb3; --bad-fg:#ffb0b0; --bad-ln:rgba(255,107,107,.45); --warn-ln:rgba(245,184,74,.4);
+  --top-bg:rgba(0,0,0,.88); --top-solid:#000; --tabs-bg:rgba(10,13,19,.94); --scrim:rgba(0,0,0,.55); --code-bg:#05070b; --bar-bg:#000; --cl-off:#3a1512;
+  --thumb:#fff; --thumb-ring:rgba(74,163,255,.38); --cap-bg:rgba(0,0,0,.65); --glow:rgba(74,163,255,.09); --orb-glow:rgba(74,163,255,.35);
+  --led-g:#30d158; --led-y:#ffd60a; --led-r:#ff453a;
+  color-scheme:dark;
+}
+/* Tema claro (se activa con data-theme="light" en <html>; el script del <head> resuelve «Automático» según el sistema) */
+html[data-theme=light]{
+  --bg:#f3f5f9; --panel:#ffffff; --raise:#eef1f6; --line:#dfe4ec; --line2:#c5cddb;
+  --fg:#10151d; --mut:#556072; --ac:#0a60bf; --ac-bg:rgba(10,96,191,.10); --ac-ln:rgba(10,96,191,.45);
+  --ctl:#7b879c; --ok:#136f46; --warn:#8f5700; --bad:#c4302b;
+  --on-ac:#ffffff; --ac-hi:#4aa3ff; --ac-lo:#7fb4ec; --bad-fg:#9b1c18; --bad-ln:rgba(196,48,43,.5); --warn-ln:rgba(154,93,0,.45);
+  --top-bg:rgba(243,245,249,.9); --top-solid:#f3f5f9; --tabs-bg:rgba(255,255,255,.94); --scrim:rgba(16,21,29,.35); --code-bg:#e9edf4; --bar-bg:#0b0e14; --cl-off:#e8c9c7;
+  --thumb:#fff; --thumb-ring:rgba(10,96,191,.35); --cap-bg:rgba(255,255,255,.85); --glow:rgba(11,111,216,.07); --orb-glow:rgba(11,111,216,.3);
+  --led-g:#1fa84a; --led-y:#d9a400; --led-r:#e0342b;
+  color-scheme:light;
+}
   --font:system-ui,-apple-system,"Segoe UI Variable Text","Segoe UI","Helvetica Neue",Roboto,sans-serif;   /* tipografía del sistema (SF en Apple) */
 }
 *{box-sizing:border-box;margin:0}
-html{color-scheme:dark;font-size:106.25%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
+html{font-size:106.25%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
 body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
   font-variant-numeric:tabular-nums;min-height:100vh;-webkit-text-size-adjust:100%;
   padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
@@ -21,11 +38,11 @@ h2{font-size:1.02rem;font-weight:650}
 .mut{color:var(--mut)}
 .small{font-size:.86rem}
 
-.btn{appearance:none;border:0;background:var(--ac);color:#04121f;font-weight:650;padding:10px 18px;border-radius:10px;min-height:42px;
+.btn{appearance:none;border:0;background:var(--ac);color:var(--on-ac);font-weight:650;padding:10px 18px;border-radius:10px;min-height:42px;
   transition:filter .12s,transform .06s}
 .btn:hover{filter:brightness(1.1)}.btn:active{transform:translateY(1px)}
 .btn.ghost{background:var(--raise);color:var(--fg);border:1px solid var(--ctl);font-weight:550}
-.btn.danger{background:transparent;color:var(--bad);border:1px solid rgba(255,107,107,.45);font-weight:550}
+.btn.danger{background:transparent;color:var(--bad);border:1px solid var(--bad-ln);font-weight:550}
 .btn.sm{padding:6px 12px;min-height:34px;font-size:.88rem;border-radius:8px}
 .btn:disabled{opacity:.4;cursor:not-allowed;filter:none}
 
@@ -48,8 +65,8 @@ input[type=range].rng.mid{--lo:.5;--hi:.5;
   background:linear-gradient(to right,var(--line2) calc(var(--lo)*(100% - 20px) + 10px),var(--ac) 0,var(--ac) calc(var(--hi)*(100% - 20px) + 10px),var(--line2) 0) no-repeat center/100% 6px}
 .rng::-webkit-slider-runnable-track{height:var(--rh);background:transparent}
 .rng::-moz-range-track{height:var(--rh);background:transparent}
-.rng::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:0;margin-top:calc((var(--rh) - 20px)/2);box-shadow:0 0 0 3px rgba(74,163,255,.38)}
-.rng::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:0;box-shadow:0 0 0 3px rgba(74,163,255,.38)}
+.rng::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--thumb);border:0;margin-top:calc((var(--rh) - 20px)/2);box-shadow:0 0 0 3px var(--thumb-ring)}
+.rng::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--thumb);border:0;box-shadow:0 0 0 3px var(--thumb-ring)}
 .rng:focus-visible{outline-offset:0}
 
 .num,.txt,.sel{background:var(--raise);border:1px solid var(--ctl);border-radius:9px;padding:9px 11px;min-height:40px;width:100%;color:var(--fg)}
@@ -61,20 +78,20 @@ label,.lbl{display:block;color:var(--mut);font-size:.86rem;margin-bottom:5px}
 
 .chip{display:inline-flex;align-items:center;gap:7px;padding:4px 11px;border-radius:999px;background:var(--raise);border:1px solid var(--line);font-size:.84rem;color:var(--mut)}
 .chip.ac{color:var(--ac);border-color:var(--ac-ln);background:var(--ac-bg)}
-.chip.warn{color:var(--warn);border-color:rgba(245,184,74,.4)}
-.chip.bad{color:var(--bad);border-color:rgba(255,107,107,.4)}
+.chip.warn{color:var(--warn);border-color:var(--warn-ln)}
+.chip.bad{color:var(--bad);border-color:var(--bad-ln)}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mut);flex:none}
 .dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
 
-.top{position:sticky;top:0;z-index:30;background:rgba(0,0,0,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
+.top{position:sticky;top:0;z-index:30;background:var(--top-bg);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
   padding-top:env(safe-area-inset-top)}               /* en la app instalada (barra de estado translúcida) el contenido no queda bajo la muesca */
 .top .in{max-width:1180px;margin:auto;display:flex;align-items:center;gap:18px;padding:10px 18px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.05rem;color:var(--fg)}
 .brand:hover{text-decoration:none}
-.logo{width:26px;height:26px;flex:none}
+.logo{width:26px;height:26px;flex:none;color:var(--ac)}
 .panelbox{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px}
 .note{border-radius:12px;padding:12px 14px;background:var(--raise);border:1px solid var(--line2);font-size:.92rem}
-.note.bad{border-color:rgba(255,107,107,.5);color:#ffb0b0}.note.warn{border-color:rgba(245,184,74,.5)}
+.note.bad{border-color:var(--bad-ln);color:var(--bad-fg)}.note.warn{border-color:var(--warn-ln)}
 
 .toasts{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:60;pointer-events:none;width:max-content;max-width:92vw}
 .toast{pointer-events:auto;background:var(--raise);border:1px solid var(--line2);border-left:3px solid var(--ok);padding:9px 14px;border-radius:10px;font-size:.9rem;
@@ -91,10 +108,14 @@ label,.lbl{display:block;color:var(--mut);font-size:.86rem;margin-bottom:5px}
   input[type=range].rng{--rh:44px}
   .switch::before{content:"";position:absolute;inset:-9px -6px}   /* zona de toque ampliada; el aspecto no cambia */
 }
+.themebtn{display:inline-flex;align-items:center;gap:6px}
+.themebtn svg{flex:none}
+@media (max-width:760px){.themebtn .tl{display:none}.themebtn{padding-left:10px;padding-right:10px}}
 /* Ajustes de accesibilidad del sistema */
 @media (prefers-contrast:more){
   :root{--mut:#b4bccc;--ctl:#8d9ab3;--line2:#6b7a96;--ac:#7ec0ff;--ac-ln:rgba(126,192,255,.8)}
+  html[data-theme=light]{--mut:#3b4556;--ctl:#566176;--line2:#8a95a8;--ac:#0a5cb5;--ac-ln:rgba(10,92,181,.8)}
 }
 @media (prefers-reduced-transparency:reduce){
-  .top{background:#000;backdrop-filter:none;-webkit-backdrop-filter:none}
+  .top{background:var(--top-solid);backdrop-filter:none;-webkit-backdrop-filter:none}
 }

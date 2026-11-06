@@ -272,6 +272,23 @@ c, _ = http("POST", "/api/layout", b'{}');             check("layout ausente -> 
 c, _ = http("POST", "/api/node", {"id": 9, "enabled": True}); check("nodo 9 editable (id máx.)", c == 200, c)
 http("POST", "/api/layout", {"layout": "stereo5"})
 
+print("\n-- posición de los altavoces en el plano --")
+c, b2 = http("GET", "/api/nodes"); n0 = json.loads(b2)[0]
+check("posición por defecto automática (pos_x/pos_y = -1)", n0["pos_x"] == -1 and n0["pos_y"] == -1, (n0["pos_x"], n0["pos_y"]))
+c, _ = http("POST", "/api/node", {"id": 0, "pos_x": 12.5, "pos_y": 80.25}); check("fijar posición -> 200", c == 200, c)
+c, b2 = http("GET", "/api/nodes"); n0 = json.loads(b2)[0]
+check("la posición se devuelve (12.5, 80.25)", (n0["pos_x"], n0["pos_y"]) == (12.5, 80.25), (n0["pos_x"], n0["pos_y"]))
+check("fijar posición no cambia canales ni volumen", (n0["ch_left"], n0["ch_right"], n0["volume_l"]) == (0, 1, 255), n0)
+c, _ = http("POST", "/api/node", {"id": 0, "pos_x": 101, "pos_y": 5});   check("pos_x=101 -> 400", c == 400, c)
+c, _ = http("POST", "/api/node", {"id": 0, "pos_x": -3, "pos_y": 5});    check("pos_x negativo -> 400", c == 400, c)
+c, _ = http("POST", "/api/node", {"id": 0, "pos_x": 40});                check("pos_x sin pos_y -> 400", c == 400, c)
+c, _ = http("POST", "/api/node", {"id": 0, "pos_x": "abc", "pos_y": 5}); check("pos_x no numérico -> 400", c == 400, c)
+c, b2 = http("GET", "/api/nodes"); n0 = json.loads(b2)[0]
+check("las posiciones inválidas no modifican la guardada", (n0["pos_x"], n0["pos_y"]) == (12.5, 80.25), (n0["pos_x"], n0["pos_y"]))
+c, _ = http("POST", "/api/node", {"id": 0, "pos_auto": True}); check("pos_auto -> 200", c == 200, c)
+c, b2 = http("GET", "/api/nodes"); n0 = json.loads(b2)[0]
+check("pos_auto devuelve la posición automática", n0["pos_x"] == -1 and n0["pos_y"] == -1, (n0["pos_x"], n0["pos_y"]))
+
 # 11) REENVÍO (NACK) y límites
 print("\n-- reenvío de paquetes (NACK) --")
 pk = pkts_after_switch()

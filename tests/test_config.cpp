@@ -22,6 +22,11 @@ int main() {
         CHECK("setNodeRole(7) rechazado", !a.setNodeRole(1, 3));
         CHECK("setXoverHz(30/250) rechazado", !a.setXoverHz(30) && !a.setXoverHz(250));
         CHECK("setLipsyncExtraMs(201) rechazado", !a.setLipsyncExtraMs(201));
+        CHECK("setNodePos válida", a.setNodePos(3, 12.5f, 80.0f));
+        CHECK("setNodePos fuera de rango/NaN/id inválido rechazada", !a.setNodePos(3, 101, 5) && !a.setNodePos(3, 5, -2) && !a.setNodePos(3, NAN, 5) && !a.setNodePos(10, 5, 5) && a.getNodes()[3].pos_x == 12.5f);
+        CHECK("posición por defecto automática", a.getNodes()[4].pos_x < 0 && a.getNodes()[4].pos_y < 0);
+        a.setNodePos(5, 40, 30); a.setNodePos(5, -1, -1);
+        CHECK("setNodePos(-1,-1) vuelve a automática", a.getNodes()[5].pos_x < 0 && a.getNodes()[5].pos_y < 0);
         a.setNodeConfig(7, 3, 9, 90, 200, true, true);          // mono: ch_right=ch_left, vol_r=vol_l
         CHECK("setNodeConfig mono fuerza ch_right/vol_r", a.getNodes()[7].ch_right == 3 && a.getNodes()[7].volume_r == 90);
         CHECK("editar un nodo => layout personalizada", a.layout() == LAYOUT_CUSTOM);
@@ -41,6 +46,7 @@ int main() {
         CHECK("nodo 7 mono persistido (canal 3, vol 90, habilitado)", n[7].mono && n[7].ch_left == 3 && n[7].ch_right == 3 && n[7].volume_l == 90 && n[7].volume_r == 90 && n[7].enabled);
         CHECK("layout personalizada persistida", b.layout() == LAYOUT_CUSTOM);
         CHECK("roles persistidos (nodo 2 sub, nodo 4 satélite, resto completo)", n[2].role == ROLE_SUB && n[4].role == ROLE_SAT && n[0].role == ROLE_FULL);
+        CHECK("posición persistida (nodo 3 = 12.5, 80); el resto sigue automático", n[3].pos_x == 12.5f && n[3].pos_y == 80.0f && n[0].pos_x < 0 && n[5].pos_x < 0);
         CHECK("EQ persistido (nodo 3)", n[3].eq_db[0] == 1.5f && n[3].eq_db[1] == -2.25f && n[3].eq_db[4] == 6.0f && n[3].eq_db[5] == -12.0f && n[0].eq_db[0] == 0);
         CHECK("flags de procesado persistidos (crossover y EQ activos)", b.xoverOn() && b.eqOn());
         CHECK("crossover persistido (110 Hz) y extra lip-sync (−7 ms)", b.xoverHz() == 110.0f && b.lipsyncExtraMs() == -7);
@@ -49,7 +55,7 @@ int main() {
     {   // fichero con basura, valores fuera de rango y claves desconocidas
         FILE* f = fopen(path, "w");
         fputs("version=1\nmaster_volume=99\nplayout_us=5\nnode9.ch_left=1\nnode1.ch_left=77\nnode1.volume_l=abc\n"
-              "node2.role=9\nnode2.eq0=50\nnode2.eq9=1\nxover_hz=5\nlipsync_extra_ms=9999\nnodeX.foo=1\nbasura sin igual\nnode3.volume_l=42\nnode3.latency_offset_us=999999999\n", f);
+              "node2.pos_x=500\nnode2.pos_y=-9\nnode2.role=9\nnode2.eq0=50\nnode2.eq9=1\nxover_hz=5\nlipsync_extra_ms=9999\nnodeX.foo=1\nbasura sin igual\nnode3.volume_l=42\nnode3.latency_offset_us=999999999\n", f);
         fclose(f);
         UdpStreamer c; c.setConfigPath(path);
         CHECK("fichero corrupto: se carga sin crash", c.loadConfig());
@@ -60,6 +66,7 @@ int main() {
         CHECK("valor válido sí se aplica (node3.volume_l=42)", n[3].volume_l == 42);
         CHECK("latencia fuera de rango ignorada", n[3].latency_offset_us == 0);
         CHECK("fichero corrupto: procesado sigue en pass-through", !c.xoverOn() && !c.eqOn());
+        CHECK("posición fuera de rango ignorada", n[2].pos_x < 0 && n[2].pos_y < 0);
         CHECK("rol 9, eq 50 dB, eq9, xover 5 Hz y lip-sync 9999 ignorados", n[2].role == ROLE_FULL && n[2].eq_db[0] == 0 && c.xoverHz() == 80.0f && c.lipsyncExtraMs() == 0);
     }
     {   // distribuciones

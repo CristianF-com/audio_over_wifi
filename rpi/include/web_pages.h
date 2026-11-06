@@ -8,13 +8,48 @@
 static const char PAGE_PANEL[] = R"HTML(<!DOCTYPE html>
 <html lang="es"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#000000"><meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#000000"><meta name="color-scheme" content="dark light">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="SonosWiFi"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
 <script>if('serviceWorker' in navigator&&window.isSecureContext)addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});</script>
+<script>/* Tema de la interfaz: «dark» (por defecto), «light» o «auto» (sigue al sistema). Se guarda en localStorage (por navegador).
+   Se ejecuta en el <head> (antes de pintar) para que no haya destello; los botones [data-theme-btn] rotan Oscuro → Claro → Automático. */
+(function () {
+  var KEY = 'sonos_theme', ORDER = ['dark', 'light', 'auto'], NAME = { dark: 'Oscuro', light: 'Claro', auto: 'Automático' };
+  var ICON = {
+    dark: '<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>',
+    light: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+    auto: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor"/>'
+  };
+  var mq = window.matchMedia ? matchMedia('(prefers-color-scheme: light)') : null;
+  function pref() { var p = 'dark'; try { p = localStorage.getItem(KEY) || 'dark'; } catch (e) {} return ORDER.indexOf(p) < 0 ? 'dark' : p; }
+  function apply() {
+    var p = pref(), t = p === 'auto' ? (mq && mq.matches ? 'light' : 'dark') : p;
+    document.documentElement.setAttribute('data-theme', t);
+    var m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', t === 'light' ? '#f3f5f9' : '#000000');
+    var bs = document.querySelectorAll('[data-theme-btn]');
+    for (var i = 0; i < bs.length; i++) {
+      var b = bs[i];
+      b.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICON[p] + '</svg><span class="tl">' + NAME[p] + '</span>';
+      b.setAttribute('aria-label', 'Tema: ' + NAME[p] + '. Pulsa para cambiar');
+      b.title = 'Tema: ' + NAME[p];
+    }
+  }
+  function set(p) { try { localStorage.setItem(KEY, p); } catch (e) {} apply(); }
+  function next() { set(ORDER[(ORDER.indexOf(pref()) + 1) % ORDER.length]); }
+  window.SonosTheme = { get: pref, set: set, next: next, apply: apply };
+  apply();
+  if (mq && mq.addEventListener) mq.addEventListener('change', apply);
+  addEventListener('storage', function (e) { if (e.key === KEY) apply(); });
+  document.addEventListener('DOMContentLoaded', function () {
+    var bs = document.querySelectorAll('[data-theme-btn]');
+    for (var i = 0; i < bs.length; i++) bs[i].addEventListener('click', next);
+    apply();
+  });
+})();</script>
 <title>SonosWiFi</title>
 <style>
 /* Sistema de diseño compartido por las tres páginas (panel, /calibrate, /ble). Negro puro + azul señal. */
@@ -23,10 +58,27 @@ static const char PAGE_PANEL[] = R"HTML(<!DOCTYPE html>
   --fg:#e9edf5; --mut:#8a93a6; --ac:#4aa3ff; --ac-bg:rgba(74,163,255,.13); --ac-ln:rgba(74,163,255,.5);
   --ctl:#6b7a96;                                   /* borde de controles (campos, interruptor apagado): ≥3:1 sobre las superficies */
   --ok:#3ecf8e; --warn:#f5b84a; --bad:#ff6b6b;
+  --on-ac:#04121f; --ac-hi:#9ad0ff; --ac-lo:#2f6fb3; --bad-fg:#ffb0b0; --bad-ln:rgba(255,107,107,.45); --warn-ln:rgba(245,184,74,.4);
+  --top-bg:rgba(0,0,0,.88); --top-solid:#000; --tabs-bg:rgba(10,13,19,.94); --scrim:rgba(0,0,0,.55); --code-bg:#05070b; --bar-bg:#000; --cl-off:#3a1512;
+  --thumb:#fff; --thumb-ring:rgba(74,163,255,.38); --cap-bg:rgba(0,0,0,.65); --glow:rgba(74,163,255,.09); --orb-glow:rgba(74,163,255,.35);
+  --led-g:#30d158; --led-y:#ffd60a; --led-r:#ff453a;
+  color-scheme:dark;
+}
+/* Tema claro (se activa con data-theme="light" en <html>; el script del <head> resuelve «Automático» según el sistema) */
+html[data-theme=light]{
+  --bg:#f3f5f9; --panel:#ffffff; --raise:#eef1f6; --line:#dfe4ec; --line2:#c5cddb;
+  --fg:#10151d; --mut:#556072; --ac:#0a60bf; --ac-bg:rgba(10,96,191,.10); --ac-ln:rgba(10,96,191,.45);
+  --ctl:#7b879c; --ok:#136f46; --warn:#8f5700; --bad:#c4302b;
+  --on-ac:#ffffff; --ac-hi:#4aa3ff; --ac-lo:#7fb4ec; --bad-fg:#9b1c18; --bad-ln:rgba(196,48,43,.5); --warn-ln:rgba(154,93,0,.45);
+  --top-bg:rgba(243,245,249,.9); --top-solid:#f3f5f9; --tabs-bg:rgba(255,255,255,.94); --scrim:rgba(16,21,29,.35); --code-bg:#e9edf4; --bar-bg:#0b0e14; --cl-off:#e8c9c7;
+  --thumb:#fff; --thumb-ring:rgba(10,96,191,.35); --cap-bg:rgba(255,255,255,.85); --glow:rgba(11,111,216,.07); --orb-glow:rgba(11,111,216,.3);
+  --led-g:#1fa84a; --led-y:#d9a400; --led-r:#e0342b;
+  color-scheme:light;
+}
   --font:system-ui,-apple-system,"Segoe UI Variable Text","Segoe UI","Helvetica Neue",Roboto,sans-serif;   /* tipografía del sistema (SF en Apple) */
 }
 *{box-sizing:border-box;margin:0}
-html{color-scheme:dark;font-size:106.25%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
+html{font-size:106.25%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
 body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
   font-variant-numeric:tabular-nums;min-height:100vh;-webkit-text-size-adjust:100%;
   padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
@@ -40,11 +92,11 @@ h2{font-size:1.02rem;font-weight:650}
 .mut{color:var(--mut)}
 .small{font-size:.86rem}
 
-.btn{appearance:none;border:0;background:var(--ac);color:#04121f;font-weight:650;padding:10px 18px;border-radius:10px;min-height:42px;
+.btn{appearance:none;border:0;background:var(--ac);color:var(--on-ac);font-weight:650;padding:10px 18px;border-radius:10px;min-height:42px;
   transition:filter .12s,transform .06s}
 .btn:hover{filter:brightness(1.1)}.btn:active{transform:translateY(1px)}
 .btn.ghost{background:var(--raise);color:var(--fg);border:1px solid var(--ctl);font-weight:550}
-.btn.danger{background:transparent;color:var(--bad);border:1px solid rgba(255,107,107,.45);font-weight:550}
+.btn.danger{background:transparent;color:var(--bad);border:1px solid var(--bad-ln);font-weight:550}
 .btn.sm{padding:6px 12px;min-height:34px;font-size:.88rem;border-radius:8px}
 .btn:disabled{opacity:.4;cursor:not-allowed;filter:none}
 
@@ -67,8 +119,8 @@ input[type=range].rng.mid{--lo:.5;--hi:.5;
   background:linear-gradient(to right,var(--line2) calc(var(--lo)*(100% - 20px) + 10px),var(--ac) 0,var(--ac) calc(var(--hi)*(100% - 20px) + 10px),var(--line2) 0) no-repeat center/100% 6px}
 .rng::-webkit-slider-runnable-track{height:var(--rh);background:transparent}
 .rng::-moz-range-track{height:var(--rh);background:transparent}
-.rng::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:0;margin-top:calc((var(--rh) - 20px)/2);box-shadow:0 0 0 3px rgba(74,163,255,.38)}
-.rng::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:0;box-shadow:0 0 0 3px rgba(74,163,255,.38)}
+.rng::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--thumb);border:0;margin-top:calc((var(--rh) - 20px)/2);box-shadow:0 0 0 3px var(--thumb-ring)}
+.rng::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--thumb);border:0;box-shadow:0 0 0 3px var(--thumb-ring)}
 .rng:focus-visible{outline-offset:0}
 
 .num,.txt,.sel{background:var(--raise);border:1px solid var(--ctl);border-radius:9px;padding:9px 11px;min-height:40px;width:100%;color:var(--fg)}
@@ -80,20 +132,20 @@ label,.lbl{display:block;color:var(--mut);font-size:.86rem;margin-bottom:5px}
 
 .chip{display:inline-flex;align-items:center;gap:7px;padding:4px 11px;border-radius:999px;background:var(--raise);border:1px solid var(--line);font-size:.84rem;color:var(--mut)}
 .chip.ac{color:var(--ac);border-color:var(--ac-ln);background:var(--ac-bg)}
-.chip.warn{color:var(--warn);border-color:rgba(245,184,74,.4)}
-.chip.bad{color:var(--bad);border-color:rgba(255,107,107,.4)}
+.chip.warn{color:var(--warn);border-color:var(--warn-ln)}
+.chip.bad{color:var(--bad);border-color:var(--bad-ln)}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mut);flex:none}
 .dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
 
-.top{position:sticky;top:0;z-index:30;background:rgba(0,0,0,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
+.top{position:sticky;top:0;z-index:30;background:var(--top-bg);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
   padding-top:env(safe-area-inset-top)}               /* en la app instalada (barra de estado translúcida) el contenido no queda bajo la muesca */
 .top .in{max-width:1180px;margin:auto;display:flex;align-items:center;gap:18px;padding:10px 18px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.05rem;color:var(--fg)}
 .brand:hover{text-decoration:none}
-.logo{width:26px;height:26px;flex:none}
+.logo{width:26px;height:26px;flex:none;color:var(--ac)}
 .panelbox{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px}
 .note{border-radius:12px;padding:12px 14px;background:var(--raise);border:1px solid var(--line2);font-size:.92rem}
-.note.bad{border-color:rgba(255,107,107,.5);color:#ffb0b0}.note.warn{border-color:rgba(245,184,74,.5)}
+.note.bad{border-color:var(--bad-ln);color:var(--bad-fg)}.note.warn{border-color:var(--warn-ln)}
 
 .toasts{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:60;pointer-events:none;width:max-content;max-width:92vw}
 .toast{pointer-events:auto;background:var(--raise);border:1px solid var(--line2);border-left:3px solid var(--ok);padding:9px 14px;border-radius:10px;font-size:.9rem;
@@ -110,12 +162,16 @@ label,.lbl{display:block;color:var(--mut);font-size:.86rem;margin-bottom:5px}
   input[type=range].rng{--rh:44px}
   .switch::before{content:"";position:absolute;inset:-9px -6px}   /* zona de toque ampliada; el aspecto no cambia */
 }
+.themebtn{display:inline-flex;align-items:center;gap:6px}
+.themebtn svg{flex:none}
+@media (max-width:760px){.themebtn .tl{display:none}.themebtn{padding-left:10px;padding-right:10px}}
 /* Ajustes de accesibilidad del sistema */
 @media (prefers-contrast:more){
   :root{--mut:#b4bccc;--ctl:#8d9ab3;--line2:#6b7a96;--ac:#7ec0ff;--ac-ln:rgba(126,192,255,.8)}
+  html[data-theme=light]{--mut:#3b4556;--ctl:#566176;--line2:#8a95a8;--ac:#0a5cb5;--ac-ln:rgba(10,92,181,.8)}
 }
 @media (prefers-reduced-transparency:reduce){
-  .top{background:#000;backdrop-filter:none;-webkit-backdrop-filter:none}
+  .top{background:var(--top-solid);backdrop-filter:none;-webkit-backdrop-filter:none}
 }
 main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 .top .in{gap:14px}
@@ -134,8 +190,22 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 .head h1{margin-right:auto}
 
 /* Plano de sala */
-.room{position:relative;width:100%;aspect-ratio:16/9;min-height:340px;border:1px solid var(--line);border-radius:20px;overflow:hidden;
-  background:radial-gradient(ellipse 70% 60% at 50% 62%,rgba(74,163,255,.09),transparent 70%),var(--panel)}
+.roombar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.roombar .hint{margin-right:auto;min-width:200px;flex:1}
+.room{user-select:none;-webkit-user-select:none;position:relative;width:100%;aspect-ratio:16/9;min-height:340px;border:1px solid var(--line);border-radius:20px;overflow:hidden;
+  background:
+    linear-gradient(var(--line) 1px,transparent 1px) 0 0/10% 12.5%,linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/10% 12.5%,
+    radial-gradient(ellipse 70% 60% at 50% 62%,var(--glow),transparent 70%),var(--panel)}
+.room>*{z-index:1}
+.dragging,.dragging *{user-select:none!important;-webkit-user-select:none!important}
+.room.edit{border-color:var(--ac-ln);box-shadow:0 0 0 3px var(--ac-bg)}
+.rl{position:absolute;font-size:.72rem;color:var(--mut);pointer-events:none;letter-spacing:.02em}
+.rl.back{left:12px;bottom:8px}
+.me small{position:absolute;top:calc(100% + 3px);left:50%;transform:translateX(-50%);font-size:.7rem;color:var(--mut);white-space:nowrap}
+.room.edit .spk{cursor:grab;touch-action:none}
+.room.edit .spk.drag{cursor:grabbing;z-index:5}
+.room.edit .spk .orb{border-style:dashed;border-color:var(--ac)}
+.room.edit .spk.drag .orb{transform:scale(1.12);box-shadow:0 0 0 5px var(--ac-bg),0 0 26px var(--orb-glow)}
 .room svg.lines{position:absolute;inset:0;width:100%;height:100%}
 .room .ring{fill:none;stroke:var(--line);stroke-width:1;vector-effect:non-scaling-stroke}
 .room .ln{stroke:var(--ac);stroke-opacity:.22;stroke-width:1;stroke-dasharray:3 5;vector-effect:non-scaling-stroke}
@@ -146,17 +216,17 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 .me{position:absolute;left:50%;top:76%;transform:translate(-50%,-50%);width:46px;height:46px;border-radius:50%;border:1px solid var(--line2);background:var(--raise);
   display:grid;place-items:center;color:var(--mut)}
 .me svg{width:22px;height:22px}
-.screen{position:absolute;left:30%;right:30%;top:2.5%;height:3px;border-radius:3px;background:var(--line2)}
+.screen{position:absolute;left:30%;right:30%;top:1.5%;height:18px;border-radius:5px;background:var(--ctl);display:grid;place-items:center;font-size:.68rem;font-weight:600;color:var(--bg);letter-spacing:.03em}
 .spk{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:0;padding:0;color:var(--fg);z-index:2}
 .orb{position:relative;width:58px;height:58px;border-radius:50%;background:var(--raise);border:1.5px solid var(--ac-ln);display:grid;place-items:center;
   font-weight:700;font-size:1.15rem;transition:transform .12s,border-color .12s,box-shadow .12s}
 .spk:hover .orb{transform:scale(1.06)}
-.spk[aria-expanded=true] .orb{border-color:var(--ac);box-shadow:0 0 0 4px var(--ac-bg),0 0 26px rgba(74,163,255,.35)}
+.spk[aria-expanded=true] .orb{border-color:var(--ac);box-shadow:0 0 0 4px var(--ac-bg),0 0 26px var(--orb-glow)}
 .spk.sub .orb{border-radius:16px}
 .spk.off .orb{border-style:dashed;border-color:var(--line2);color:var(--mut);background:transparent}
 .spk .st{position:absolute;right:-1px;top:-1px;width:13px;height:13px;border-radius:50%;border:2px solid var(--panel);background:var(--bad)}
 .spk .st.on{background:var(--ok)}
-.spk .cap{font-size:.78rem;color:var(--mut);background:rgba(0,0,0,.65);padding:1px 7px;border-radius:6px;white-space:nowrap}
+.spk .cap{font-size:.78rem;color:var(--mut);background:var(--cap-bg);padding:1px 7px;border-radius:6px;white-space:nowrap}
 .spk .lv{position:absolute;bottom:-1px;left:50%;transform:translateX(-50%);width:34px;height:3px;border-radius:2px;background:var(--line2);overflow:hidden}
 .spk .lv i{display:block;height:100%;background:var(--ac);width:0}
 .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;color:var(--mut);font-size:.85rem}
@@ -171,16 +241,16 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 .mh{display:flex;align-items:baseline;gap:10px;margin-bottom:8px}.mh b{font-weight:650}.mh .hint{margin-left:auto}
 .mb{display:grid;grid-template-columns:repeat(10,1fr);gap:8px}
 .mc{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
-.mc .bar{display:flex;flex-direction:column-reverse;gap:2px;width:100%;max-width:34px;padding:2px;background:#000;border:1px solid var(--line2);border-radius:0}
+.mc .bar{display:flex;flex-direction:column-reverse;gap:2px;width:100%;max-width:34px;padding:2px;background:var(--bar-bg);border:1px solid var(--line2);border-radius:0}
 .led{display:block;height:5px;border-radius:0;background:var(--c);opacity:.16}   /* LED apagado: el mismo color, muy tenue */
 .led.on{opacity:1}
-.led.g{--c:#30d158}.led.y{--c:#ffd60a}.led.r{--c:#ff453a}
+.led.g{--c:var(--led-g)}.led.y{--c:var(--led-y)}.led.r{--c:var(--led-r)}
 .mc .lab{font-size:.68rem;color:var(--mut);line-height:1}
-.mc .cl{width:8px;height:8px;border-radius:0;background:#3a1512}.mc .cl.on{background:#ff453a}
+.mc .cl{width:8px;height:8px;border-radius:0;background:var(--cl-off)}.mc .cl.on{background:var(--led-r)}
 .ms{color:var(--mut);font-size:.74rem;margin-top:8px}
 .meters.off .led.on{opacity:.16}
 /* Cajón del altavoz */
-.scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40;opacity:0;pointer-events:none;transition:opacity .18s}
+.scrim{position:fixed;inset:0;background:var(--scrim);z-index:40;opacity:0;pointer-events:none;transition:opacity .18s}
 .scrim.on{opacity:1;pointer-events:auto}
 .drawer{position:fixed;top:0;right:0;bottom:0;width:min(420px,100%);background:var(--panel);border-left:1px solid var(--line2);z-index:50;
   transform:translateX(102%);transition:transform .2s ease-out;display:flex;flex-direction:column}
@@ -222,7 +292,7 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 .hint{font-size:.88rem;color:var(--mut)}
 
 /* Latencia */
-.cmd{display:block;background:#05070b;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-family:ui-monospace,Consolas,monospace;font-size:.85rem;word-break:break-all;color:var(--fg)}
+.cmd{display:block;background:var(--code-bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-family:ui-monospace,Consolas,monospace;font-size:.85rem;word-break:break-all;color:var(--fg)}
 .big{font-size:2.3rem;font-weight:700;letter-spacing:-.02em;line-height:1.1}
 .big small{font-size:1rem;color:var(--mut);font-weight:500;margin-left:4px}
 table{width:100%;border-collapse:collapse;font-size:.9rem}
@@ -232,14 +302,14 @@ th:first-child,td:first-child{text-align:left}
 td.bad{color:var(--bad)}td.warn{color:var(--warn)}
 .tw{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
 .tw table{min-width:640px}.tw tr:last-child td{border-bottom:0}
-.log{background:#05070b;border:1px solid var(--line);border-radius:12px;padding:12px;font:.84rem/1.6 ui-monospace,Consolas,monospace;height:340px;overflow-y:auto;color:var(--mut)}
+.log{background:var(--code-bg);border:1px solid var(--line);border-radius:12px;padding:12px;font:.84rem/1.6 ui-monospace,Consolas,monospace;height:340px;overflow-y:auto;color:var(--mut)}
 .log b{color:var(--ac);font-weight:500}
 
 .found{border:1px solid var(--line);background:var(--bg);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
 .found .hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.found .hd b{font-weight:650;margin-right:auto}
 .found .ac{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .found .ac .sel{width:auto;min-width:130px;flex:1}
-.found.done{border-color:rgba(62,207,142,.45)}
+.found.done{border-color:var(--ok)}
 .found .res{font-size:.88rem}.found .res.ok{color:var(--ok)}.found .res.bad{color:var(--bad)}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line2);border-top-color:var(--ac);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:6px}
 @keyframes sp{to{transform:rotate(360deg)}}
@@ -247,7 +317,7 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   main{padding:12px 12px calc(96px + env(safe-area-inset-bottom))}
   /* Barra de pestañas inferior (al alcance del pulgar), con icono y una sola palabra */
   .tabs{position:fixed;left:0;right:0;bottom:0;z-index:35;margin:0;gap:0;overflow:visible;justify-content:space-around;border-bottom:0;border-top:1px solid var(--line);
-    background:rgba(10,13,19,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    background:var(--tabs-bg);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
     padding:6px calc(6px + env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) calc(6px + env(safe-area-inset-left))}
   .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;font-size:.72rem;border-bottom:0;margin-bottom:0;min-height:50px}
   .tab svg{display:block}
@@ -270,13 +340,13 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
 </style>
 </head><body>
 <div class="top"><div class="in">
-  <a class="brand" href="/"><svg class="logo" viewBox="0 0 26 26" fill="none" stroke="#4aa3ff" stroke-width="2" stroke-linecap="round"><path d="M3 13h2M8 8v10M13 4v18M18 8v10M23 13h-2"/></svg>SonosWiFi</a>
+  <a class="brand" href="/"><svg class="logo" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 13h2M8 8v10M13 4v18M18 8v10M23 13h-2"/></svg>SonosWiFi</a>
   <span class="chip" id="st"><i class="dot" id="dot"></i><span id="hs">Conectando…</span></span>
   <div class="mv" title="Volumen maestro">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
     <input class="rng" id="mvs" type="range" min="0" max="100" value="100" aria-label="Volumen maestro"><b id="mvd">100%</b>
   </div>
-  <div class="links"><a class="btn ghost sm" id="lcal" href="#">Calibrar</a><button class="btn ghost sm" id="lble">Añadir altavoces</button></div>
+  <div class="links"><button class="btn ghost sm themebtn" data-theme-btn type="button"></button><a class="btn ghost sm" id="lcal" href="#">Calibrar</a><button class="btn ghost sm" id="lble">Añadir altavoces</button></div>
 </div></div>
 
 <main>
@@ -299,15 +369,18 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
     <div class="mb" id="mb"></div>
     <div class="ms">Cada LED son 3 dB (de −60 a 0 dBFS): verde hasta −18, amarillo hasta −6 y rojo por encima. El LED suelto por encima de la barra es el pico reciente.</div>
   </div>
+  <div class="roombar"><span class="hint" id="mhint">Toca un altavoz para ajustarlo. Los cambios se guardan solos.</span>
+    <button class="btn ghost sm" id="mreset" hidden>Restablecer posiciones</button>
+    <button class="btn ghost sm" id="medit" aria-pressed="false" aria-describedby="mhint">Mover altavoces</button></div>
   <div class="room" id="room" aria-label="Plano de la sala con los altavoces">
     <svg class="lines" id="lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
       <ellipse class="ring" cx="50" cy="76" rx="22" ry="17"/><ellipse class="ring" cx="50" cy="76" rx="42" ry="30"/>
     </svg>
-    <div class="screen" title="Pantalla"></div>
-    <div class="me" title="Posición de escucha"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg></div>
+    <div class="screen" title="Pantalla">Pantalla</div><span class="rl back">Atrás</span>
+    <div class="me" title="Posición de escucha"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg><small>Escucha</small></div>
     <div id="spks"></div>
   </div>
-  <div class="legend"><span>Cuadrado = subwoofer</span><span>Punto verde = en línea</span><span>Toca un altavoz para ajustarlo. Los cambios se guardan solos.</span></div>
+  <div class="legend"><span>Cuadrado = subwoofer</span><span>Punto verde = en línea</span><span>Línea = hacia la posición de escucha</span></div>
   <div class="chips" id="chips"></div>
 </section>
 
@@ -390,7 +463,7 @@ const LY=76;
 const EQF=['354 Hz','707 Hz','1,4 kHz','2,8 kHz','5,7 kHz','9,8 kHz'];
 const ROLES=['Rango completo','Satélite','Subwoofer'];
 const LYN=['5 ESP estéreo','10 ESP mono (1 por canal)','Personalizada'];
-let nodes=[],layout=0,st={},openId=null,sig='';
+let nodes=[],layout=0,st={},openId=null,sig='',editRoom=false,drag=null;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pct=v=>Math.round(v/2.55);
@@ -448,9 +521,10 @@ async function loadStatus(){
   }catch(e){lvOK=false;lvTxt='';$('hs').textContent='Sin conexión';$('dot').className='dot bad';}
 }
 async function loadNodes(){
+  if(drag)return;
   try{nodes=await (await fetch('/api/nodes')).json();}catch(e){return;}
   const vis=nodes.filter(n=>n.enabled||n.online||layout!==0);
-  const s=JSON.stringify(vis.map(n=>[n.id,n.enabled,n.online,n.ch_left,n.ch_right,n.mono,n.role,n.ip]))+openId+layout;
+  const s=JSON.stringify(vis.map(n=>[n.id,n.enabled,n.online,n.ch_left,n.ch_right,n.mono,n.role,n.ip,n.pos_x,n.pos_y]))+openId+layout+editRoom;
   if(s!==sig){sig=s;drawRoom();}
   else vis.forEach(n=>{const l=document.querySelector('#spks [data-id="'+n.id+'"] .lv i');if(l)l.style.width=Math.max(0,Math.min(100,n.fill_pct||0))+'%';});
   const on=nodes.filter(n=>n.enabled&&n.online).length,tot=nodes.filter(n=>n.enabled).length;
@@ -458,25 +532,77 @@ async function loadNodes(){
   drawHealth();drawSound();if(openId!==null)updDrawerStats();
 }
 const find=id=>nodes.find(n=>n.id===id);
-function nodePos(n){const a=POS[n.ch_left]||[50,50],b=POS[n.ch_right]||a;return n.mono||n.ch_left===n.ch_right?a:[(a[0]+b[0])/2,(a[1]+b[1])/2];}
+const hasPos=n=>n.pos_x>=0&&n.pos_y>=0;
+function nodePos(n){if(hasPos(n))return [n.pos_x,n.pos_y];const a=POS[n.ch_left]||[50,50],b=POS[n.ch_right]||a;return n.mono||n.ch_left===n.ch_right?a:[(a[0]+b[0])/2,(a[1]+b[1])/2];}
 function nodeLabel(n){return n.mono||n.ch_left===n.ch_right?CH[n.ch_left]:CH[n.ch_left]+' + '+CH[n.ch_right];}
 
 function drawRoom(){
   const vis=nodes.filter(n=>n.enabled||n.online||layout!==0);
   const used={};let h='',ln='';
   let gh='';
-  vis.forEach(n=>{if(!n.enabled)return;let [x,y]=nodePos(n);const k=Math.round(x)+','+Math.round(y);used[k]=(used[k]||0)+1;x+=(used[k]-1)*5;y+=(used[k]-1)*7;
-    ln+='<line class="ln'+(n.online?'':' off')+'" x1="50" y1="'+LY+'" x2="'+x+'" y2="'+y+'"/>';
-    if(!(n.mono||n.ch_left===n.ch_right))[n.ch_left,n.ch_right].forEach(c=>{const g=POS[c]||[50,50];
+  vis.forEach(n=>{if(!n.enabled)return;let [x,y]=nodePos(n);const own=hasPos(n);
+    if(!own){const k=Math.round(x)+','+Math.round(y);used[k]=(used[k]||0)+1;x+=(used[k]-1)*5;y+=(used[k]-1)*7;}
+    ln+='<line class="ln'+(n.online?'':' off')+'" data-lid="'+n.id+'" x1="50" y1="'+LY+'" x2="'+x+'" y2="'+y+'"/>';
+    if(!own&&!(n.mono||n.ch_left===n.ch_right))[n.ch_left,n.ch_right].forEach(c=>{const g=POS[c]||[50,50];
       ln+='<line class="ln pair" x1="'+x+'" y1="'+y+'" x2="'+g[0]+'" y2="'+g[1]+'"/>';
       gh+='<span class="gd'+(n.online?'':' off')+'" style="left:'+g[0]+'%;top:'+g[1]+'%" title="'+CHN[c]+'">'+CH[c]+'</span>';});
-    h+='<button class="spk'+(n.role===2?' sub':'')+(n.online?'':' off')+'" data-id="'+n.id+'" aria-expanded="'+(openId===n.id)+'" style="left:'+x+'%;top:'+y+'%" aria-label="Altavoz '+n.id+', '+nodeLabel(n)+'">'+
+    h+='<button class="spk'+(n.role===2?' sub':'')+(n.online?'':' off')+'" data-id="'+n.id+'" aria-expanded="'+(openId===n.id)+'" style="left:'+x+'%;top:'+y+'%" aria-label="Altavoz '+n.id+', '+nodeLabel(n)+(editRoom?'. Mover con las flechas del teclado':'')+'">'+
       '<span class="orb">'+n.id+'<i class="st'+(n.online?' on':'')+'"></i><span class="lv"><i style="width:'+Math.min(100,n.fill_pct||0)+'%"></i></span></span><span class="cap">'+nodeLabel(n)+(n.role===2?' · sub':n.role===1?' · sat':'')+'</span></button>';});
   $('spks').innerHTML=gh+h||'<div class="empty" style="position:absolute;inset:0;display:grid;place-items:center">Aún no hay altavoces. Enciende un ESP32 o añádelo con «Añadir altavoz».</div>';
   document.querySelectorAll('#lines .ln').forEach(e=>e.remove());$('lines').insertAdjacentHTML('beforeend',ln);
   $('chips').innerHTML=vis.map(n=>'<button data-id="'+n.id+'" aria-expanded="'+(openId===n.id)+'"><i class="dot '+(n.online?'ok':'bad')+'"></i>#'+n.id+' · '+nodeLabel(n)+(n.enabled?'':' · apagado')+'</button>').join('');
-  document.querySelectorAll('#spks .spk,#chips button').forEach(b=>b.onclick=()=>openDrawer(+b.dataset.id));
+  document.querySelectorAll('#spks .spk,#chips button').forEach(b=>b.onclick=()=>{if(editRoom&&b.classList.contains('spk'))return;openDrawer(+b.dataset.id);});
 }
+
+/* Colocar los altavoces en el plano: modo «Mover altavoces». La posición se guarda en la Raspberry (la ven todos los dispositivos). */
+const clampN=(v,a,b)=>Math.max(a,Math.min(b,v));
+const r1=v=>Math.round(v*10)/10;
+async function savePos(n){
+  const r=await J('/api/node',{id:n.id,pos_x:r1(n.pos_x),pos_y:r1(n.pos_y)});
+  if(!r.ok){toast('No se pudo guardar la posición. Comprueba la conexión con la Raspberry.',false);sig='';loadNodes();}
+}
+function setEdit(on){
+  editRoom=on;$('room').classList.toggle('edit',on);$('medit').setAttribute('aria-pressed',on);$('medit').textContent=on?'Listo':'Mover altavoces';
+  $('mreset').hidden=!on;
+  $('mhint').textContent=on?'Arrastra cada altavoz a su lugar en la sala, o usa las flechas del teclado. Se guarda solo.':'Toca un altavoz para ajustarlo. Los cambios se guardan solos.';
+  if(on&&$('drawer').classList.contains('on'))closeDrawer();
+  drawRoom();
+}
+$('medit').onclick=()=>setEdit(!editRoom);
+$('mreset').onclick=async()=>{
+  const rs=await Promise.all(nodes.filter(n=>hasPos(n)).map(n=>J('/api/node',{id:n.id,pos_auto:true})));
+  toast(rs.every(r=>r.ok)?'Posiciones restablecidas: cada altavoz vuelve al lugar de su canal':'No se pudieron restablecer todas las posiciones',rs.every(r=>r.ok));
+  sig='';await loadNodes();
+};
+$('spks').addEventListener('pointerdown',e=>{
+  if(!editRoom)return;const b=e.target.closest('.spk');if(!b)return;
+  e.preventDefault();b.setPointerCapture(e.pointerId);b.classList.add('drag');document.body.classList.add('dragging');if(getSelection)getSelection().removeAllRanges();
+  const n=find(+b.dataset.id),r=$('room').getBoundingClientRect(),bb=b.getBoundingClientRect();
+  drag={id:n.id,b,pid:e.pointerId,moved:false,dx:(bb.left+bb.width/2-e.clientX),dy:(bb.top+bb.height/2-e.clientY)};
+});
+$('spks').addEventListener('pointermove',e=>{
+  if(!drag||e.pointerId!==drag.pid)return;
+  const r=$('room').getBoundingClientRect(),n=find(drag.id);
+  n.pos_x=clampN((e.clientX+drag.dx-r.left)/r.width*100,4,96);n.pos_y=clampN((e.clientY+drag.dy-r.top)/r.height*100,7,93);drag.moved=true;
+  drag.b.style.left=n.pos_x+'%';drag.b.style.top=n.pos_y+'%';
+  const l=document.querySelector('#lines .ln[data-lid="'+n.id+'"]');if(l){l.setAttribute('x2',n.pos_x);l.setAttribute('y2',n.pos_y);}
+});
+const endDrag=async e=>{
+  if(!drag||e.pointerId!==drag.pid)return;
+  const d=drag;d.b.classList.remove('drag');document.body.classList.remove('dragging');
+  if(d.moved){await savePos(find(d.id));}
+  drag=null;sig='';drawRoom();
+};
+$('spks').addEventListener('pointerup',endDrag);$('spks').addEventListener('pointercancel',endDrag);
+const posT={};
+$('spks').addEventListener('keydown',e=>{
+  if(!editRoom)return;const b=e.target.closest('.spk');if(!b)return;
+  const k={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key];if(!k)return;
+  e.preventDefault();const n=find(+b.dataset.id),p=nodePos(n),s=e.shiftKey?5:1;
+  n.pos_x=clampN(p[0]+k[0]*s,4,96);n.pos_y=clampN(p[1]+k[1]*s,7,93);
+  drawRoom();const f=document.querySelector('#spks .spk[data-id="'+n.id+'"]');if(f)f.focus();
+  clearTimeout(posT[n.id]);posT[n.id]=setTimeout(()=>savePos(n),400);
+});
 
 /* Cajón */
 function openDrawer(id){closeBle();openId=id;sig='';buildDrawer();$('drawer').classList.add('on');$('scrim').classList.add('on');$('drawer').setAttribute('aria-hidden','false');sheetOpen($('drawer'));drawRoom();sig='x';loadNodes();}
@@ -710,13 +836,48 @@ setInterval(loadStatus,5000);setInterval(loadNodes,2500);
 static const char PAGE_CAL[] = R"HTML(<!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#000000"><meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#000000"><meta name="color-scheme" content="dark light">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="SonosWiFi"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
 <script>if('serviceWorker' in navigator&&window.isSecureContext)addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});</script>
+<script>/* Tema de la interfaz: «dark» (por defecto), «light» o «auto» (sigue al sistema). Se guarda en localStorage (por navegador).
+   Se ejecuta en el <head> (antes de pintar) para que no haya destello; los botones [data-theme-btn] rotan Oscuro → Claro → Automático. */
+(function () {
+  var KEY = 'sonos_theme', ORDER = ['dark', 'light', 'auto'], NAME = { dark: 'Oscuro', light: 'Claro', auto: 'Automático' };
+  var ICON = {
+    dark: '<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>',
+    light: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+    auto: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor"/>'
+  };
+  var mq = window.matchMedia ? matchMedia('(prefers-color-scheme: light)') : null;
+  function pref() { var p = 'dark'; try { p = localStorage.getItem(KEY) || 'dark'; } catch (e) {} return ORDER.indexOf(p) < 0 ? 'dark' : p; }
+  function apply() {
+    var p = pref(), t = p === 'auto' ? (mq && mq.matches ? 'light' : 'dark') : p;
+    document.documentElement.setAttribute('data-theme', t);
+    var m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', t === 'light' ? '#f3f5f9' : '#000000');
+    var bs = document.querySelectorAll('[data-theme-btn]');
+    for (var i = 0; i < bs.length; i++) {
+      var b = bs[i];
+      b.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICON[p] + '</svg><span class="tl">' + NAME[p] + '</span>';
+      b.setAttribute('aria-label', 'Tema: ' + NAME[p] + '. Pulsa para cambiar');
+      b.title = 'Tema: ' + NAME[p];
+    }
+  }
+  function set(p) { try { localStorage.setItem(KEY, p); } catch (e) {} apply(); }
+  function next() { set(ORDER[(ORDER.indexOf(pref()) + 1) % ORDER.length]); }
+  window.SonosTheme = { get: pref, set: set, next: next, apply: apply };
+  apply();
+  if (mq && mq.addEventListener) mq.addEventListener('change', apply);
+  addEventListener('storage', function (e) { if (e.key === KEY) apply(); });
+  document.addEventListener('DOMContentLoaded', function () {
+    var bs = document.querySelectorAll('[data-theme-btn]');
+    for (var i = 0; i < bs.length; i++) bs[i].addEventListener('click', next);
+    apply();
+  });
+})();</script>
 <title>SonosWiFi — Calibración</title>
 <style>
 /* Sistema de diseño compartido por las tres páginas (panel, /calibrate, /ble). Negro puro + azul señal. */
@@ -725,10 +886,27 @@ static const char PAGE_CAL[] = R"HTML(<!DOCTYPE html>
   --fg:#e9edf5; --mut:#8a93a6; --ac:#4aa3ff; --ac-bg:rgba(74,163,255,.13); --ac-ln:rgba(74,163,255,.5);
   --ctl:#6b7a96;                                   /* borde de controles (campos, interruptor apagado): ≥3:1 sobre las superficies */
   --ok:#3ecf8e; --warn:#f5b84a; --bad:#ff6b6b;
+  --on-ac:#04121f; --ac-hi:#9ad0ff; --ac-lo:#2f6fb3; --bad-fg:#ffb0b0; --bad-ln:rgba(255,107,107,.45); --warn-ln:rgba(245,184,74,.4);
+  --top-bg:rgba(0,0,0,.88); --top-solid:#000; --tabs-bg:rgba(10,13,19,.94); --scrim:rgba(0,0,0,.55); --code-bg:#05070b; --bar-bg:#000; --cl-off:#3a1512;
+  --thumb:#fff; --thumb-ring:rgba(74,163,255,.38); --cap-bg:rgba(0,0,0,.65); --glow:rgba(74,163,255,.09); --orb-glow:rgba(74,163,255,.35);
+  --led-g:#30d158; --led-y:#ffd60a; --led-r:#ff453a;
+  color-scheme:dark;
+}
+/* Tema claro (se activa con data-theme="light" en <html>; el script del <head> resuelve «Automático» según el sistema) */
+html[data-theme=light]{
+  --bg:#f3f5f9; --panel:#ffffff; --raise:#eef1f6; --line:#dfe4ec; --line2:#c5cddb;
+  --fg:#10151d; --mut:#556072; --ac:#0a60bf; --ac-bg:rgba(10,96,191,.10); --ac-ln:rgba(10,96,191,.45);
+  --ctl:#7b879c; --ok:#136f46; --warn:#8f5700; --bad:#c4302b;
+  --on-ac:#ffffff; --ac-hi:#4aa3ff; --ac-lo:#7fb4ec; --bad-fg:#9b1c18; --bad-ln:rgba(196,48,43,.5); --warn-ln:rgba(154,93,0,.45);
+  --top-bg:rgba(243,245,249,.9); --top-solid:#f3f5f9; --tabs-bg:rgba(255,255,255,.94); --scrim:rgba(16,21,29,.35); --code-bg:#e9edf4; --bar-bg:#0b0e14; --cl-off:#e8c9c7;
+  --thumb:#fff; --thumb-ring:rgba(10,96,191,.35); --cap-bg:rgba(255,255,255,.85); --glow:rgba(11,111,216,.07); --orb-glow:rgba(11,111,216,.3);
+  --led-g:#1fa84a; --led-y:#d9a400; --led-r:#e0342b;
+  color-scheme:light;
+}
   --font:system-ui,-apple-system,"Segoe UI Variable Text","Segoe UI","Helvetica Neue",Roboto,sans-serif;   /* tipografía del sistema (SF en Apple) */
 }
 *{box-sizing:border-box;margin:0}
-html{color-scheme:dark;font-size:106.25%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
+html{font-size:106.25%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
 body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
   font-variant-numeric:tabular-nums;min-height:100vh;-webkit-text-size-adjust:100%;
   padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
@@ -742,11 +920,11 @@ h2{font-size:1.02rem;font-weight:650}
 .mut{color:var(--mut)}
 .small{font-size:.86rem}
 
-.btn{appearance:none;border:0;background:var(--ac);color:#04121f;font-weight:650;padding:10px 18px;border-radius:10px;min-height:42px;
+.btn{appearance:none;border:0;background:var(--ac);color:var(--on-ac);font-weight:650;padding:10px 18px;border-radius:10px;min-height:42px;
   transition:filter .12s,transform .06s}
 .btn:hover{filter:brightness(1.1)}.btn:active{transform:translateY(1px)}
 .btn.ghost{background:var(--raise);color:var(--fg);border:1px solid var(--ctl);font-weight:550}
-.btn.danger{background:transparent;color:var(--bad);border:1px solid rgba(255,107,107,.45);font-weight:550}
+.btn.danger{background:transparent;color:var(--bad);border:1px solid var(--bad-ln);font-weight:550}
 .btn.sm{padding:6px 12px;min-height:34px;font-size:.88rem;border-radius:8px}
 .btn:disabled{opacity:.4;cursor:not-allowed;filter:none}
 
@@ -769,8 +947,8 @@ input[type=range].rng.mid{--lo:.5;--hi:.5;
   background:linear-gradient(to right,var(--line2) calc(var(--lo)*(100% - 20px) + 10px),var(--ac) 0,var(--ac) calc(var(--hi)*(100% - 20px) + 10px),var(--line2) 0) no-repeat center/100% 6px}
 .rng::-webkit-slider-runnable-track{height:var(--rh);background:transparent}
 .rng::-moz-range-track{height:var(--rh);background:transparent}
-.rng::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:0;margin-top:calc((var(--rh) - 20px)/2);box-shadow:0 0 0 3px rgba(74,163,255,.38)}
-.rng::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:0;box-shadow:0 0 0 3px rgba(74,163,255,.38)}
+.rng::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--thumb);border:0;margin-top:calc((var(--rh) - 20px)/2);box-shadow:0 0 0 3px var(--thumb-ring)}
+.rng::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--thumb);border:0;box-shadow:0 0 0 3px var(--thumb-ring)}
 .rng:focus-visible{outline-offset:0}
 
 .num,.txt,.sel{background:var(--raise);border:1px solid var(--ctl);border-radius:9px;padding:9px 11px;min-height:40px;width:100%;color:var(--fg)}
@@ -782,20 +960,20 @@ label,.lbl{display:block;color:var(--mut);font-size:.86rem;margin-bottom:5px}
 
 .chip{display:inline-flex;align-items:center;gap:7px;padding:4px 11px;border-radius:999px;background:var(--raise);border:1px solid var(--line);font-size:.84rem;color:var(--mut)}
 .chip.ac{color:var(--ac);border-color:var(--ac-ln);background:var(--ac-bg)}
-.chip.warn{color:var(--warn);border-color:rgba(245,184,74,.4)}
-.chip.bad{color:var(--bad);border-color:rgba(255,107,107,.4)}
+.chip.warn{color:var(--warn);border-color:var(--warn-ln)}
+.chip.bad{color:var(--bad);border-color:var(--bad-ln)}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mut);flex:none}
 .dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
 
-.top{position:sticky;top:0;z-index:30;background:rgba(0,0,0,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
+.top{position:sticky;top:0;z-index:30;background:var(--top-bg);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
   padding-top:env(safe-area-inset-top)}               /* en la app instalada (barra de estado translúcida) el contenido no queda bajo la muesca */
 .top .in{max-width:1180px;margin:auto;display:flex;align-items:center;gap:18px;padding:10px 18px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.05rem;color:var(--fg)}
 .brand:hover{text-decoration:none}
-.logo{width:26px;height:26px;flex:none}
+.logo{width:26px;height:26px;flex:none;color:var(--ac)}
 .panelbox{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px}
 .note{border-radius:12px;padding:12px 14px;background:var(--raise);border:1px solid var(--line2);font-size:.92rem}
-.note.bad{border-color:rgba(255,107,107,.5);color:#ffb0b0}.note.warn{border-color:rgba(245,184,74,.5)}
+.note.bad{border-color:var(--bad-ln);color:var(--bad-fg)}.note.warn{border-color:var(--warn-ln)}
 
 .toasts{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:60;pointer-events:none;width:max-content;max-width:92vw}
 .toast{pointer-events:auto;background:var(--raise);border:1px solid var(--line2);border-left:3px solid var(--ok);padding:9px 14px;border-radius:10px;font-size:.9rem;
@@ -812,12 +990,16 @@ label,.lbl{display:block;color:var(--mut);font-size:.86rem;margin-bottom:5px}
   input[type=range].rng{--rh:44px}
   .switch::before{content:"";position:absolute;inset:-9px -6px}   /* zona de toque ampliada; el aspecto no cambia */
 }
+.themebtn{display:inline-flex;align-items:center;gap:6px}
+.themebtn svg{flex:none}
+@media (max-width:760px){.themebtn .tl{display:none}.themebtn{padding-left:10px;padding-right:10px}}
 /* Ajustes de accesibilidad del sistema */
 @media (prefers-contrast:more){
   :root{--mut:#b4bccc;--ctl:#8d9ab3;--line2:#6b7a96;--ac:#7ec0ff;--ac-ln:rgba(126,192,255,.8)}
+  html[data-theme=light]{--mut:#3b4556;--ctl:#566176;--line2:#8a95a8;--ac:#0a5cb5;--ac-ln:rgba(10,92,181,.8)}
 }
 @media (prefers-reduced-transparency:reduce){
-  .top{background:#000;backdrop-filter:none;-webkit-backdrop-filter:none}
+  .top{background:var(--top-solid);backdrop-filter:none;-webkit-backdrop-filter:none}
 }
 main{max-width:760px;margin:0 auto;padding:20px 16px 80px;display:flex;flex-direction:column;gap:16px}
 .top .in{max-width:760px}
@@ -826,14 +1008,14 @@ main{max-width:760px;margin:0 auto;padding:20px 16px 80px;display:flex;flex-dire
 .steps span{display:flex;align-items:center;gap:8px;white-space:nowrap}
 .steps b{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--line2);display:grid;place-items:center;font-size:.8rem}
 .steps .on{color:var(--fg)}.steps .on b{border-color:var(--ac);color:var(--ac)}
-.steps .done b{background:var(--ac);border-color:var(--ac);color:#04121f}
+.steps .done b{background:var(--ac);border-color:var(--ac);color:var(--on-ac)}
 .opts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .meter{height:10px;background:var(--raise);border-radius:5px;overflow:hidden;border:1px solid var(--line)}
-.meter>div{height:100%;width:0;background:linear-gradient(90deg,var(--ac),#9ad0ff);transition:width .08s}
+.meter>div{height:100%;width:0;background:linear-gradient(90deg,var(--ac),var(--ac-hi));transition:width .08s}
 .prog{height:4px;background:var(--line);border-radius:2px;overflow:hidden}.prog>div{height:100%;width:0;background:var(--ac);transition:width .25s linear}
 .count{font-size:2.6rem;font-weight:700;letter-spacing:-.02em;line-height:1}
 .node{border:1px solid var(--line);background:var(--panel);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:12px}
-.node.bad{border-color:rgba(255,107,107,.45)}
+.node.bad{border-color:var(--bad-ln)}
 .node h3{font-size:1rem;display:flex;align-items:center;gap:10px}
 .node h3 .chip{margin-left:auto}
 .mets{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
@@ -843,21 +1025,21 @@ main{max-width:760px;margin:0 auto;padding:20px 16px 80px;display:flex;flex-dire
 .eqm div{flex:1;position:relative;background:var(--raise);border-radius:6px}
 .eqm div::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:var(--line2)}
 .eqm i{position:absolute;left:18%;right:18%;border-radius:3px;background:var(--ac)}
-.eqm i.neg{background:#2f6fb3}
+.eqm i.neg{background:var(--ac-lo)}
 .eqm em{position:absolute;left:0;right:0;bottom:-18px;text-align:center;font-style:normal;font-size:.7rem;color:var(--mut)}
 .eqw{padding-bottom:20px}
 .tg{display:flex;gap:18px;flex-wrap:wrap}
 .tg label.ck{display:flex;align-items:center;gap:8px;margin:0;color:var(--fg);font-size:.9rem}
 input[type=checkbox]{appearance:none;width:20px;height:20px;border-radius:6px;border:1.5px solid var(--line2);background:var(--raise);display:inline-grid;place-items:center;flex:none;cursor:pointer}
 input[type=checkbox]:checked{background:var(--ac);border-color:var(--ac)}
-input[type=checkbox]:checked::after{content:"";width:5px;height:10px;border:solid #04121f;border-width:0 2.5px 2.5px 0;transform:rotate(45deg) translate(-1px,-1px)}
+input[type=checkbox]:checked::after{content:"";width:5px;height:10px;border:solid var(--on-ac);border-width:0 2.5px 2.5px 0;transform:rotate(45deg) translate(-1px,-1px)}
 .applybox{display:flex;flex-direction:column;gap:12px}
 .log{font:.82rem/1.6 ui-monospace,Consolas,monospace;color:var(--mut);white-space:pre-wrap;max-height:150px;overflow:auto}
 @media (max-width:560px){.opts{grid-template-columns:1fr}.mets{grid-template-columns:1fr 1fr}.steps span em{display:none}}
 </style></head><body>
 <div class="top"><div class="in">
-  <a class="brand" href="/"><svg class="logo" viewBox="0 0 26 26" fill="none" stroke="#4aa3ff" stroke-width="2" stroke-linecap="round"><path d="M3 13h2M8 8v10M13 4v18M18 8v10M23 13h-2"/></svg>SonosWiFi</a>
-  <a class="btn ghost sm" style="margin-left:auto" href="/">Volver al panel</a>
+  <a class="brand" href="/"><svg class="logo" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 13h2M8 8v10M13 4v18M18 8v10M23 13h-2"/></svg>SonosWiFi</a>
+  <span style="margin-left:auto;display:flex;gap:6px"><button class="btn ghost sm themebtn" data-theme-btn type="button"></button><a class="btn ghost sm" href="/">Volver al panel</a></span>
 </div></div>
 <main>
   <div><h1>Calibración acústica</h1><p class="mut">Mide cuándo y con qué nivel llega cada altavoz a tu asiento, y propone latencia, volumen y EQ.</p></div>
@@ -1122,13 +1304,48 @@ view(1);
 static const char PAGE_BLE[] = R"HTML(<!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#000000"><meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#000000"><meta name="color-scheme" content="dark light">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="SonosWiFi"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
 <script>if('serviceWorker' in navigator&&window.isSecureContext)addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});</script>
+<script>/* Tema de la interfaz: «dark» (por defecto), «light» o «auto» (sigue al sistema). Se guarda en localStorage (por navegador).
+   Se ejecuta en el <head> (antes de pintar) para que no haya destello; los botones [data-theme-btn] rotan Oscuro → Claro → Automático. */
+(function () {
+  var KEY = 'sonos_theme', ORDER = ['dark', 'light', 'auto'], NAME = { dark: 'Oscuro', light: 'Claro', auto: 'Automático' };
+  var ICON = {
+    dark: '<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>',
+    light: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+    auto: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor"/>'
+  };
+  var mq = window.matchMedia ? matchMedia('(prefers-color-scheme: light)') : null;
+  function pref() { var p = 'dark'; try { p = localStorage.getItem(KEY) || 'dark'; } catch (e) {} return ORDER.indexOf(p) < 0 ? 'dark' : p; }
+  function apply() {
+    var p = pref(), t = p === 'auto' ? (mq && mq.matches ? 'light' : 'dark') : p;
+    document.documentElement.setAttribute('data-theme', t);
+    var m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', t === 'light' ? '#f3f5f9' : '#000000');
+    var bs = document.querySelectorAll('[data-theme-btn]');
+    for (var i = 0; i < bs.length; i++) {
+      var b = bs[i];
+      b.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICON[p] + '</svg><span class="tl">' + NAME[p] + '</span>';
+      b.setAttribute('aria-label', 'Tema: ' + NAME[p] + '. Pulsa para cambiar');
+      b.title = 'Tema: ' + NAME[p];
+    }
+  }
+  function set(p) { try { localStorage.setItem(KEY, p); } catch (e) {} apply(); }
+  function next() { set(ORDER[(ORDER.indexOf(pref()) + 1) % ORDER.length]); }
+  window.SonosTheme = { get: pref, set: set, next: next, apply: apply };
+  apply();
+  if (mq && mq.addEventListener) mq.addEventListener('change', apply);
+  addEventListener('storage', function (e) { if (e.key === KEY) apply(); });
+  document.addEventListener('DOMContentLoaded', function () {
+    var bs = document.querySelectorAll('[data-theme-btn]');
+    for (var i = 0; i < bs.length; i++) bs[i].addEventListener('click', next);
+    apply();
+  });
+})();</script>
 <title>SonosWiFi — Añadir altavoz</title>
 <style>
 /* Sistema de diseño compartido por las tres páginas (panel, /calibrate, /ble). Negro puro + azul señal. */
@@ -1137,10 +1354,27 @@ static const char PAGE_BLE[] = R"HTML(<!DOCTYPE html>
   --fg:#e9edf5; --mut:#8a93a6; --ac:#4aa3ff; --ac-bg:rgba(74,163,255,.13); --ac-ln:rgba(74,163,255,.5);
   --ctl:#6b7a96;                                   /* borde de controles (campos, interruptor apagado): ≥3:1 sobre las superficies */
   --ok:#3ecf8e; --warn:#f5b84a; --bad:#ff6b6b;
+  --on-ac:#04121f; --ac-hi:#9ad0ff; --ac-lo:#2f6fb3; --bad-fg:#ffb0b0; --bad-ln:rgba(255,107,107,.45); --warn-ln:rgba(245,184,74,.4);
+  --top-bg:rgba(0,0,0,.88); --top-solid:#000; --tabs-bg:rgba(10,13,19,.94); --scrim:rgba(0,0,0,.55); --code-bg:#05070b; --bar-bg:#000; --cl-off:#3a1512;
+  --thumb:#fff; --thumb-ring:rgba(74,163,255,.38); --cap-bg:rgba(0,0,0,.65); --glow:rgba(74,163,255,.09); --orb-glow:rgba(74,163,255,.35);
+  --led-g:#30d158; --led-y:#ffd60a; --led-r:#ff453a;
+  color-scheme:dark;
+}
+/* Tema claro (se activa con data-theme="light" en <html>; el script del <head> resuelve «Automático» según el sistema) */
+html[data-theme=light]{
+  --bg:#f3f5f9; --panel:#ffffff; --raise:#eef1f6; --line:#dfe4ec; --line2:#c5cddb;
+  --fg:#10151d; --mut:#556072; --ac:#0a60bf; --ac-bg:rgba(10,96,191,.10); --ac-ln:rgba(10,96,191,.45);
+  --ctl:#7b879c; --ok:#136f46; --warn:#8f5700; --bad:#c4302b;
+  --on-ac:#ffffff; --ac-hi:#4aa3ff; --ac-lo:#7fb4ec; --bad-fg:#9b1c18; --bad-ln:rgba(196,48,43,.5); --warn-ln:rgba(154,93,0,.45);
+  --top-bg:rgba(243,245,249,.9); --top-solid:#f3f5f9; --tabs-bg:rgba(255,255,255,.94); --scrim:rgba(16,21,29,.35); --code-bg:#e9edf4; --bar-bg:#0b0e14; --cl-off:#e8c9c7;
+  --thumb:#fff; --thumb-ring:rgba(10,96,191,.35); --cap-bg:rgba(255,255,255,.85); --glow:rgba(11,111,216,.07); --orb-glow:rgba(11,111,216,.3);
+  --led-g:#1fa84a; --led-y:#d9a400; --led-r:#e0342b;
+  color-scheme:light;
+}
   --font:system-ui,-apple-system,"Segoe UI Variable Text","Segoe UI","Helvetica Neue",Roboto,sans-serif;   /* tipografía del sistema (SF en Apple) */
 }
 *{box-sizing:border-box;margin:0}
-html{color-scheme:dark;font-size:106.25%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
+html{font-size:106.25%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
 body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
   font-variant-numeric:tabular-nums;min-height:100vh;-webkit-text-size-adjust:100%;
   padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
@@ -1154,11 +1388,11 @@ h2{font-size:1.02rem;font-weight:650}
 .mut{color:var(--mut)}
 .small{font-size:.86rem}
 
-.btn{appearance:none;border:0;background:var(--ac);color:#04121f;font-weight:650;padding:10px 18px;border-radius:10px;min-height:42px;
+.btn{appearance:none;border:0;background:var(--ac);color:var(--on-ac);font-weight:650;padding:10px 18px;border-radius:10px;min-height:42px;
   transition:filter .12s,transform .06s}
 .btn:hover{filter:brightness(1.1)}.btn:active{transform:translateY(1px)}
 .btn.ghost{background:var(--raise);color:var(--fg);border:1px solid var(--ctl);font-weight:550}
-.btn.danger{background:transparent;color:var(--bad);border:1px solid rgba(255,107,107,.45);font-weight:550}
+.btn.danger{background:transparent;color:var(--bad);border:1px solid var(--bad-ln);font-weight:550}
 .btn.sm{padding:6px 12px;min-height:34px;font-size:.88rem;border-radius:8px}
 .btn:disabled{opacity:.4;cursor:not-allowed;filter:none}
 
@@ -1181,8 +1415,8 @@ input[type=range].rng.mid{--lo:.5;--hi:.5;
   background:linear-gradient(to right,var(--line2) calc(var(--lo)*(100% - 20px) + 10px),var(--ac) 0,var(--ac) calc(var(--hi)*(100% - 20px) + 10px),var(--line2) 0) no-repeat center/100% 6px}
 .rng::-webkit-slider-runnable-track{height:var(--rh);background:transparent}
 .rng::-moz-range-track{height:var(--rh);background:transparent}
-.rng::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:0;margin-top:calc((var(--rh) - 20px)/2);box-shadow:0 0 0 3px rgba(74,163,255,.38)}
-.rng::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:0;box-shadow:0 0 0 3px rgba(74,163,255,.38)}
+.rng::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--thumb);border:0;margin-top:calc((var(--rh) - 20px)/2);box-shadow:0 0 0 3px var(--thumb-ring)}
+.rng::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--thumb);border:0;box-shadow:0 0 0 3px var(--thumb-ring)}
 .rng:focus-visible{outline-offset:0}
 
 .num,.txt,.sel{background:var(--raise);border:1px solid var(--ctl);border-radius:9px;padding:9px 11px;min-height:40px;width:100%;color:var(--fg)}
@@ -1194,20 +1428,20 @@ label,.lbl{display:block;color:var(--mut);font-size:.86rem;margin-bottom:5px}
 
 .chip{display:inline-flex;align-items:center;gap:7px;padding:4px 11px;border-radius:999px;background:var(--raise);border:1px solid var(--line);font-size:.84rem;color:var(--mut)}
 .chip.ac{color:var(--ac);border-color:var(--ac-ln);background:var(--ac-bg)}
-.chip.warn{color:var(--warn);border-color:rgba(245,184,74,.4)}
-.chip.bad{color:var(--bad);border-color:rgba(255,107,107,.4)}
+.chip.warn{color:var(--warn);border-color:var(--warn-ln)}
+.chip.bad{color:var(--bad);border-color:var(--bad-ln)}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mut);flex:none}
 .dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
 
-.top{position:sticky;top:0;z-index:30;background:rgba(0,0,0,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
+.top{position:sticky;top:0;z-index:30;background:var(--top-bg);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
   padding-top:env(safe-area-inset-top)}               /* en la app instalada (barra de estado translúcida) el contenido no queda bajo la muesca */
 .top .in{max-width:1180px;margin:auto;display:flex;align-items:center;gap:18px;padding:10px 18px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.05rem;color:var(--fg)}
 .brand:hover{text-decoration:none}
-.logo{width:26px;height:26px;flex:none}
+.logo{width:26px;height:26px;flex:none;color:var(--ac)}
 .panelbox{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px}
 .note{border-radius:12px;padding:12px 14px;background:var(--raise);border:1px solid var(--line2);font-size:.92rem}
-.note.bad{border-color:rgba(255,107,107,.5);color:#ffb0b0}.note.warn{border-color:rgba(245,184,74,.5)}
+.note.bad{border-color:var(--bad-ln);color:var(--bad-fg)}.note.warn{border-color:var(--warn-ln)}
 
 .toasts{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:60;pointer-events:none;width:max-content;max-width:92vw}
 .toast{pointer-events:auto;background:var(--raise);border:1px solid var(--line2);border-left:3px solid var(--ok);padding:9px 14px;border-radius:10px;font-size:.9rem;
@@ -1224,19 +1458,23 @@ label,.lbl{display:block;color:var(--mut);font-size:.86rem;margin-bottom:5px}
   input[type=range].rng{--rh:44px}
   .switch::before{content:"";position:absolute;inset:-9px -6px}   /* zona de toque ampliada; el aspecto no cambia */
 }
+.themebtn{display:inline-flex;align-items:center;gap:6px}
+.themebtn svg{flex:none}
+@media (max-width:760px){.themebtn .tl{display:none}.themebtn{padding-left:10px;padding-right:10px}}
 /* Ajustes de accesibilidad del sistema */
 @media (prefers-contrast:more){
   :root{--mut:#b4bccc;--ctl:#8d9ab3;--line2:#6b7a96;--ac:#7ec0ff;--ac-ln:rgba(126,192,255,.8)}
+  html[data-theme=light]{--mut:#3b4556;--ctl:#566176;--line2:#8a95a8;--ac:#0a5cb5;--ac-ln:rgba(10,92,181,.8)}
 }
 @media (prefers-reduced-transparency:reduce){
-  .top{background:#000;backdrop-filter:none;-webkit-backdrop-filter:none}
+  .top{background:var(--top-solid);backdrop-filter:none;-webkit-backdrop-filter:none}
 }
 main{max-width:600px;margin:0 auto;padding:20px 16px 80px;display:flex;flex-direction:column;gap:16px}
 .top .in{max-width:600px}
 .step{display:flex;gap:14px}
 .num2{flex:none;width:30px;height:30px;border-radius:50%;border:1.5px solid var(--line2);display:grid;place-items:center;font-weight:700;color:var(--mut)}
 .step.cur .num2{border-color:var(--ac);color:var(--ac)}
-.step.done .num2{background:var(--ac);border-color:var(--ac);color:#04121f}
+.step.done .num2{background:var(--ac);border-color:var(--ac);color:var(--on-ac)}
 .step .bd{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
 .step.lock .bd{opacity:.4;pointer-events:none}
 .pills{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
@@ -1256,8 +1494,8 @@ details.adv .in2{padding:4px 0 14px;display:flex;flex-direction:column;gap:12px}
 @media (max-width:420px){.kv{grid-template-columns:1fr}}
 </style></head><body>
 <div class="top"><div class="in">
-  <a class="brand" href="/"><svg class="logo" viewBox="0 0 26 26" fill="none" stroke="#4aa3ff" stroke-width="2" stroke-linecap="round"><path d="M3 13h2M8 8v10M13 4v18M18 8v10M23 13h-2"/></svg>SonosWiFi</a>
-  <a class="btn ghost sm" style="margin-left:auto" href="/">Volver al panel</a>
+  <a class="brand" href="/"><svg class="logo" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 13h2M8 8v10M13 4v18M18 8v10M23 13h-2"/></svg>SonosWiFi</a>
+  <span style="margin-left:auto;display:flex;gap:6px"><button class="btn ghost sm themebtn" data-theme-btn type="button"></button><a class="btn ghost sm" href="/">Volver al panel</a></span>
 </div></div>
 <main>
   <div><h1>Añadir un altavoz</h1><p class="mut">Conecta el ESP32 por Bluetooth y dile a qué WiFi unirse. Solo hace falta una vez.</p></div>
@@ -1401,8 +1639,8 @@ static const char PWA_MANIFEST[] = R"HTML({
 static const char PWA_SW[] = R"HTML(/* Service worker de SonosWiFi. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * 62c068e10b lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-62c068e10b';
+ * 4a62b7a280 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-4a62b7a280';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png'];
 
 self.addEventListener('install', e => {

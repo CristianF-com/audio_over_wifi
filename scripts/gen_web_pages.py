@@ -6,6 +6,7 @@ root = pathlib.Path(__file__).resolve().parent.parent
 web = root / "rpi" / "web"
 out = root / "rpi" / "include" / "web_pages.h"
 css = (web / "shared.css").read_text(encoding="utf-8").strip()
+theme = (web / "theme.js").read_text(encoding="utf-8").strip()
 ana = (web / "analysis.js").read_text(encoding="utf-8").strip()
 pages = [("PAGE_PANEL", "panel.html"), ("PAGE_CAL", "calibrate.html"), ("PAGE_BLE", "ble.html")]
 parts = ["""// web_pages.h — GENERADO por scripts/gen_web_pages.py a partir de rpi/web/*.html. NO editar a mano.
@@ -17,8 +18,8 @@ parts = ["""// web_pages.h — GENERADO por scripts/gen_web_pages.py a partir de
 """]
 for name, f in pages:
     h = (web / f).read_text(encoding="utf-8")
-    h = h.replace("/*@SHARED_CSS@*/", css).replace("/*@ANALYSIS@*/", ana)
-    assert ')HTML"' not in h and "@SHARED_CSS@" not in h and "@ANALYSIS@" not in h, f
+    h = h.replace("/*@SHARED_CSS@*/", css).replace("/*@ANALYSIS@*/", ana).replace("/*@THEME_JS@*/", theme)
+    assert ')HTML"' not in h and "@SHARED_CSS@" not in h and "@ANALYSIS@" not in h and "@THEME_JS@" not in h, f
     parts.append(f'\nstatic const char {name}[] = R"HTML({h.rstrip()})HTML";\n')
 # ── PWA: manifiesto, service worker, icono SVG y PNG (rpi/web/icons/, generados con scripts/gen_icons.py) ──
 import hashlib

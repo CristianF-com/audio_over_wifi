@@ -472,6 +472,7 @@ std::string WebServer::getNodes() {
           << jbool("enabled", n.enabled)  << ","
           << jbool("mono",    n.mono)     << ","
           << jnum("role",     n.role)     << ","
+          << jnum("pos_x",    std::round(n.pos_x * 100.0) / 100.0) << "," << jnum("pos_y", std::round(n.pos_y * 100.0) / 100.0) << ","
           << "\"eq\":[" ;
         for (int b = 0; b < EQ_BANDS; b++) o << (b ? "," : "") << std::round(n.eq_db[b] * 100.0) / 100.0;
         o << "],"
@@ -513,6 +514,14 @@ std::string WebServer::setNode(const std::string& b) {
     if (!streamer_.setNodeConfig((uint8_t)id, (uint8_t)chl, (uint8_t)chr,
                                  (uint8_t)vl, (uint8_t)vr, enabled, mono)) return BAD;
     if (!streamer_.setNodeRole((uint8_t)id, (uint8_t)role)) return BAD;
+    // Posición en el plano: «pos_x» y «pos_y» (0..100, % del plano) siempre juntos; «pos_auto»:true la devuelve a la posición según el canal.
+    std::string sx = jsonGet(b, "pos_x"), sy = jsonGet(b, "pos_y"), sa = jsonGet(b, "pos_auto");
+    if (sa == "true" || sa == "1") { if (!streamer_.setNodePos((uint8_t)id, -1, -1)) return BAD; }
+    else if (!sx.empty() || !sy.empty()) {
+        double px, py;
+        if (!parseFloat(sx, 0, 100, px) || !parseFloat(sy, 0, 100, py)) return BAD;
+        if (!streamer_.setNodePos((uint8_t)id, (float)px, (float)py)) return BAD;
+    }
     return "{\"ok\":true}";
 }
 std::string WebServer::setLayout(const std::string& b) {
