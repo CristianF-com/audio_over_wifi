@@ -23,3 +23,4 @@ Audio multicanal inalámbrico: Traktor Audio 10 (USB, 10 canales) → Raspberry 
 * El procesado (crossover y EQ) está en pass-through por defecto; se activa con `POST /api/dsp`.
 * El firmware NO se ha compilado con ESP-IDF real ni probado en hardware, y el Bluetooth desde la RPi (`scripts/sonos_ble_prov.py`) solo se ha probado simulado. Dilo siempre que se afirme que algo funciona "de verdad".
 * La WiFi de los altavoces se guarda en `config.txt.ble` (0600); nunca la devuelvas por la API ni la subas al repo.
+* PWA: `rpi/web/{manifest.webmanifest,sw.js,icon.svg,icons/}` los sirve `web_server.cpp` sin auth; `gen_web_pages.py` los incrusta (hash de build en el nombre de caché). Iconos: `python3 scripts/gen_icons.py` (PNG opacos). `/api/*` nunca se cachea. Mantén objetivos táctiles ≥44 px, contraste ≥4,5:1 (bordes ≥3:1) y respeta áreas seguras; ver `AUDITORIA_UX.md`.

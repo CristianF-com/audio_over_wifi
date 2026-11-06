@@ -20,6 +20,17 @@ for name, f in pages:
     h = h.replace("/*@SHARED_CSS@*/", css).replace("/*@ANALYSIS@*/", ana)
     assert ')HTML"' not in h and "@SHARED_CSS@" not in h and "@ANALYSIS@" not in h, f
     parts.append(f'\nstatic const char {name}[] = R"HTML({h.rstrip()})HTML";\n')
+# ── PWA: manifiesto, service worker, icono SVG y PNG (rpi/web/icons/, generados con scripts/gen_icons.py) ──
+import hashlib
+build = hashlib.sha1("".join(parts).encode("utf-8")).hexdigest()[:10]
+for name, f in (("PWA_MANIFEST", "manifest.webmanifest"), ("PWA_SW", "sw.js"), ("PWA_ICON_SVG", "icon.svg")):
+    t = (web / f).read_text(encoding="utf-8").replace("@BUILD@", build)
+    assert ')HTML"' not in t, f
+    parts.append(f'\nstatic const char {name}[] = R"HTML({t.rstrip()})HTML";\n')
+for f in ("icon-180", "icon-192", "icon-512", "icon-maskable-512"):
+    data = (web / "icons" / (f + ".png")).read_bytes()
+    body = ",".join(str(b) for b in data)
+    parts.append(f'\nstatic const unsigned char PWA_{f.upper().replace("-", "_")}[] = {{{body}}};\n')
 text = "".join(parts)
 if "--check" in sys.argv:
     cur = out.read_text(encoding="utf-8") if out.exists() else ""

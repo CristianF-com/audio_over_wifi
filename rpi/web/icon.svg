@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="SonosWiFi">
+  <rect width="512" height="512" fill="#000"/>
+  <g fill="#4aa3ff">
+    <rect x="78"  y="211" width="44" height="90"  rx="22"/>
+    <rect x="156" y="161" width="44" height="190" rx="22"/>
+    <rect x="234" y="96"  width="44" height="320" rx="22"/>
+    <rect x="312" y="161" width="44" height="190" rx="22"/>
+    <rect x="390" y="211" width="44" height="90"  rx="22"/>
+  </g>
+</svg>

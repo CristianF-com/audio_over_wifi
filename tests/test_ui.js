@@ -20,7 +20,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   // Estado de transmisión y vúmetros (datos reales del arnés: ch0/1 −6 dBFS, ch2 y ch4 −12 dBFS, el resto en silencio)
   ok('estado: «Transmitiendo · 5 altavoces»',await until(async()=>(await p.textContent('#hs')).includes('Transmitiendo · 5 altavoces')),await p.textContent('#hs'));
   ok('estado: punto verde',(await p.getAttribute('#dot','class')).includes('ok'));
-  const lit=await p.evaluate(()=>[...document.querySelectorAll('#mb .bar')].map(b=>b.querySelectorAll('.seg.on').length));
+  const lit=await p.evaluate(()=>[...document.querySelectorAll('#mb .bar')].map(b=>b.querySelectorAll('.led.on').length));
   ok('vúmetros LED: 10 canales x 20 segmentos',await p.evaluate(()=>[...document.querySelectorAll('#mb .bar')].every(b=>b.children.length===20))&&lit.length===10);
   ok('vúmetros LED: FL/FR ≈ 18 LED (−6 dBFS), C y canal 4 ≈ 16 (−12 dBFS), LFE apagado',Math.abs(lit[0]-18)<=1&&Math.abs(lit[1]-18)<=1&&Math.abs(lit[2]-16)<=1&&lit[4]>=15&&lit[4]<=17&&lit[3]===0,lit);
   const cs=await p.evaluate(()=>{const b=document.querySelector('#mb .bar'),sg=b.children[0],bs=getComputedStyle(b),ss=getComputedStyle(sg);
@@ -31,13 +31,13 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('vúmetros: texto de pico ≈ −6 dBFS',(await p.textContent('#mtxt')).includes('−')===false&&(await p.textContent('#mtxt')).includes('-6'),await p.textContent('#mtxt'));
   const fake=async(o)=>{await p.route('**/api/levels',r=>r.fulfill({contentType:'application/json',body:JSON.stringify(Object.assign({capturing:true,signal:true,signal_age_ms:10,pps:900,sending:true,nodes_online:5,db:[-6,-6,-12,-90,-12,-90,-90,-90,-90,-90]},o))}));};
   await fake({capturing:false,signal:false,sending:false,db:[-90,-90,-90,-90,-90,-90,-90,-90,-90,-90]});
-  ok('estado: sin captura -> «Sin captura de la Traktor» (rojo) y barras atenuadas',await until(async()=>(await p.textContent('#hs'))==='Sin captura de la Traktor'&&(await p.getAttribute('#dot','class')).includes('bad')&&(await p.getAttribute('#meters','class')).includes('off')&&(await p.locator('#mb .seg.on').count())===0));
+  ok('estado: sin captura -> «Sin captura de la Traktor» (rojo) y barras atenuadas',await until(async()=>(await p.textContent('#hs'))==='Sin captura de la Traktor'&&(await p.getAttribute('#dot','class')).includes('bad')&&(await p.getAttribute('#meters','class')).includes('off')&&(await p.locator('#mb .led.on').count())===0));
   await fake({signal:false,sending:false,db:[-90,-90,-90,-90,-90,-90,-90,-90,-90,-90]});
   ok('estado: silencio -> «Traktor conectada, sin señal» (ámbar)',await until(async()=>(await p.textContent('#hs'))==='Traktor conectada, sin señal'&&(await p.getAttribute('#dot','class')).includes('warn')&&(await p.textContent('#mtxt'))==='Silencio'));
   await fake({sending:false,nodes_online:0});
   ok('estado: señal sin altavoces -> «Hay señal, ningún altavoz en línea»',await until(async()=>(await p.textContent('#hs'))==='Hay señal, ningún altavoz en línea'));
   await fake({db:[-0.5,-6,-12,-90,-12,-90,-90,-90,-90,-90]});
-  ok('vúmetros: clip (≥ −1 dBFS) enciende el indicador del canal y los 2 LED rojos',await until(async()=>(await p.getAttribute('#mcl0','class')).includes('on')&&(await p.locator('#mb .bar').first().locator('.seg.r.on').count())===2));
+  ok('vúmetros: clip (≥ −1 dBFS) enciende el indicador del canal y los 2 LED rojos',await until(async()=>(await p.getAttribute('#mcl0','class')).includes('on')&&(await p.locator('#mb .bar').first().locator('.led.r.on').count())===2));
   if(SHOTS)await p.screenshot({path:SHOTS+'/panel_vumetros_clip.png'});
   await p.unroute('**/api/levels');
   ok('estado: vuelve a «Transmitiendo» al restablecerse',await until(async()=>(await p.textContent('#hs')).startsWith('Transmitiendo')));
@@ -121,16 +121,67 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('BLE: se configuraron A101 (5), B202 (6) con la WiFi guardada',lines.some(x=>x.address.endsWith('01')&&x.id===5&&x.ssid==='Casa5G'&&x.pass_len===10)&&lines.some(x=>x.address.endsWith('02')&&x.id===6),lines);
   await p.keyboard.press('Escape');ok('Esc cierra el panel Bluetooth',await until(async()=>!(await p.$('#bdrawer.on'))));
   ok('panel sin errores de JS',errs.length===0,errs);
+  // ── PWA ──
+  const mf=await fetch(BASE+'/manifest.webmanifest');const mj=await mf.json();
+  ok('PWA: manifiesto válido (nombre, standalone, inicio, colores, 3 iconos, atajos)',mj.name==='SonosWiFi'&&mj.display==='standalone'&&mj.start_url==='/'&&mj.theme_color==='#000000'&&mj.background_color==='#000000'&&mj.lang==='es'&&mj.icons.length>=3&&mj.icons.some(i=>i.purpose==='maskable')&&mj.shortcuts.length>=2,mj);
+  const pngSize=async u=>{const b=Buffer.from(await (await fetch(BASE+u)).arrayBuffer());return b.readUInt32BE(0)===0x89504e47?[b.readUInt32BE(16),b.readUInt32BE(20),b[25]]:null;};
+  ok('PWA: iconos PNG con el tamaño declarado y sin canal alfa (opacos, como pide Apple)',JSON.stringify(await pngSize('/icons/icon-180.png'))==='[180,180,2]'&&JSON.stringify(await pngSize('/icons/icon-192.png'))==='[192,192,2]'&&JSON.stringify(await pngSize('/icons/icon-512.png'))==='[512,512,2]'&&JSON.stringify(await pngSize('/icons/icon-maskable-512.png'))==='[512,512,2]');
+  const sw=await (await fetch(BASE+'/sw.js')).text();
+  ok('PWA: service worker (la API no se cachea, la caché se invalida por versión)',sw.includes("startsWith('/api/')")&&sw.includes('caches.open')&&!sw.includes('@BUILD@')&&/sonoswifi-[0-9a-f]{10}/.test(sw.replace("'sonoswifi-@BUILD@'","")+'')||/CACHE = 'sonoswifi-[0-9a-f]{10}'/.test(sw),sw.slice(0,200));
+  for(const [u,n] of [['/','panel'],['/ble','ble'],['/calibrate','calibrar']]){
+    const html=await (await fetch(BASE+u)).text();
+    ok('PWA: '+n+' enlaza manifiesto, apple-touch-icon, viewport-fit y modo app',html.includes('rel="manifest" href="/manifest.webmanifest"')&&html.includes('rel="apple-touch-icon" href="/icons/icon-180.png"')&&html.includes('viewport-fit=cover')&&html.includes('apple-mobile-web-app-capable')&&html.includes("register('/sw.js')"));
+  }
+  // ── Accesibilidad (HIG › Accessibility) ──
+  const ratio=await p.evaluate(()=>{const cs=getComputedStyle(document.documentElement),v=n=>cs.getPropertyValue(n).trim();
+    const lum=h=>{h=h.replace('#','');if(h.length===3)h=h.split('').map(x=>x+x).join('');const c=[0,2,4].map(i=>parseInt(h.substr(i,2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*c[0]+.7152*c[1]+.0722*c[2];};
+    const cr=(a,b)=>{const x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+    return {mutBg:cr(v('--mut'),v('--bg')),mutPanel:cr(v('--mut'),v('--panel')),mutRaise:cr(v('--mut'),v('--raise')),acPanel:cr(v('--ac'),v('--panel')),fgBg:cr(v('--fg'),v('--bg')),
+      ctlRaise:cr(v('--ctl'),v('--raise')),ctlPanel:cr(v('--ctl'),v('--panel')),badBg:cr(v('--bad'),v('--bg')),okBg:cr(v('--ok'),v('--bg')),warnBg:cr(v('--warn'),v('--bg'))};});
+  ok('contraste del texto ≥ 4.5:1 (WCAG AA, como en la HIG) sobre todas las superficies',['mutBg','mutPanel','mutRaise','acPanel','fgBg','badBg','okBg','warnBg'].every(k=>ratio[k]>=4.5),ratio);
+  ok('contraste del borde de controles (campos, interruptor, botones) ≥ 3:1',ratio.ctlRaise>=3&&ratio.ctlPanel>=3,ratio);
+  const small=await p.evaluate(()=>{const out=[];for(const e of document.querySelectorAll('body *')){if(!e.offsetParent&&getComputedStyle(e).position!=='fixed')continue;
+    if(![...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim()))continue;const fs=parseFloat(getComputedStyle(e).fontSize);if(fs<11)out.push(e.className+':'+e.textContent.trim().slice(0,20)+':'+fs);}return out;});
+  ok('ningún texto por debajo de 11 px (mínimo de iOS)',small.length===0,small);
+  ok('el texto base es 17 px y sigue el tamaño de letra del navegador (rem)',await p.evaluate(()=>getComputedStyle(document.body).fontSize==='17px'&&getComputedStyle(document.documentElement).fontSize==='17px'));
+  const sb=await p.locator('#lyseg button').first().boundingBox();
+  ok('controles segmentados visibles (no se pisan con los LED del vúmetro)',sb&&sb.height>=30&&sb.width>=60,sb);
+  ok('el cajón cerrado es inerte y está oculto (el teclado no entra en él)',await p.evaluate(()=>document.getElementById('drawer').inert===true&&document.getElementById('bdrawer').inert===true&&document.getElementById('drawer').getAttribute('aria-hidden')==='true'));
+  ok('los cajones son diálogos modales con título',await p.evaluate(()=>['drawer','bdrawer'].every(i=>{const d=document.getElementById(i);return d.getAttribute('role')==='dialog'&&d.getAttribute('aria-modal')==='true'&&document.getElementById(d.getAttribute('aria-labelledby'))!==null;})));
+  await p.click('#spks .spk[data-id="2"]');await p.waitForSelector('#drawer.on');
+  ok('al abrir un cajón: el foco entra en él y el resto de la página queda inerte',await until(async()=>await p.evaluate(()=>document.activeElement&&document.activeElement.id==='dclose'&&document.querySelector('main').inert&&document.querySelector('.top').inert&&!document.getElementById('drawer').inert)));
+  await p.keyboard.press('Escape');
+  ok('al cerrar con Esc: el foco vuelve al altavoz que lo abrió y la página deja de ser inerte',await until(async()=>await p.evaluate(()=>document.activeElement&&document.activeElement.classList.contains('spk')&&document.activeElement.dataset.id==='2'&&!document.querySelector('main').inert&&document.getElementById('drawer').inert)));
+  await p.focus('.tab[data-tab="spk"]');await p.keyboard.press('ArrowRight');
+  ok('pestañas con teclado: → selecciona y enfoca la siguiente (foco itinerante)',await p.evaluate(()=>document.activeElement.dataset.tab==='snd'&&document.activeElement.getAttribute('aria-selected')==='true'&&document.querySelector('.tab[data-tab="spk"]').tabIndex===-1&&!document.getElementById('p_snd').hidden));
+  await p.keyboard.press('End');ok('pestañas con teclado: Fin va a la última',await p.evaluate(()=>document.activeElement.dataset.tab==='log'));
+  await p.keyboard.press('Home');ok('pestañas con teclado: Inicio va a la primera',await p.evaluate(()=>document.activeElement.dataset.tab==='spk'));
+  ok('pestañas enlazadas con sus paneles (aria-controls / aria-labelledby)',await p.evaluate(()=>[...document.querySelectorAll('.tab')].every(t=>{const pane=document.getElementById(t.getAttribute('aria-controls'));return pane&&pane.getAttribute('aria-labelledby')===t.id;})));
+  ok('los avisos se anuncian al lector de pantalla (región en vivo) y los errores como alerta',await p.evaluate(()=>{const tb=document.getElementById('tb');toast('prueba',false);const a=tb.querySelector('.toast.bad');const r=tb.getAttribute('role')==='status'&&tb.getAttribute('aria-live')==='polite'&&a&&a.getAttribute('role')==='alert';if(a)a.remove();return r;}));
+  ok('volumen maestro con texto para lector de pantalla (aria-valuetext)',await p.evaluate(()=>/\d+ %/.test(document.getElementById('mvs').getAttribute('aria-valuetext')||'')));
   // Móvil
   const m=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
   const q=await m.newPage();await q.goto(BASE+'/');await q.waitForSelector('#spks .spk');await sleep(800);
   ok('móvil: sin scroll horizontal',await q.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
   if(SHOTS)await q.screenshot({path:SHOTS+'/movil_altavoces.png'});
+  ok('móvil: la navegación es una barra inferior fija con icono y una sola palabra por pestaña',await q.evaluate(()=>{const t=document.querySelector('.tabs'),r=t.getBoundingClientRect(),cs=getComputedStyle(t);
+    return cs.position==='fixed'&&Math.abs(r.bottom-innerHeight)<2&&[...t.querySelectorAll('.tab')].every(b=>b.querySelector('svg')&&getComputedStyle(b.querySelector('svg')).display!=='none'&&b.textContent.trim().split(/\s+/).length===1);}));
+  ok('móvil: objetivos táctiles de 44 px como mínimo (botones, segmentos, pestañas, selector, campo)',await q.evaluate(()=>['#lble','#lcal','#lyseg button','.tab','#spks .spk','#mvs'].every(s=>{const e=document.querySelector(s);const r=e.getBoundingClientRect();return r.height>=44-.5;})));
+  ok('móvil: la cabecera ya no es fija (la navegación va abajo)',await q.evaluate(()=>getComputedStyle(document.querySelector('.top')).position==='static'));
+  ok('móvil: ningún texto por debajo de 11 px',await q.evaluate(()=>{for(const e of document.querySelectorAll('body *')){if(!e.offsetParent&&getComputedStyle(e).position!=='fixed')continue;if(![...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim()))continue;if(parseFloat(getComputedStyle(e).fontSize)<11)return false;}return true;}));
   await q.tap('#spks .spk[data-id="0"]');await q.waitForSelector('#drawer.on');await sleep(400);
   if(SHOTS)await q.screenshot({path:SHOTS+'/movil_cajon.png'});
+  ok('móvil: la hoja muestra el asa (grabber)',await q.evaluate(()=>getComputedStyle(document.querySelector('#drawer .grab')).display==='block'));
+  ok('móvil: los botones de la hoja miden 44 px (cerrar, interruptor)',await q.evaluate(()=>{const x=document.getElementById('dclose').getBoundingClientRect();const sw=getComputedStyle(document.querySelector('#drawer .switch'),'::before');return x.height>=43.5&&x.width>=43.5&&sw.content!=='none';}));
+  {const bx=await q.locator('#dtitle').boundingBox();const cx=bx.x+bx.width/2,cy=bx.y+bx.height/2;
+   await q.mouse.move(cx,cy);await q.mouse.down();await q.mouse.move(cx,cy+60,{steps:4});await q.mouse.move(cx,cy+220,{steps:6});await q.mouse.up();
+   ok('móvil: deslizar la hoja hacia abajo la cierra (como un sheet de iOS)',await until(async()=>!(await q.$('#drawer.on'))));
+   await q.tap('#spks .spk[data-id="0"]');await q.waitForSelector('#drawer.on');await sleep(300);
+   const bx2=await q.locator('#dtitle').boundingBox();await q.mouse.move(bx2.x+bx2.width/2,bx2.y+5);await q.mouse.down();await q.mouse.move(bx2.x+bx2.width/2,bx2.y+25,{steps:3});await q.mouse.up();await sleep(300);
+   ok('móvil: un arrastre corto no la cierra (vuelve a su sitio)',!!(await q.$('#drawer.on'))&&await q.evaluate(()=>document.getElementById('drawer').style.transform===''));}
   await q.tap('#dclose');await q.click('.tab[data-tab="snd"]');await sleep(300);
   ok('móvil: Sonido sin scroll horizontal',await q.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
-  if(SHOTS)await q.screenshot({path:SHOTS+'/movil_sonido.png',fullPage:true});
+  if(SHOTS)await q.screenshot({path:SHOTS+'/movil_sonido.png'});
   await m.close();
   // /ble con Web Bluetooth simulado
   const bp=await ctx.newPage();const berr=[];bp.on('pageerror',e=>berr.push(String(e)));

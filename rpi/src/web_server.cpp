@@ -291,16 +291,31 @@ void WebServer::handleClient(int cfd, bool tls) {
     }
     std::string resp, ct = "application/json", extra;
     int code = 200;
+    // Recursos de la PWA (manifiesto, service worker, iconos): públicos, sin datos; el navegador los pide sin credenciales.
+    const char* pwaTxt = nullptr; const char* pwaCt = nullptr;
+    const unsigned char* pwaBin = nullptr; size_t pwaBinLen = 0;
+    if (m == "GET") {
+        if      (p == "/manifest.webmanifest") { pwaTxt = PWA_MANIFEST;  pwaCt = "application/manifest+json; charset=utf-8"; }
+        else if (p == "/sw.js")                { pwaTxt = PWA_SW;        pwaCt = "text/javascript; charset=utf-8"; extra = "Service-Worker-Allowed: /\r\n"; }
+        else if (p == "/icon.svg")             { pwaTxt = PWA_ICON_SVG;  pwaCt = "image/svg+xml"; }
+        else if (p == "/icons/icon-180.png" || p == "/apple-touch-icon.png") { pwaBin = PWA_ICON_180; pwaBinLen = sizeof(PWA_ICON_180); }
+        else if (p == "/icons/icon-192.png")   { pwaBin = PWA_ICON_192;  pwaBinLen = sizeof(PWA_ICON_192); }
+        else if (p == "/icons/icon-512.png")   { pwaBin = PWA_ICON_512;  pwaBinLen = sizeof(PWA_ICON_512); }
+        else if (p == "/icons/icon-maskable-512.png") { pwaBin = PWA_ICON_MASKABLE_512; pwaBinLen = sizeof(PWA_ICON_MASKABLE_512); }
+    }
+    const bool pwa = pwaTxt || pwaBin;
     bool authed = password_.empty();
     if (!authed && auth.size() > 6 && strncasecmp(auth.c_str(), "Basic ", 6) == 0) {
         std::string up = b64decode(auth.substr(6));
         size_t colon = up.find(':');
         authed = colon != std::string::npos && constEq(up.substr(colon + 1), password_);   // el usuario es libre
     }
-    if (!authed) {
+    if (!authed && !pwa) {
         code = 401; resp = "{\"error\":\"unauthorized\"}";
         extra = "WWW-Authenticate: Basic realm=\"SonosWiFi\", charset=\"UTF-8\"\r\n";
     }
+    else if (pwaTxt) { resp = pwaTxt; ct = pwaCt; }
+    else if (pwaBin) { resp.assign(reinterpret_cast<const char*>(pwaBin), pwaBinLen); ct = "image/png"; }
     else if ((p == "/" || p == "/index.html") && m == "GET") { resp = PAGE_PANEL; ct = "text/html; charset=utf-8"; }
     else if (p == "/calibrate" && m == "GET") { resp = PAGE_CAL; ct = "text/html; charset=utf-8"; }
     else if (p == "/ble"       && m == "GET") { resp = PAGE_BLE; ct = "text/html; charset=utf-8"; }

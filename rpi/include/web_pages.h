@@ -7,21 +7,29 @@
 
 static const char PAGE_PANEL[] = R"HTML(<!DOCTYPE html>
 <html lang="es"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#000000">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000"><meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SonosWiFi"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="/icons/icon-180.png">
+<script>if('serviceWorker' in navigator&&window.isSecureContext)addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});</script>
 <title>SonosWiFi</title>
 <style>
 /* Sistema de diseño compartido por las tres páginas (panel, /calibrate, /ble). Negro puro + azul señal. */
 :root{
   --bg:#000; --panel:#0a0d13; --raise:#121722; --line:#1f2735; --line2:#2b3548;
   --fg:#e9edf5; --mut:#8a93a6; --ac:#4aa3ff; --ac-bg:rgba(74,163,255,.13); --ac-ln:rgba(74,163,255,.5);
+  --ctl:#6b7a96;                                   /* borde de controles (campos, interruptor apagado): ≥3:1 sobre las superficies */
   --ok:#3ecf8e; --warn:#f5b84a; --bad:#ff6b6b;
-  --font:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Roboto,sans-serif;
+  --font:system-ui,-apple-system,"Segoe UI Variable Text","Segoe UI","Helvetica Neue",Roboto,sans-serif;   /* tipografía del sistema (SF en Apple) */
 }
 *{box-sizing:border-box;margin:0}
-html{color-scheme:dark}
-body{background:var(--bg);color:var(--fg);font:15px/1.45 var(--font);-webkit-font-smoothing:antialiased;
-  font-variant-numeric:tabular-nums;min-height:100vh;-webkit-text-size-adjust:100%}
+html{color-scheme:dark;font-size:106.25%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
+body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
+  font-variant-numeric:tabular-nums;min-height:100vh;-webkit-text-size-adjust:100%;
+  padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
 a{color:var(--ac);text-decoration:none}a:hover{text-decoration:underline}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
@@ -35,35 +43,35 @@ h2{font-size:1.02rem;font-weight:650}
 .btn{appearance:none;border:0;background:var(--ac);color:#04121f;font-weight:650;padding:10px 18px;border-radius:10px;min-height:42px;
   transition:filter .12s,transform .06s}
 .btn:hover{filter:brightness(1.1)}.btn:active{transform:translateY(1px)}
-.btn.ghost{background:var(--raise);color:var(--fg);border:1px solid var(--line2);font-weight:550}
+.btn.ghost{background:var(--raise);color:var(--fg);border:1px solid var(--ctl);font-weight:550}
 .btn.danger{background:transparent;color:var(--bad);border:1px solid rgba(255,107,107,.45);font-weight:550}
 .btn.sm{padding:6px 12px;min-height:34px;font-size:.88rem;border-radius:8px}
 .btn:disabled{opacity:.4;cursor:not-allowed;filter:none}
 
-.seg{display:inline-flex;background:var(--raise);border:1px solid var(--line);border-radius:11px;padding:3px;gap:2px;max-width:100%}
+.seg{display:inline-flex;background:var(--raise);border:1px solid var(--ctl);border-radius:11px;padding:3px;gap:2px;max-width:100%}
 .seg button{appearance:none;border:0;background:transparent;color:var(--mut);padding:7px 14px;border-radius:8px;min-height:34px;font-weight:550;white-space:nowrap}
 .seg button:hover{color:var(--fg)}
 .seg button[aria-pressed=true]{background:var(--ac-bg);color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac-ln)}
-.seg.block{display:flex}.seg.block button{flex:1}
+.seg.block{display:flex}.seg.block button{flex:1;min-width:0;white-space:normal;line-height:1.2;padding-left:8px;padding-right:8px}   /* con texto grande o pantalla estrecha, las etiquetas bajan de línea en vez de salirse */
 
-.switch{appearance:none;position:relative;width:46px;height:27px;border-radius:14px;border:1px solid var(--line2);background:var(--raise);flex:none;
+.switch{appearance:none;position:relative;width:46px;height:27px;border-radius:14px;border:1px solid var(--ctl);background:var(--raise);flex:none;
   transition:background .15s,border-color .15s}
 .switch::after{content:"";position:absolute;top:2px;left:2px;width:21px;height:21px;border-radius:50%;background:var(--mut);transition:transform .15s,background .15s}
 .switch[aria-checked=true]{background:var(--ac-bg);border-color:var(--ac-ln)}
 .switch[aria-checked=true]::after{transform:translateX(19px);background:var(--ac)}
 
 input[type=range].rng{-webkit-appearance:none;appearance:none;width:100%;height:28px;background:transparent;border-radius:0;cursor:pointer;
-  --f:.5;
+  --f:.5;--rh:28px;height:var(--rh);
   background:linear-gradient(to right,var(--ac) calc(var(--f)*(100% - 20px) + 10px),var(--line2) 0) no-repeat center/100% 6px}
 input[type=range].rng.mid{--lo:.5;--hi:.5;
   background:linear-gradient(to right,var(--line2) calc(var(--lo)*(100% - 20px) + 10px),var(--ac) 0,var(--ac) calc(var(--hi)*(100% - 20px) + 10px),var(--line2) 0) no-repeat center/100% 6px}
-.rng::-webkit-slider-runnable-track{height:28px;background:transparent}
-.rng::-moz-range-track{height:28px;background:transparent}
-.rng::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:0;margin-top:4px;box-shadow:0 0 0 3px rgba(74,163,255,.38)}
+.rng::-webkit-slider-runnable-track{height:var(--rh);background:transparent}
+.rng::-moz-range-track{height:var(--rh);background:transparent}
+.rng::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:0;margin-top:calc((var(--rh) - 20px)/2);box-shadow:0 0 0 3px rgba(74,163,255,.38)}
 .rng::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:0;box-shadow:0 0 0 3px rgba(74,163,255,.38)}
 .rng:focus-visible{outline-offset:0}
 
-.num,.txt,.sel{background:var(--raise);border:1px solid var(--line2);border-radius:9px;padding:9px 11px;min-height:40px;width:100%;color:var(--fg)}
+.num,.txt,.sel{background:var(--raise);border:1px solid var(--ctl);border-radius:9px;padding:9px 11px;min-height:40px;width:100%;color:var(--fg)}
 .num{width:110px}
 .num:focus,.txt:focus,.sel:focus{outline:2px solid var(--ac);outline-offset:1px;border-color:transparent}
 .sel{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--mut) 50%),linear-gradient(135deg,var(--mut) 50%,transparent 50%);
@@ -77,7 +85,8 @@ label,.lbl{display:block;color:var(--mut);font-size:.86rem;margin-bottom:5px}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mut);flex:none}
 .dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
 
-.top{position:sticky;top:0;z-index:30;background:rgba(0,0,0,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top{position:sticky;top:0;z-index:30;background:rgba(0,0,0,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
+  padding-top:env(safe-area-inset-top)}               /* en la app instalada (barra de estado translúcida) el contenido no queda bajo la muesca */
 .top .in{max-width:1180px;margin:auto;display:flex;align-items:center;gap:18px;padding:10px 18px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.05rem;color:var(--fg)}
 .brand:hover{text-decoration:none}
@@ -86,14 +95,28 @@ label,.lbl{display:block;color:var(--mut);font-size:.86rem;margin-bottom:5px}
 .note{border-radius:12px;padding:12px 14px;background:var(--raise);border:1px solid var(--line2);font-size:.92rem}
 .note.bad{border-color:rgba(255,107,107,.5);color:#ffb0b0}.note.warn{border-color:rgba(245,184,74,.5)}
 
-.toasts{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:60;pointer-events:none;width:max-content;max-width:92vw}
-.toast{background:var(--raise);border:1px solid var(--line2);border-left:3px solid var(--ok);padding:9px 14px;border-radius:10px;font-size:.9rem;
+.toasts{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:60;pointer-events:none;width:max-content;max-width:92vw}
+.toast{pointer-events:auto;background:var(--raise);border:1px solid var(--line2);border-left:3px solid var(--ok);padding:9px 14px;border-radius:10px;font-size:.9rem;
   animation:tin .18s ease-out}
 .toast.bad{border-left-color:var(--bad)}
 @keyframes tin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 .procbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;border-radius:12px;background:var(--ac-bg);border:1px solid var(--ac-ln);color:var(--ac);font-size:.92rem}
 .procbar[hidden]{display:none}
+
+/* Objetivos táctiles: 44 × 44 (mínimo cómodo de iOS) cuando el puntero es el dedo */
+@media (pointer:coarse){
+  .btn,.btn.sm,.seg button,.tab,.num,.txt,.sel{min-height:44px}
+  input[type=range].rng{--rh:44px}
+  .switch::before{content:"";position:absolute;inset:-9px -6px}   /* zona de toque ampliada; el aspecto no cambia */
+}
+/* Ajustes de accesibilidad del sistema */
+@media (prefers-contrast:more){
+  :root{--mut:#b4bccc;--ctl:#8d9ab3;--line2:#6b7a96;--ac:#7ec0ff;--ac-ln:rgba(126,192,255,.8)}
+}
+@media (prefers-reduced-transparency:reduce){
+  .top{background:#000;backdrop-filter:none;-webkit-backdrop-filter:none}
+}
 main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 .top .in{gap:14px}
 .mv{display:flex;align-items:center;gap:10px;margin-left:auto;min-width:210px;flex:0 1 300px}
@@ -103,6 +126,7 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 .tabs{display:flex;gap:4px;overflow-x:auto;margin:6px 0 18px;border-bottom:1px solid var(--line);scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
 .tab{appearance:none;background:none;border:0;color:var(--mut);padding:11px 16px;font-weight:600;border-bottom:2px solid transparent;white-space:nowrap;margin-bottom:-1px}
+.tab svg{display:none;width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .tab:hover{color:var(--fg)}
 .tab[aria-selected=true]{color:var(--ac);border-bottom-color:var(--ac)}
 .pane[hidden]{display:none}
@@ -148,20 +172,22 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 .mb{display:grid;grid-template-columns:repeat(10,1fr);gap:8px}
 .mc{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
 .mc .bar{display:flex;flex-direction:column-reverse;gap:2px;width:100%;max-width:34px;padding:2px;background:#000;border:1px solid var(--line2);border-radius:0}
-.seg{display:block;height:5px;border-radius:0;background:var(--c);opacity:.16}   /* LED apagado: el mismo color, muy tenue */
-.seg.on{opacity:1}
-.seg.g{--c:#30d158}.seg.y{--c:#ffd60a}.seg.r{--c:#ff453a}
+.led{display:block;height:5px;border-radius:0;background:var(--c);opacity:.16}   /* LED apagado: el mismo color, muy tenue */
+.led.on{opacity:1}
+.led.g{--c:#30d158}.led.y{--c:#ffd60a}.led.r{--c:#ff453a}
 .mc .lab{font-size:.68rem;color:var(--mut);line-height:1}
 .mc .cl{width:8px;height:8px;border-radius:0;background:#3a1512}.mc .cl.on{background:#ff453a}
 .ms{color:var(--mut);font-size:.74rem;margin-top:8px}
-.meters.off .seg.on{opacity:.16}
+.meters.off .led.on{opacity:.16}
 /* Cajón del altavoz */
 .scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40;opacity:0;pointer-events:none;transition:opacity .18s}
 .scrim.on{opacity:1;pointer-events:auto}
 .drawer{position:fixed;top:0;right:0;bottom:0;width:min(420px,100%);background:var(--panel);border-left:1px solid var(--line2);z-index:50;
   transform:translateX(102%);transition:transform .2s ease-out;display:flex;flex-direction:column}
 .drawer.on{transform:none}
-.drawer header{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--line)}
+.grab{display:none;flex:none;width:100%;padding:8px 0 2px;touch-action:none}
+.grab::before{content:"";display:block;width:38px;height:5px;border-radius:3px;background:var(--ctl);margin:0 auto}
+.drawer header{touch-action:none;display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--line)}
 .drawer header h2{font-size:1.15rem;margin-right:auto}
 .x{appearance:none;border:0;background:var(--raise);width:36px;height:36px;border-radius:50%;font-size:1.1rem;color:var(--mut)}
 .x:hover{color:var(--fg)}
@@ -191,7 +217,7 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 .tile .tag{align-self:flex-start;margin-top:6px}
 .cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:14px}
-.card.dim{opacity:.55}
+.card.dim>:not(.sw){opacity:.65}                     /* se atenúa el contenido, no el interruptor que lo activa */
 .card p{color:var(--mut);font-size:.92rem}
 .hint{font-size:.88rem;color:var(--mut)}
 
@@ -218,7 +244,17 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line2);border-top-color:var(--ac);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:6px}
 @keyframes sp{to{transform:rotate(360deg)}}
 @media (max-width:760px){
-  main{padding:12px 12px 90px}
+  main{padding:12px 12px calc(96px + env(safe-area-inset-bottom))}
+  /* Barra de pestañas inferior (al alcance del pulgar), con icono y una sola palabra */
+  .tabs{position:fixed;left:0;right:0;bottom:0;z-index:35;margin:0;gap:0;overflow:visible;justify-content:space-around;border-bottom:0;border-top:1px solid var(--line);
+    background:rgba(10,13,19,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    padding:6px calc(6px + env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) calc(6px + env(safe-area-inset-left))}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;font-size:.72rem;border-bottom:0;margin-bottom:0;min-height:50px}
+  .tab svg{display:block}
+  .toasts{bottom:calc(74px + env(safe-area-inset-bottom))}
+  .grab{display:block}
+  .drawer{padding-bottom:env(safe-area-inset-bottom)}
+  .top{position:static}                                /* la navegación ya va en la barra inferior: la cabecera no ocupa pantalla fija */
   .top .in{padding:8px 12px;gap:8px}
   .mv{order:5;flex:1 1 100%;margin-left:0}
   .links{margin-left:auto}
@@ -229,6 +265,8 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   .drawer.on{transform:none}
   .flow{flex-wrap:nowrap}
 }
+@media (pointer:coarse){.x{width:44px;height:44px}.chips button{min-height:44px}}   /* aquí, después de las reglas base de estos componentes */
+@media (prefers-reduced-transparency:reduce){.tabs{background:var(--panel);backdrop-filter:none;-webkit-backdrop-filter:none}}
 </style>
 </head><body>
 <div class="top"><div class="in">
@@ -242,14 +280,14 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
 </div></div>
 
 <main>
-<div class="tabs" role="tablist">
-  <button class="tab" role="tab" data-tab="spk" aria-selected="true">Altavoces</button>
-  <button class="tab" role="tab" data-tab="snd" aria-selected="false">Sonido</button>
-  <button class="tab" role="tab" data-tab="lat" aria-selected="false">Latencia</button>
-  <button class="tab" role="tab" data-tab="log" aria-selected="false">Registro</button>
+<div class="tabs" role="tablist" aria-label="Secciones">
+  <button class="tab" role="tab" id="tab_spk" aria-controls="p_spk" data-tab="spk" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg><span>Altavoces</span></button>
+  <button class="tab" role="tab" id="tab_snd" aria-controls="p_snd" data-tab="snd" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4v5M6 13v7M12 4v9M12 17v3M18 4v3M18 11v9"/><circle cx="6" cy="11" r="2"/><circle cx="12" cy="15" r="2"/><circle cx="18" cy="9" r="2"/></svg><span>Sonido</span></button>
+  <button class="tab" role="tab" id="tab_lat" aria-controls="p_lat" data-tab="lat" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span>Latencia</span></button>
+  <button class="tab" role="tab" id="tab_log" aria-controls="p_log" data-tab="log" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9"/></svg><span>Registro</span></button>
 </div>
 
-<section class="pane" id="p_spk" role="tabpanel">
+<section class="pane" id="p_spk" role="tabpanel" aria-labelledby="tab_spk">
   <div class="head"><h1>Tu sala</h1><span class="chip" id="onl">—</span>
     <div class="seg" id="lyseg" role="group" aria-label="Distribución">
       <button data-ly="stereo5" aria-pressed="false">5 estéreo</button><button data-ly="mono10" aria-pressed="false">10 mono</button>
@@ -273,7 +311,7 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   <div class="chips" id="chips"></div>
 </section>
 
-<section class="pane" id="p_snd" role="tabpanel" hidden>
+<section class="pane" id="p_snd" role="tabpanel" aria-labelledby="tab_snd" hidden>
   <div class="head"><h1>Sonido</h1></div>
   <div class="flow" id="flow"></div>
   <div class="tiles">
@@ -303,7 +341,7 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   </div>
 </section>
 
-<section class="pane" id="p_lat" role="tabpanel" hidden>
+<section class="pane" id="p_lat" role="tabpanel" aria-labelledby="tab_lat" hidden>
   <div class="head"><h1>Latencia</h1></div>
   <div class="cards">
     <div class="card">
@@ -325,22 +363,24 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   <div class="tw"><table><thead><tr><th>Altavoz</th><th>RTT</th><th>Jitter</th><th>Perdidos</th><th>Recuperados</th><th>Tarde</th><th>Vacíos</th><th>Sync</th><th>Búfer</th></tr></thead><tbody id="health"></tbody></table></div>
 </section>
 
-<section class="pane" id="p_log" role="tabpanel" hidden>
+<section class="pane" id="p_log" role="tabpanel" aria-labelledby="tab_log" hidden>
   <div class="head"><h1>Registro</h1><button class="btn ghost sm" id="logclr">Limpiar</button></div>
   <div class="log" id="lb" role="log"></div>
 </section>
 </main>
 
 <div class="scrim" id="scrim"></div>
-<aside class="drawer" id="drawer" aria-hidden="true" aria-label="Ajustes del altavoz">
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="dtitle" aria-hidden="true" inert>
+  <div class="grab" aria-hidden="true"></div>
   <header><h2 id="dtitle">Altavoz</h2><span class="chip" id="dst">—</span><button class="x" id="dclose" aria-label="Cerrar">✕</button></header>
   <div class="dbody" id="dbody"></div>
 </aside>
-<aside class="drawer" id="bdrawer" aria-hidden="true" aria-label="Añadir altavoces por Bluetooth">
-  <header><h2>Añadir altavoces</h2><button class="x" id="bclose" aria-label="Cerrar">✕</button></header>
+<aside class="drawer" id="bdrawer" role="dialog" aria-modal="true" aria-labelledby="btitle" aria-hidden="true" inert>
+  <div class="grab" aria-hidden="true"></div>
+  <header><h2 id="btitle">Añadir altavoces</h2><button class="x" id="bclose" aria-label="Cerrar">✕</button></header>
   <div class="dbody" id="bbody"></div>
 </aside>
-<div class="toasts" id="tb"></div>
+<div class="toasts" id="tb" role="status" aria-live="polite"></div>
 
 <script>
 const CH=['FL','FR','C','LFE','SL','SR','SBL','SBR','AUX-L','AUX-R'];
@@ -356,7 +396,8 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 const pct=v=>Math.round(v/2.55);
 const J=(u,b)=>fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(r=>r.json()).catch(()=>({error:'red'}));
 
-function toast(m,ok=true){const d=document.createElement('div');d.className='toast'+(ok?'':' bad');d.textContent=m;$('tb').appendChild(d);setTimeout(()=>d.remove(),2600);}
+function toast(m,ok=true){const d=document.createElement('div');d.className='toast'+(ok?'':' bad');d.textContent=m;
+  if(!ok)d.setAttribute('role','alert');d.onclick=()=>d.remove();$('tb').appendChild(d);setTimeout(()=>d.remove(),ok?2600:7000);}
 function log(m){const b=$('lb'),t=new Date().toLocaleTimeString();const d=document.createElement('div');d.innerHTML='<b>'+t+'</b> '+esc(m);b.appendChild(d);b.scrollTop=b.scrollHeight;}
 function fillRng(el){const mn=+el.min,mx=+el.max,v=+el.value;
   if(el.classList.contains('mid')){const p=(v-mn)/(mx-mn);el.style.setProperty('--lo',v>=0?.5:p);el.style.setProperty('--hi',v>=0?p:.5);}
@@ -365,10 +406,33 @@ function setSeg(seg,attr,val){seg.querySelectorAll('button').forEach(b=>b.setAtt
 function setSw(el,on){el.setAttribute('aria-checked',on?'true':'false');}
 
 /* Pestañas */
-function showTab(t){document.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));
+function showTab(t){document.querySelectorAll('.tab').forEach(b=>{const on=b.dataset.tab===t;b.setAttribute('aria-selected',on);b.tabIndex=on?0:-1;});
   ['spk','snd','lat','log'].forEach(k=>$('p_'+k).hidden=(k!==t));
   try{history.replaceState(null,'','#'+t);}catch(e){}if(t==='lat')updLat();}
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+document.querySelector('.tabs').addEventListener('keydown',e=>{               // flechas, Inicio y Fin como en cualquier barra de pestañas
+  if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;
+  const tabs=[...document.querySelectorAll('.tab')];let i=tabs.indexOf(document.activeElement);if(i<0)return;
+  i=e.key==='Home'?0:e.key==='End'?tabs.length-1:(i+(e.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;
+  e.preventDefault();tabs[i].focus();showTab(tabs[i].dataset.tab);});
+
+/* Hojas (cajón del altavoz y Bluetooth): modales de verdad. El resto de la página queda inerte (teclado y lector de pantalla),
+   el foco entra en la hoja y vuelve a donde estaba al cerrarla; en el móvil se cierran deslizando hacia abajo. */
+let lastFocus=null;
+const lockBehind=on=>[document.querySelector('.top'),document.querySelector('main')].forEach(e=>{if(e)e.inert=on;});
+function sheetOpen(el){if(!lastFocus)lastFocus=document.activeElement;
+  el.inert=false;lockBehind(true);requestAnimationFrame(()=>{const f=el.querySelector('.x');if(f)f.focus();});}
+function sheetClose(el){el.inert=true;if(document.querySelector('.drawer.on'))return;lockBehind(false);
+  const f=lastFocus;lastFocus=null;if(!f)return;
+  const t=f.isConnected?f:(f.dataset&&f.dataset.id!==undefined?document.querySelector('.spk[data-id="'+f.dataset.id+'"]'):null);
+  if(t&&t.focus)t.focus();}
+function sheetDrag(el,close){const hs=[el.querySelector('.grab'),el.querySelector('header')];let y0=null,dy=0,t0=0;
+  const start=e=>{if(!matchMedia('(max-width:760px)').matches||e.target.closest('button'))return;y0=e.clientY;dy=0;t0=e.timeStamp;el.style.transition='none';e.currentTarget.setPointerCapture(e.pointerId);};
+  const move=e=>{if(y0===null)return;dy=Math.max(0,e.clientY-y0);el.style.transform='translateY('+dy+'px)';};
+  const end=e=>{if(y0===null)return;const v=dy/Math.max(1,e.timeStamp-t0),go=dy>90||(dy>30&&v>.6);y0=null;
+    if(go){el.style.transition='transform .2s ease-out';el.style.transform='translateY(102%)';close();setTimeout(()=>{el.style.transform='';el.style.transition='';},260);}
+    else{el.style.transition='';el.style.transform='';}};
+  hs.forEach(h=>{h.addEventListener('pointerdown',start);h.addEventListener('pointermove',move);h.addEventListener('pointerup',end);h.addEventListener('pointercancel',end);});}
 
 /* Datos */
 async function loadStatus(){
@@ -379,7 +443,7 @@ async function loadStatus(){
     if(document.activeElement!==$('xos')){$('xos').value=d.xover_hz||80;$('xod').textContent=Math.round(d.xover_hz||80)+' Hz';fillRng($('xos'));}
     if(document.activeElement!==$('lex')&&d.lipsync_extra_ms!==undefined)$('lex').value=d.lipsync_extra_ms;
     if(document.activeElement!==$('pls')&&d.playout_ms){$('pls').value=d.playout_ms;$('pld').textContent=Math.round(d.playout_ms)+' ms';fillRng($('pls'));setSeg($('plseg'),'pl',Math.round(d.playout_ms));}
-    if(document.activeElement!==$('mvs')&&d.master_volume!==undefined){const v=Math.round(Math.min(1,d.master_volume)*100);$('mvs').value=v;$('mvd').textContent=v+'%';fillRng($('mvs'));}
+    if(document.activeElement!==$('mvs')&&d.master_volume!==undefined){const v=Math.round(Math.min(1,d.master_volume)*100);$('mvs').value=v;$('mvd').textContent=v+'%';$('mvs').setAttribute('aria-valuetext',v+' %');fillRng($('mvs'));}
     drawSound();
   }catch(e){lvOK=false;lvTxt='';$('hs').textContent='Sin conexión';$('dot').className='dot bad';}
 }
@@ -415,9 +479,9 @@ function drawRoom(){
 }
 
 /* Cajón */
-function openDrawer(id){closeBle();openId=id;sig='';buildDrawer();$('drawer').classList.add('on');$('scrim').classList.add('on');$('drawer').setAttribute('aria-hidden','false');drawRoom();sig='x';loadNodes();}
-function closeDrawer(){const was=openId!==null;openId=null;$('drawer').classList.remove('on');if(!$('bdrawer').classList.contains('on'))$('scrim').classList.remove('on');$('drawer').setAttribute('aria-hidden','true');sig='';drawRoom();}
-$('scrim').onclick=()=>{closeDrawer();closeBle();};$('dclose').onclick=closeDrawer;
+function openDrawer(id){closeBle();openId=id;sig='';buildDrawer();$('drawer').classList.add('on');$('scrim').classList.add('on');$('drawer').setAttribute('aria-hidden','false');sheetOpen($('drawer'));drawRoom();sig='x';loadNodes();}
+function closeDrawer(){const was=openId!==null;openId=null;$('drawer').classList.remove('on');if(!$('bdrawer').classList.contains('on'))$('scrim').classList.remove('on');$('drawer').setAttribute('aria-hidden','true');sig='';drawRoom();sheetClose($('drawer'));}
+$('scrim').onclick=()=>{closeDrawer();closeBle();};$('dclose').onclick=closeDrawer;sheetDrag($('drawer'),closeDrawer);
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(openId!==null)closeDrawer();closeBle();}});
 function chOpts(sel){return CH.map((c,i)=>'<option value="'+i+'"'+(i===sel?' selected':'')+'>'+c+' · '+CHN[i]+'</option>').join('');}
 function buildDrawer(){
@@ -461,7 +525,7 @@ async function doSave(){
   const r1=await J('/api/node',b),r2=await J('/api/eq',eb),r3=await J('/api/calibrate',{esp_id:id,latency_us:lat});
   if(r1.ok&&r2.ok&&r3.ok){const n=find(id);if(n){Object.assign(n,b);n.eq=[0,1,2,3,4,5].map(i=>eb['eq'+i]);n.latency_offset_us=lat;}
     layout=(r1.layout!==undefined)?r1.layout:layout;if($('d_ss'))$('d_ss').textContent='Guardado';log('Altavoz #'+id+' actualizado');sig='';loadStatus();loadNodes();}
-  else{if($('d_ss'))$('d_ss').textContent='No se pudo guardar';toast('No se pudo guardar',false);}
+  else{if($('d_ss'))$('d_ss').textContent='No se pudo guardar';toast('No se pudo guardar. Comprueba la conexión con la Raspberry.',false);}
 }
 function wireDrawer(){
   const q=queueSave;
@@ -488,7 +552,7 @@ $('lyseg').querySelectorAll('button').forEach(b=>b.onclick=async()=>{
 async function setDsp(o){const r=await J('/api/dsp',o);
   if(r.ok){if(o.xover!==undefined)st.dsp_xover=o.xover;if(o.eq!==undefined)st.dsp_eq=o.eq;
     log('Procesado: crossover '+(st.dsp_xover?'sí':'no')+', EQ '+(st.dsp_eq?'sí':'no'));drawSound();if($('d_eqh'))eqHint();toast(!st.dsp_xover&&!st.dsp_eq?'Pass-through activo':'Procesado actualizado');}
-  else{toast('No se pudo cambiar',false);}loadStatus();}
+  else{toast('No se pudo cambiar el procesado. Vuelve a intentarlo.',false);}loadStatus();}
 function subNode(){return nodes.find(n=>n.role===2&&n.enabled);}
 function drawSound(){
   const xo=!!st.dsp_xover,eq=!!st.dsp_eq,pass=!xo&&!eq,sub=subNode();
@@ -517,7 +581,7 @@ $('t_proc').onclick=()=>{if(st.dsp_xover||st.dsp_eq)return;setDsp({xover:true,eq
 $('sw_xo').onclick=()=>setDsp({xover:$('sw_xo').getAttribute('aria-checked')!=='true'});
 $('sw_eq').onclick=()=>setDsp({eq:$('sw_eq').getAttribute('aria-checked')!=='true'});
 $('xos').oninput=function(){$('xod').textContent=this.value+' Hz';fillRng(this);};
-$('xos').onchange=async function(){const r=await J('/api/bass',{xover_hz:+this.value});if(r.ok){toast('Corte a '+this.value+' Hz');log('Corte de graves: '+this.value+' Hz');loadStatus();}else toast('No se pudo guardar',false);};
+$('xos').onchange=async function(){const r=await J('/api/bass',{xover_hz:+this.value});if(r.ok){toast('Corte a '+this.value+' Hz');log('Corte de graves: '+this.value+' Hz');loadStatus();}else toast('No se pudo guardar. Comprueba la conexión con la Raspberry.',false);};
 $('subsel').onchange=async function(){const sel=this.value;
   for(const n of nodes){const role=sel==='-'?0:(String(n.id)===sel?2:(n.enabled?1:0));if(role!==n.role)await J('/api/node',{id:n.id,role});}
   toast(sel==='-'?'Todos a rango completo':'Subwoofer: altavoz #'+sel);log(sel==='-'?'Todos a rango completo':'Subwoofer = #'+sel);sig='';loadNodes();};
@@ -526,7 +590,7 @@ $('subsel').onchange=async function(){const sel=this.value;
 async function updLat(){try{const j=await (await fetch('/api/latency')).json();
   $('bigtot').innerHTML=Math.round(j.total_ms)+'<small>ms</small>';$('bigad').innerHTML=Math.round(j.audio_delay_ms)+'<small>ms</small>';
   $('mpvcmd').textContent='mpv --audio-delay='+j.mpv_audio_delay_s.toFixed(3)+' vídeo.mkv';}catch(e){}}
-async function setPL(v){const r=await J('/api/playout',{ms:+v});if(r.ok){toast('Colchón '+v+' ms');log('Colchón de red: '+v+' ms');loadStatus();updLat();}else toast('No se pudo cambiar',false);}
+async function setPL(v){const r=await J('/api/playout',{ms:+v});if(r.ok){toast('Colchón '+v+' ms');log('Colchón de red: '+v+' ms');loadStatus();updLat();}else toast('No se pudo cambiar el colchón de red. Vuelve a intentarlo.',false);}
 $('pls').oninput=function(){$('pld').textContent=this.value+' ms';fillRng(this);};
 $('pls').onchange=function(){setPL(this.value);};
 $('plseg').querySelectorAll('button').forEach(b=>b.onclick=()=>setPL(b.dataset.pl));
@@ -538,10 +602,10 @@ function drawHealth(){const vis=nodes.filter(n=>n.enabled||n.online);
 /* Añadir altavoces por Bluetooth desde la Raspberry */
 let bs={available:false,ssid:'',has_pass:false,rpi_ip:''},bdevs=[],bscan=false,bres={};
 const rssiTxt=r=>r==null?'':r>-60?'Señal fuerte':r>-75?'Señal media':'Señal débil';
-function openBle(){closeDrawer();$('bdrawer').classList.add('on');$('scrim').classList.add('on');$('bdrawer').setAttribute('aria-hidden','false');
+function openBle(){closeDrawer();$('bdrawer').classList.add('on');$('scrim').classList.add('on');$('bdrawer').setAttribute('aria-hidden','false');sheetOpen($('bdrawer'));
   fetch('/api/ble/status').then(r=>r.json()).then(j=>{bs=j;bleBuild();}).catch(()=>{bleBuild();});bleBuild();}
-function closeBle(){const d=$('bdrawer');if(!d.classList.contains('on'))return;d.classList.remove('on');d.setAttribute('aria-hidden','true');if(openId===null)$('scrim').classList.remove('on');}
-$('lble').onclick=openBle;$('bclose').onclick=closeBle;
+function closeBle(){const d=$('bdrawer');if(!d.classList.contains('on'))return;d.classList.remove('on');d.setAttribute('aria-hidden','true');if(openId===null)$('scrim').classList.remove('on');sheetClose(d);}
+$('lble').onclick=openBle;$('bclose').onclick=closeBle;sheetDrag($('bdrawer'),closeBle);
 const onlineIds=()=>new Set(nodes.filter(n=>n.online).map(n=>n.id));
 function bleBuild(){
   const credsOk=!!(bs.ssid&&bs.has_pass),keep=document.activeElement&&document.activeElement.id;
@@ -580,9 +644,9 @@ async function bleSaveWifi(){const r=await J('/api/ble/wifi',{ssid:$('b_ssid').v
   else{$('b_ss').textContent=r.error||'No se pudo guardar';$('b_ss').style.color='var(--bad)';}}
 async function bleDoScan(){bscan=true;bleScanned=true;bleBuild();const r=await J('/api/ble/scan',{seconds:6});bscan=false;
   if(r.devices){bdevs=r.devices;bres={};log('Bluetooth: '+bdevs.length+' altavoz(ces) encontrado(s)');}
-  else{bdevs=[];toast(r.error||'No se pudo buscar',false);log('Bluetooth: '+(r.error||'error'));}
+  else{bdevs=[];toast(r.error||'No se pudo buscar. Comprueba el Bluetooth de la Raspberry.',false);log('Bluetooth: '+(r.error||'error'));}
   bleBuild();if(r.error&&$('b_hint')){$('b_hint').textContent=r.error;$('b_hint').style.color='var(--bad)';}}
-async function bleIdent(i){const d=bdevs[i];const r=await J('/api/ble/identify',{address:d.address});if(r.ok)toast('Sonando en '+d.name);else toast(r.error||'No se pudo',false);}
+async function bleIdent(i){const d=bdevs[i];const r=await J('/api/ble/identify',{address:d.address});if(r.ok)toast('Sonando en '+d.name);else toast(r.error||'No se pudo hacer sonar el altavoz.',false);}
 async function bleProvOne(i){const d=bdevs[i],sel=document.querySelector('[data-sel="'+i+'"]'),id=sel?+sel.value:d.suggested_id;
   const own=!d.new&&d.id===id;
   const el=$('b_r'+i);if(el){el.className='res';el.innerHTML='<span class="spin"></span>Configurando…';}
@@ -590,7 +654,7 @@ async function bleProvOne(i){const d=bdevs[i],sel=document.querySelector('[data-
   bres[d.address]=r.ok?{ok:true}:{err:r.error||'No se pudo configurar'};
   if(r.ok){log('Bluetooth: '+d.name+' configurado como #'+id);setTimeout(()=>{sig='';loadNodes();},6000);}else log('Bluetooth: '+d.name+': '+bres[d.address].err);
   return !!r.ok;}
-async function bleProv(i){const okk=await bleProvOne(i);if(okk)toast('Enviado a '+bdevs[i].name);else toast('No se pudo configurar',false);bleBuild();}
+async function bleProv(i){const okk=await bleProvOne(i);if(okk)toast('Enviado a '+bdevs[i].name);else toast('No se pudo configurar el altavoz. El motivo está en la lista.',false);bleBuild();}
 async function bleProvAll(){const todo=[];bdevs.forEach((d,i)=>{if(d.new&&d.status&&d.suggested_id!=null&&!(bres[d.address]||{}).ok)todo.push(i);});
   if(!todo.length)return;
   const msg='Se enviará la WiFi «'+bs.ssid+'» a:\n'+todo.map(i=>'  '+bdevs[i].name+' → número '+(document.querySelector('[data-sel="'+i+'"]')||{value:bdevs[i].suggested_id}).value).join('\n')+'\n\n¿Continuar?';
@@ -603,7 +667,7 @@ const MDB=60;                                   // la escala va de −60 a 0 dBF
 let lvOK=false,lastDraw=0,lvTxt='',holdV=new Array(10).fill(-90),holdT=new Array(10).fill(0),clipT=new Array(10).fill(0);
 const NSEG=20,SEGDB=MDB/NSEG;                  // 20 LED por canal, 3 dB cada uno
 const segCls=i=>{const top=-MDB+SEGDB*(i+1);return top<=-18?'g':top<=-6?'y':'r';};   // verde hasta −18 dB, amarillo hasta −6 dB, rojo por encima
-$('mb').innerHTML=CHS.map((c,i)=>'<div class="mc"><i class="cl" id="mcl'+i+'"></i><div class="bar" title="'+CH[i]+' · '+CHN[i]+'">'+Array.from({length:NSEG},(_,k)=>'<i class="seg '+segCls(k)+'"></i>').join('')+'</div><span class="lab">'+c+'</span></div>').join('');
+$('mb').innerHTML=CHS.map((c,i)=>'<div class="mc"><i class="cl" id="mcl'+i+'"></i><div class="bar" title="'+CH[i]+' · '+CHN[i]+'">'+Array.from({length:NSEG},(_,k)=>'<i class="led '+segCls(k)+'"></i>').join('')+'</div><span class="lab">'+c+'</span></div>').join('');
 const SEGS=[...document.querySelectorAll('#mb .bar')].map(b=>[...b.children]),segIdx=db=>db<=-MDB?-1:Math.min(NSEG-1,Math.ceil((db+MDB)/SEGDB)-1);
 function setTx(dot,txt,title){const t=txt;if(t!==lvTxt){lvTxt=t;$('hs').textContent=t;}$('dot').className='dot '+dot;$('st').title=title||'';}
 function drawMeters(d){
@@ -632,7 +696,7 @@ async function pollLevels(){
 function lvLoop(){pollLevels().finally(()=>setTimeout(lvLoop,$('p_spk').hidden?1000:150));}
 
 /* Volumen maestro y enlaces */
-$('mvs').oninput=function(){$('mvd').textContent=this.value+'%';fillRng(this);clearTimeout(window._mv);window._mv=setTimeout(()=>J('/api/volume',{volume:+this.value/100}),120);};
+$('mvs').oninput=function(){$('mvd').textContent=this.value+'%';this.setAttribute('aria-valuetext',this.value+' %');fillRng(this);clearTimeout(window._mv);window._mv=setTimeout(()=>J('/api/volume',{volume:+this.value/100}),120);};
 $('logclr').onclick=()=>{$('lb').innerHTML='';};
 (function(){const b=location.protocol==='https:'?'':'https://'+location.hostname+':8443';
   $('lcal').href=b+'/calibrate';$('lcal2').href=b+'/calibrate';window._bleHref=b+'/ble';})();
@@ -645,21 +709,29 @@ setInterval(loadStatus,5000);setInterval(loadNodes,2500);
 
 static const char PAGE_CAL[] = R"HTML(<!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#000000">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000"><meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SonosWiFi"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="/icons/icon-180.png">
+<script>if('serviceWorker' in navigator&&window.isSecureContext)addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});</script>
 <title>SonosWiFi — Calibración</title>
 <style>
 /* Sistema de diseño compartido por las tres páginas (panel, /calibrate, /ble). Negro puro + azul señal. */
 :root{
   --bg:#000; --panel:#0a0d13; --raise:#121722; --line:#1f2735; --line2:#2b3548;
   --fg:#e9edf5; --mut:#8a93a6; --ac:#4aa3ff; --ac-bg:rgba(74,163,255,.13); --ac-ln:rgba(74,163,255,.5);
+  --ctl:#6b7a96;                                   /* borde de controles (campos, interruptor apagado): ≥3:1 sobre las superficies */
   --ok:#3ecf8e; --warn:#f5b84a; --bad:#ff6b6b;
-  --font:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Roboto,sans-serif;
+  --font:system-ui,-apple-system,"Segoe UI Variable Text","Segoe UI","Helvetica Neue",Roboto,sans-serif;   /* tipografía del sistema (SF en Apple) */
 }
 *{box-sizing:border-box;margin:0}
-html{color-scheme:dark}
-body{background:var(--bg);color:var(--fg);font:15px/1.45 var(--font);-webkit-font-smoothing:antialiased;
-  font-variant-numeric:tabular-nums;min-height:100vh;-webkit-text-size-adjust:100%}
+html{color-scheme:dark;font-size:106.25%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
+body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
+  font-variant-numeric:tabular-nums;min-height:100vh;-webkit-text-size-adjust:100%;
+  padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
 a{color:var(--ac);text-decoration:none}a:hover{text-decoration:underline}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
@@ -673,35 +745,35 @@ h2{font-size:1.02rem;font-weight:650}
 .btn{appearance:none;border:0;background:var(--ac);color:#04121f;font-weight:650;padding:10px 18px;border-radius:10px;min-height:42px;
   transition:filter .12s,transform .06s}
 .btn:hover{filter:brightness(1.1)}.btn:active{transform:translateY(1px)}
-.btn.ghost{background:var(--raise);color:var(--fg);border:1px solid var(--line2);font-weight:550}
+.btn.ghost{background:var(--raise);color:var(--fg);border:1px solid var(--ctl);font-weight:550}
 .btn.danger{background:transparent;color:var(--bad);border:1px solid rgba(255,107,107,.45);font-weight:550}
 .btn.sm{padding:6px 12px;min-height:34px;font-size:.88rem;border-radius:8px}
 .btn:disabled{opacity:.4;cursor:not-allowed;filter:none}
 
-.seg{display:inline-flex;background:var(--raise);border:1px solid var(--line);border-radius:11px;padding:3px;gap:2px;max-width:100%}
+.seg{display:inline-flex;background:var(--raise);border:1px solid var(--ctl);border-radius:11px;padding:3px;gap:2px;max-width:100%}
 .seg button{appearance:none;border:0;background:transparent;color:var(--mut);padding:7px 14px;border-radius:8px;min-height:34px;font-weight:550;white-space:nowrap}
 .seg button:hover{color:var(--fg)}
 .seg button[aria-pressed=true]{background:var(--ac-bg);color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac-ln)}
-.seg.block{display:flex}.seg.block button{flex:1}
+.seg.block{display:flex}.seg.block button{flex:1;min-width:0;white-space:normal;line-height:1.2;padding-left:8px;padding-right:8px}   /* con texto grande o pantalla estrecha, las etiquetas bajan de línea en vez de salirse */
 
-.switch{appearance:none;position:relative;width:46px;height:27px;border-radius:14px;border:1px solid var(--line2);background:var(--raise);flex:none;
+.switch{appearance:none;position:relative;width:46px;height:27px;border-radius:14px;border:1px solid var(--ctl);background:var(--raise);flex:none;
   transition:background .15s,border-color .15s}
 .switch::after{content:"";position:absolute;top:2px;left:2px;width:21px;height:21px;border-radius:50%;background:var(--mut);transition:transform .15s,background .15s}
 .switch[aria-checked=true]{background:var(--ac-bg);border-color:var(--ac-ln)}
 .switch[aria-checked=true]::after{transform:translateX(19px);background:var(--ac)}
 
 input[type=range].rng{-webkit-appearance:none;appearance:none;width:100%;height:28px;background:transparent;border-radius:0;cursor:pointer;
-  --f:.5;
+  --f:.5;--rh:28px;height:var(--rh);
   background:linear-gradient(to right,var(--ac) calc(var(--f)*(100% - 20px) + 10px),var(--line2) 0) no-repeat center/100% 6px}
 input[type=range].rng.mid{--lo:.5;--hi:.5;
   background:linear-gradient(to right,var(--line2) calc(var(--lo)*(100% - 20px) + 10px),var(--ac) 0,var(--ac) calc(var(--hi)*(100% - 20px) + 10px),var(--line2) 0) no-repeat center/100% 6px}
-.rng::-webkit-slider-runnable-track{height:28px;background:transparent}
-.rng::-moz-range-track{height:28px;background:transparent}
-.rng::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:0;margin-top:4px;box-shadow:0 0 0 3px rgba(74,163,255,.38)}
+.rng::-webkit-slider-runnable-track{height:var(--rh);background:transparent}
+.rng::-moz-range-track{height:var(--rh);background:transparent}
+.rng::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:0;margin-top:calc((var(--rh) - 20px)/2);box-shadow:0 0 0 3px rgba(74,163,255,.38)}
 .rng::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:0;box-shadow:0 0 0 3px rgba(74,163,255,.38)}
 .rng:focus-visible{outline-offset:0}
 
-.num,.txt,.sel{background:var(--raise);border:1px solid var(--line2);border-radius:9px;padding:9px 11px;min-height:40px;width:100%;color:var(--fg)}
+.num,.txt,.sel{background:var(--raise);border:1px solid var(--ctl);border-radius:9px;padding:9px 11px;min-height:40px;width:100%;color:var(--fg)}
 .num{width:110px}
 .num:focus,.txt:focus,.sel:focus{outline:2px solid var(--ac);outline-offset:1px;border-color:transparent}
 .sel{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--mut) 50%),linear-gradient(135deg,var(--mut) 50%,transparent 50%);
@@ -715,7 +787,8 @@ label,.lbl{display:block;color:var(--mut);font-size:.86rem;margin-bottom:5px}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mut);flex:none}
 .dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
 
-.top{position:sticky;top:0;z-index:30;background:rgba(0,0,0,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top{position:sticky;top:0;z-index:30;background:rgba(0,0,0,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
+  padding-top:env(safe-area-inset-top)}               /* en la app instalada (barra de estado translúcida) el contenido no queda bajo la muesca */
 .top .in{max-width:1180px;margin:auto;display:flex;align-items:center;gap:18px;padding:10px 18px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.05rem;color:var(--fg)}
 .brand:hover{text-decoration:none}
@@ -724,14 +797,28 @@ label,.lbl{display:block;color:var(--mut);font-size:.86rem;margin-bottom:5px}
 .note{border-radius:12px;padding:12px 14px;background:var(--raise);border:1px solid var(--line2);font-size:.92rem}
 .note.bad{border-color:rgba(255,107,107,.5);color:#ffb0b0}.note.warn{border-color:rgba(245,184,74,.5)}
 
-.toasts{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:60;pointer-events:none;width:max-content;max-width:92vw}
-.toast{background:var(--raise);border:1px solid var(--line2);border-left:3px solid var(--ok);padding:9px 14px;border-radius:10px;font-size:.9rem;
+.toasts{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:60;pointer-events:none;width:max-content;max-width:92vw}
+.toast{pointer-events:auto;background:var(--raise);border:1px solid var(--line2);border-left:3px solid var(--ok);padding:9px 14px;border-radius:10px;font-size:.9rem;
   animation:tin .18s ease-out}
 .toast.bad{border-left-color:var(--bad)}
 @keyframes tin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 .procbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;border-radius:12px;background:var(--ac-bg);border:1px solid var(--ac-ln);color:var(--ac);font-size:.92rem}
 .procbar[hidden]{display:none}
+
+/* Objetivos táctiles: 44 × 44 (mínimo cómodo de iOS) cuando el puntero es el dedo */
+@media (pointer:coarse){
+  .btn,.btn.sm,.seg button,.tab,.num,.txt,.sel{min-height:44px}
+  input[type=range].rng{--rh:44px}
+  .switch::before{content:"";position:absolute;inset:-9px -6px}   /* zona de toque ampliada; el aspecto no cambia */
+}
+/* Ajustes de accesibilidad del sistema */
+@media (prefers-contrast:more){
+  :root{--mut:#b4bccc;--ctl:#8d9ab3;--line2:#6b7a96;--ac:#7ec0ff;--ac-ln:rgba(126,192,255,.8)}
+}
+@media (prefers-reduced-transparency:reduce){
+  .top{background:#000;backdrop-filter:none;-webkit-backdrop-filter:none}
+}
 main{max-width:760px;margin:0 auto;padding:20px 16px 80px;display:flex;flex-direction:column;gap:16px}
 .top .in{max-width:760px}
 .steps{display:flex;gap:8px;align-items:center;color:var(--mut);font-size:.9rem}
@@ -1034,21 +1121,29 @@ view(1);
 
 static const char PAGE_BLE[] = R"HTML(<!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#000000">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000"><meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SonosWiFi"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="/icons/icon-180.png">
+<script>if('serviceWorker' in navigator&&window.isSecureContext)addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});</script>
 <title>SonosWiFi — Añadir altavoz</title>
 <style>
 /* Sistema de diseño compartido por las tres páginas (panel, /calibrate, /ble). Negro puro + azul señal. */
 :root{
   --bg:#000; --panel:#0a0d13; --raise:#121722; --line:#1f2735; --line2:#2b3548;
   --fg:#e9edf5; --mut:#8a93a6; --ac:#4aa3ff; --ac-bg:rgba(74,163,255,.13); --ac-ln:rgba(74,163,255,.5);
+  --ctl:#6b7a96;                                   /* borde de controles (campos, interruptor apagado): ≥3:1 sobre las superficies */
   --ok:#3ecf8e; --warn:#f5b84a; --bad:#ff6b6b;
-  --font:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Roboto,sans-serif;
+  --font:system-ui,-apple-system,"Segoe UI Variable Text","Segoe UI","Helvetica Neue",Roboto,sans-serif;   /* tipografía del sistema (SF en Apple) */
 }
 *{box-sizing:border-box;margin:0}
-html{color-scheme:dark}
-body{background:var(--bg);color:var(--fg);font:15px/1.45 var(--font);-webkit-font-smoothing:antialiased;
-  font-variant-numeric:tabular-nums;min-height:100vh;-webkit-text-size-adjust:100%}
+html{color-scheme:dark;font-size:106.25%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
+body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
+  font-variant-numeric:tabular-nums;min-height:100vh;-webkit-text-size-adjust:100%;
+  padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
 a{color:var(--ac);text-decoration:none}a:hover{text-decoration:underline}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
@@ -1062,35 +1157,35 @@ h2{font-size:1.02rem;font-weight:650}
 .btn{appearance:none;border:0;background:var(--ac);color:#04121f;font-weight:650;padding:10px 18px;border-radius:10px;min-height:42px;
   transition:filter .12s,transform .06s}
 .btn:hover{filter:brightness(1.1)}.btn:active{transform:translateY(1px)}
-.btn.ghost{background:var(--raise);color:var(--fg);border:1px solid var(--line2);font-weight:550}
+.btn.ghost{background:var(--raise);color:var(--fg);border:1px solid var(--ctl);font-weight:550}
 .btn.danger{background:transparent;color:var(--bad);border:1px solid rgba(255,107,107,.45);font-weight:550}
 .btn.sm{padding:6px 12px;min-height:34px;font-size:.88rem;border-radius:8px}
 .btn:disabled{opacity:.4;cursor:not-allowed;filter:none}
 
-.seg{display:inline-flex;background:var(--raise);border:1px solid var(--line);border-radius:11px;padding:3px;gap:2px;max-width:100%}
+.seg{display:inline-flex;background:var(--raise);border:1px solid var(--ctl);border-radius:11px;padding:3px;gap:2px;max-width:100%}
 .seg button{appearance:none;border:0;background:transparent;color:var(--mut);padding:7px 14px;border-radius:8px;min-height:34px;font-weight:550;white-space:nowrap}
 .seg button:hover{color:var(--fg)}
 .seg button[aria-pressed=true]{background:var(--ac-bg);color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac-ln)}
-.seg.block{display:flex}.seg.block button{flex:1}
+.seg.block{display:flex}.seg.block button{flex:1;min-width:0;white-space:normal;line-height:1.2;padding-left:8px;padding-right:8px}   /* con texto grande o pantalla estrecha, las etiquetas bajan de línea en vez de salirse */
 
-.switch{appearance:none;position:relative;width:46px;height:27px;border-radius:14px;border:1px solid var(--line2);background:var(--raise);flex:none;
+.switch{appearance:none;position:relative;width:46px;height:27px;border-radius:14px;border:1px solid var(--ctl);background:var(--raise);flex:none;
   transition:background .15s,border-color .15s}
 .switch::after{content:"";position:absolute;top:2px;left:2px;width:21px;height:21px;border-radius:50%;background:var(--mut);transition:transform .15s,background .15s}
 .switch[aria-checked=true]{background:var(--ac-bg);border-color:var(--ac-ln)}
 .switch[aria-checked=true]::after{transform:translateX(19px);background:var(--ac)}
 
 input[type=range].rng{-webkit-appearance:none;appearance:none;width:100%;height:28px;background:transparent;border-radius:0;cursor:pointer;
-  --f:.5;
+  --f:.5;--rh:28px;height:var(--rh);
   background:linear-gradient(to right,var(--ac) calc(var(--f)*(100% - 20px) + 10px),var(--line2) 0) no-repeat center/100% 6px}
 input[type=range].rng.mid{--lo:.5;--hi:.5;
   background:linear-gradient(to right,var(--line2) calc(var(--lo)*(100% - 20px) + 10px),var(--ac) 0,var(--ac) calc(var(--hi)*(100% - 20px) + 10px),var(--line2) 0) no-repeat center/100% 6px}
-.rng::-webkit-slider-runnable-track{height:28px;background:transparent}
-.rng::-moz-range-track{height:28px;background:transparent}
-.rng::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:0;margin-top:4px;box-shadow:0 0 0 3px rgba(74,163,255,.38)}
+.rng::-webkit-slider-runnable-track{height:var(--rh);background:transparent}
+.rng::-moz-range-track{height:var(--rh);background:transparent}
+.rng::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:0;margin-top:calc((var(--rh) - 20px)/2);box-shadow:0 0 0 3px rgba(74,163,255,.38)}
 .rng::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:0;box-shadow:0 0 0 3px rgba(74,163,255,.38)}
 .rng:focus-visible{outline-offset:0}
 
-.num,.txt,.sel{background:var(--raise);border:1px solid var(--line2);border-radius:9px;padding:9px 11px;min-height:40px;width:100%;color:var(--fg)}
+.num,.txt,.sel{background:var(--raise);border:1px solid var(--ctl);border-radius:9px;padding:9px 11px;min-height:40px;width:100%;color:var(--fg)}
 .num{width:110px}
 .num:focus,.txt:focus,.sel:focus{outline:2px solid var(--ac);outline-offset:1px;border-color:transparent}
 .sel{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--mut) 50%),linear-gradient(135deg,var(--mut) 50%,transparent 50%);
@@ -1104,7 +1199,8 @@ label,.lbl{display:block;color:var(--mut);font-size:.86rem;margin-bottom:5px}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mut);flex:none}
 .dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
 
-.top{position:sticky;top:0;z-index:30;background:rgba(0,0,0,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top{position:sticky;top:0;z-index:30;background:rgba(0,0,0,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
+  padding-top:env(safe-area-inset-top)}               /* en la app instalada (barra de estado translúcida) el contenido no queda bajo la muesca */
 .top .in{max-width:1180px;margin:auto;display:flex;align-items:center;gap:18px;padding:10px 18px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.05rem;color:var(--fg)}
 .brand:hover{text-decoration:none}
@@ -1113,14 +1209,28 @@ label,.lbl{display:block;color:var(--mut);font-size:.86rem;margin-bottom:5px}
 .note{border-radius:12px;padding:12px 14px;background:var(--raise);border:1px solid var(--line2);font-size:.92rem}
 .note.bad{border-color:rgba(255,107,107,.5);color:#ffb0b0}.note.warn{border-color:rgba(245,184,74,.5)}
 
-.toasts{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:60;pointer-events:none;width:max-content;max-width:92vw}
-.toast{background:var(--raise);border:1px solid var(--line2);border-left:3px solid var(--ok);padding:9px 14px;border-radius:10px;font-size:.9rem;
+.toasts{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:60;pointer-events:none;width:max-content;max-width:92vw}
+.toast{pointer-events:auto;background:var(--raise);border:1px solid var(--line2);border-left:3px solid var(--ok);padding:9px 14px;border-radius:10px;font-size:.9rem;
   animation:tin .18s ease-out}
 .toast.bad{border-left-color:var(--bad)}
 @keyframes tin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 .procbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;border-radius:12px;background:var(--ac-bg);border:1px solid var(--ac-ln);color:var(--ac);font-size:.92rem}
 .procbar[hidden]{display:none}
+
+/* Objetivos táctiles: 44 × 44 (mínimo cómodo de iOS) cuando el puntero es el dedo */
+@media (pointer:coarse){
+  .btn,.btn.sm,.seg button,.tab,.num,.txt,.sel{min-height:44px}
+  input[type=range].rng{--rh:44px}
+  .switch::before{content:"";position:absolute;inset:-9px -6px}   /* zona de toque ampliada; el aspecto no cambia */
+}
+/* Ajustes de accesibilidad del sistema */
+@media (prefers-contrast:more){
+  :root{--mut:#b4bccc;--ctl:#8d9ab3;--line2:#6b7a96;--ac:#7ec0ff;--ac-ln:rgba(126,192,255,.8)}
+}
+@media (prefers-reduced-transparency:reduce){
+  .top{background:#000;backdrop-filter:none;-webkit-backdrop-filter:none}
+}
 main{max-width:600px;margin:0 auto;padding:20px 16px 80px;display:flex;flex-direction:column;gap:16px}
 .top .in{max-width:600px}
 .step{display:flex;gap:14px}
@@ -1263,3 +1373,74 @@ $('save').onclick=async()=>{
   $('save').disabled=false;
 };
 </script></body></html>)HTML";
+
+static const char PWA_MANIFEST[] = R"HTML({
+  "id": "/",
+  "name": "SonosWiFi",
+  "short_name": "SonosWiFi",
+  "description": "Control del audio multicanal inalámbrico: altavoces, sonido y latencia.",
+  "lang": "es",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Sonido", "short_name": "Sonido", "url": "/#snd", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Latencia", "short_name": "Latencia", "url": "/#lat", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] }
+  ]
+})HTML";
+
+static const char PWA_SW[] = R"HTML(/* Service worker de SonosWiFi. Solo se registra en contexto seguro (HTTPS o localhost).
+ * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
+ * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
+ * 62c068e10b lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-62c068e10b';
+const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png'];
+
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE)
+    .then(c => Promise.all(SHELL.map(u => c.add(new Request(u, { credentials: 'same-origin' })).catch(() => 0))))
+    .then(() => self.skipWaiting()));
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys()
+    .then(ks => Promise.all(ks.filter(k => k.startsWith('sonoswifi-') && k !== CACHE).map(k => caches.delete(k))))
+    .then(() => self.clients.claim()));
+});
+
+self.addEventListener('fetch', e => {
+  const r = e.request, u = new URL(r.url);
+  if (r.method !== 'GET' || u.origin !== self.location.origin || u.pathname.startsWith('/api/')) return;   // no se intercepta
+  e.respondWith(fetch(r).then(res => {
+    if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(r, copy)).catch(() => 0); }
+    return res;
+  }).catch(() => caches.match(r).then(hit => hit || (r.mode === 'navigate' ? caches.match('/') : undefined) || Response.error())));
+});)HTML";
+
+static const char PWA_ICON_SVG[] = R"HTML(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="SonosWiFi">
+  <rect width="512" height="512" fill="#000"/>
+  <g fill="#4aa3ff">
+    <rect x="78"  y="211" width="44" height="90"  rx="22"/>
+    <rect x="156" y="161" width="44" height="190" rx="22"/>
+    <rect x="234" y="96"  width="44" height="320" rx="22"/>
+    <rect x="312" y="161" width="44" height="190" rx="22"/>
+    <rect x="390" y="211" width="44" height="90"  rx="22"/>
+  </g>
+</svg>)HTML";
+
+static const unsigned char PWA_ICON_180[] = {137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,180,0,0,0,180,8,2,0,0,0,178,175,145,101,0,0,8,25,73,68,65,84,120,156,236,221,107,108,83,101,28,199,241,167,187,117,99,45,219,216,152,110,221,6,97,19,38,93,17,140,81,32,68,197,104,140,23,212,24,149,121,33,162,243,130,168,111,80,81,81,95,152,160,137,70,141,38,222,230,37,98,52,110,106,98,148,121,35,49,72,50,197,73,184,108,172,195,41,227,178,107,89,25,108,93,187,110,93,233,234,95,140,72,24,255,246,57,208,179,246,217,249,125,66,120,209,254,147,157,243,236,219,203,78,219,211,20,1,192,72,17,0,12,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,1,44,196,241,63,107,81,5,253,239,237,114,10,56,14,113,136,146,43,30,156,113,229,35,214,226,138,19,151,120,59,157,237,63,189,217,177,185,90,24,155,73,24,88,218,212,233,142,170,15,207,185,112,217,105,175,237,221,89,215,84,189,226,152,223,35,140,202,192,113,152,76,75,214,55,78,45,153,23,97,100,176,163,233,151,103,23,136,112,88,24,82,178,48,170,89,203,158,178,45,190,51,242,140,57,235,220,80,112,164,255,175,95,132,33,25,52,14,107,177,99,193,234,26,83,82,244,221,159,54,231,210,222,157,27,71,7,123,133,241,36,9,67,42,186,172,42,41,37,77,102,146,198,10,23,223,33,12,201,160,127,173,208,227,133,78,195,147,9,226,136,241,240,100,98,208,56,194,161,160,252,176,204,83,147,73,9,7,193,128,133,56,128,133,56,128,133,56,128,133,56,128,133,56,128,133,56,128,133,56,128,133,56,128,133,56,128,133,56,128,133,56,128,133,56,128,165,100,28,153,133,229,86,155,125,74,126,233,240,145,14,95,119,139,183,179,89,36,30,107,177,195,98,179,103,228,150,248,221,251,188,221,45,67,61,173,66,53,138,197,145,93,182,104,254,67,159,78,201,159,117,242,133,193,161,1,231,134,85,174,134,207,69,98,40,88,184,188,98,229,187,169,153,217,39,95,232,119,239,111,124,231,174,129,182,223,132,58,148,121,155,160,41,57,117,246,173,47,44,122,174,254,148,50,8,253,26,22,60,92,59,127,117,77,178,57,83,196,85,202,148,44,218,12,218,152,83,202,32,180,217,180,241,179,111,89,79,59,34,20,161,76,28,197,151,85,149,221,176,46,194,251,110,10,23,85,150,221,244,156,136,171,243,110,126,158,54,131,187,150,54,190,236,198,103,104,71,132,34,212,136,131,110,118,229,183,191,18,117,108,214,181,79,228,156,183,88,196,9,61,228,205,188,234,209,168,99,180,35,227,239,252,18,147,26,113,20,47,125,32,37,61,250,67,134,41,41,105,214,117,107,69,156,148,94,255,36,109,64,212,49,218,17,218,29,161,2,53,158,144,102,151,46,148,157,44,147,157,140,49,147,41,103,246,18,201,89,249,221,137,47,5,238,57,146,82,205,217,165,151,72,14,155,179,206,201,152,62,83,76,184,204,130,57,105,214,92,201,225,236,210,139,147,82,211,69,194,83,32,14,122,44,79,78,211,176,148,185,229,151,139,9,151,163,229,206,32,57,45,99,234,140,249,34,225,41,240,176,18,240,28,210,52,31,244,15,136,9,167,245,135,198,101,35,181,194,225,115,96,33,14,96,33,14,96,33,14,96,33,14,96,33,14,96,33,14,96,33,14,96,233,27,7,189,72,157,231,184,218,90,50,207,106,179,167,100,100,249,122,246,248,186,90,14,239,254,97,212,219,39,64,139,52,107,222,63,43,105,179,91,108,115,67,163,126,111,151,115,176,189,177,175,121,83,120,44,36,116,163,99,28,244,194,244,5,171,62,57,249,53,244,127,207,248,25,240,184,155,63,188,207,189,171,78,128,156,252,5,203,28,85,31,152,179,242,79,185,188,127,239,214,166,119,87,248,221,251,133,62,244,122,109,165,248,242,251,150,188,208,116,218,119,87,208,78,94,180,102,99,197,189,239,41,241,226,83,124,37,167,91,28,85,239,211,114,141,47,131,208,242,210,34,23,44,172,20,250,208,37,142,212,204,156,242,202,151,83,210,45,17,102,74,150,222,159,59,119,169,128,136,242,236,87,210,205,44,194,0,45,242,249,119,188,154,106,153,38,116,160,75,28,246,149,239,80,31,81,199,232,174,82,167,189,154,28,104,13,237,43,223,142,58,150,158,83,104,191,59,250,216,25,136,125,28,230,172,115,11,23,46,151,153,164,189,42,184,248,54,1,140,130,75,150,167,103,23,200,76,210,130,235,113,202,195,216,199,161,233,157,10,74,188,173,33,94,226,190,146,177,143,195,170,105,151,74,16,7,75,211,226,88,117,136,35,246,127,202,166,231,216,228,135,205,211,52,12,27,141,166,197,209,180,236,146,112,132,20,88,136,3,88,136,3,88,136,3,88,136,3,88,136,3,88,136,3,88,136,3,88,136,3,88,136,3,88,136,3,88,136,3,88,136,3,88,136,3,88,136,3,88,177,127,179,207,72,127,183,252,112,224,168,134,97,163,209,180,56,154,150,93,82,236,227,240,182,55,202,15,15,118,104,24,54,26,77,139,163,105,217,37,197,254,97,101,80,83,28,237,136,131,21,247,149,140,253,61,71,192,115,168,71,238,52,228,35,3,46,215,239,137,114,194,242,4,228,218,246,197,72,127,143,204,36,45,184,214,51,167,201,208,229,115,43,45,31,175,30,245,29,141,58,182,251,189,123,130,67,253,2,24,65,223,209,150,143,31,142,58,70,183,177,150,13,15,9,29,232,18,135,204,94,117,108,174,238,107,222,36,32,162,222,29,95,71,189,27,214,239,54,166,215,103,101,93,13,181,91,30,43,237,223,187,117,252,85,1,143,123,251,107,55,56,63,90,37,64,66,227,91,149,180,92,180,104,227,175,162,229,165,69,214,239,54,166,227,113,14,191,123,127,195,250,75,243,28,87,79,157,49,223,90,84,145,108,182,224,20,12,103,198,189,171,174,254,105,251,244,121,215,88,138,236,150,194,185,161,128,79,249,83,48,16,218,244,195,77,223,211,63,1,103,135,110,78,221,191,126,34,38,22,142,144,2,11,113,0,11,113,0,11,113,0,11,113,0,11,113,0,11,113,0,11,113,0,11,113,0,75,129,239,120,27,238,107,15,143,141,201,207,251,92,113,248,214,120,77,63,148,118,103,248,240,65,145,240,20,136,99,108,116,120,168,119,175,228,112,136,134,93,127,138,9,71,63,52,20,240,75,14,123,187,154,199,130,35,34,225,169,241,165,195,242,111,115,242,118,236,22,225,176,152,120,225,176,183,179,89,114,118,160,173,65,168,64,141,56,14,252,248,218,216,177,81,153,201,182,186,23,69,156,236,251,238,101,153,177,177,99,193,206,45,31,8,21,168,17,135,103,223,182,214,218,39,163,142,29,216,244,134,123,231,70,17,39,189,219,191,234,216,92,29,117,172,181,118,173,231,192,118,161,2,53,226,32,7,55,189,222,231,252,41,194,128,183,123,79,107,205,227,34,174,254,248,108,141,183,211,25,97,160,119,199,55,180,35,66,17,202,196,65,182,189,116,213,214,231,23,143,255,6,137,224,208,192,174,183,42,235,159,178,135,67,199,68,92,209,115,210,250,117,14,218,24,218,164,83,174,162,205,166,141,223,241,250,77,66,29,138,29,231,24,104,251,109,203,99,165,153,133,229,86,155,125,74,126,233,240,145,14,95,119,139,252,51,193,137,225,106,248,156,254,89,139,29,22,155,61,35,183,196,239,222,231,237,110,25,234,137,195,31,216,103,73,201,131,96,180,208,137,191,214,148,108,162,85,171,21,142,144,2,11,113,0,11,113,0,11,113,0,11,113,0,11,113,0,11,113,0,11,113,0,11,113,0,11,113,0,11,113,0,11,113,0,11,113,0,11,113,0,75,165,55,251,196,144,231,224,14,157,134,39,19,131,222,115,224,100,169,50,12,122,207,225,110,252,54,48,120,88,102,114,212,219,71,195,194,144,12,26,71,104,196,247,103,237,90,153,201,214,154,39,104,88,24,146,65,227,32,93,245,27,6,218,126,143,60,115,100,207,207,52,38,140,42,89,24,88,239,174,111,50,11,202,45,5,115,78,127,237,206,186,166,234,21,242,31,114,156,124,12,29,7,253,226,93,13,53,1,207,161,140,188,153,230,172,252,19,151,123,59,157,127,124,182,230,175,47,215,25,185,12,98,18,240,31,107,81,133,248,231,83,206,78,1,199,33,14,96,225,8,41,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,16,7,176,254,6,0,0,255,255,38,60,246,51,0,0,0,6,73,68,65,84,3,0,118,209,99,217,197,162,153,61,0,0,0,0,73,69,78,68,174,66,96,130};
+
+static const unsigned char PWA_ICON_192[] = {137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,192,0,0,0,192,8,2,0,0,0,221,190,251,80,0,0,7,206,73,68,65,84,120,156,236,221,107,108,84,101,26,192,241,119,232,149,14,208,153,161,165,165,96,101,41,180,83,2,195,174,100,89,22,109,65,19,113,49,187,11,187,49,49,236,234,154,93,212,238,77,118,99,98,52,36,198,47,70,33,104,162,38,138,38,168,212,251,7,141,38,26,209,106,189,80,162,120,1,44,165,76,169,92,164,194,64,161,237,180,208,171,197,214,151,17,16,105,211,158,183,15,135,115,14,252,127,33,4,152,103,146,115,222,254,123,202,156,57,39,147,172,0,129,100,5,8,16,16,68,8,8,34,4,4,17,2,130,8,1,65,132,128,32,66,64,16,33,32,136,16,16,68,8,8,34,4,4,17,2,130,8,1,65,132,128,32,66,64,16,33,32,136,16,16,68,8,8,34,4,4,17,2,130,8,1,65,132,128,32,66,64,16,33,32,136,16,16,68,8,8,34,4,4,17,2,130,8,1,65,132,128,32,66,64,16,33,32,136,16,16,68,8,8,34,4,52,136,80,241,194,73,243,111,242,231,133,199,76,12,235,191,182,31,170,235,136,69,15,126,242,98,75,244,35,133,159,243,41,156,197,55,42,169,224,143,43,167,255,233,62,253,135,115,30,234,239,251,190,254,181,251,246,190,181,74,255,65,225,52,2,250,73,234,184,9,87,172,120,45,84,116,213,16,51,205,209,143,183,61,126,227,119,109,141,10,9,73,10,167,77,91,122,239,164,249,127,25,122,38,35,123,138,62,2,53,215,190,175,144,48,74,33,33,48,237,183,83,175,191,203,202,164,30,27,123,89,68,33,129,128,78,153,114,221,255,124,163,44,173,134,30,251,197,226,59,21,18,120,21,118,74,112,218,60,235,195,227,139,23,42,36,112,4,58,41,45,51,119,116,214,229,214,231,245,176,126,138,2,1,253,40,96,114,248,25,241,83,46,74,252,8,59,169,183,179,85,25,26,193,83,46,74,4,4,17,2,130,8,1,65,132,128,32,66,64,16,33,32,136,16,16,68,8,8,34,4,4,17,2,130,8,1,65,132,128,32,66,64,16,33,32,136,120,62,32,127,110,161,63,47,172,127,239,237,104,233,136,213,181,199,162,189,29,113,229,86,41,254,224,152,188,98,189,193,41,254,80,199,225,122,189,181,157,135,191,86,94,230,225,128,178,102,94,27,41,43,79,15,76,60,231,223,15,84,149,239,124,225,255,39,92,118,189,78,114,70,230,140,155,31,155,124,213,223,206,249,247,238,120,172,102,221,242,163,219,223,81,222,228,201,43,18,83,199,102,233,116,230,222,93,49,176,30,109,114,201,45,165,171,106,179,35,191,83,174,145,115,197,146,210,213,209,129,245,104,233,193,188,95,223,181,33,114,251,250,228,140,128,242,32,79,6,84,120,195,253,131,126,49,206,208,95,149,95,221,241,106,198,132,169,202,5,244,102,204,254,215,139,131,182,126,134,142,62,124,227,42,229,65,222,11,40,107,214,162,252,107,202,134,29,75,78,247,71,202,158,83,62,167,111,189,245,249,102,255,243,121,189,49,195,14,234,157,114,213,81,211,34,239,5,84,240,135,149,22,39,67,133,87,134,194,11,148,163,244,6,4,167,207,183,56,60,245,247,247,40,175,241,90,64,62,95,160,224,55,214,199,29,191,119,194,104,3,2,5,115,157,63,100,26,242,88,64,227,242,103,39,165,166,91,159,15,22,56,28,144,209,6,36,165,142,214,59,168,60,197,99,1,133,194,11,77,198,85,176,240,74,39,191,167,125,190,96,81,137,209,51,76,119,208,113,30,59,15,148,226,55,123,173,171,95,240,171,254,126,229,148,254,254,212,49,33,163,103,152,238,160,227,120,43,3,34,4,4,17,2,130,8,1,65,132,128,32,66,64,16,33,32,136,16,16,68,8,8,34,23,40,160,241,51,174,25,123,89,100,76,94,56,125,124,126,119,115,67,123,44,122,252,219,237,205,59,63,84,56,31,28,92,94,219,3,74,11,76,140,220,190,62,123,214,162,129,15,29,169,222,80,243,244,173,61,241,152,194,72,57,190,188,118,190,153,234,243,77,94,176,188,116,117,116,208,221,211,38,204,94,92,250,96,237,228,210,191,43,140,128,59,150,215,198,128,210,50,115,139,151,173,73,201,200,28,98,70,191,119,24,94,246,80,90,48,79,193,144,75,150,215,198,128,34,183,61,155,226,15,14,59,166,223,175,158,121,203,19,10,134,172,47,239,172,229,235,148,109,236,10,200,159,23,206,142,92,103,113,56,103,206,146,209,217,83,20,44,51,90,94,253,179,204,190,229,181,43,160,113,249,191,52,154,15,56,125,233,160,183,184,103,121,109,11,232,114,179,61,52,157,191,196,185,103,121,237,122,25,111,154,60,71,32,35,238,89,94,251,206,3,153,94,72,234,220,133,167,158,228,150,229,229,173,12,136,16,16,68,8,8,34,4,4,17,2,130,8,1,65,132,128,32,66,64,16,33,32,136,16,16,68,8,8,34,4,4,17,2,130,8,1,65,132,128,32,66,64,16,177,235,146,214,142,67,187,108,157,191,196,185,103,121,237,58,2,29,219,255,149,173,243,151,56,247,44,175,109,1,53,24,238,97,3,1,25,112,207,242,218,245,35,172,117,207,231,241,221,155,173,14,239,254,76,207,43,88,102,180,188,77,181,149,246,45,175,109,119,166,246,247,85,175,253,171,149,207,126,211,51,219,158,88,166,231,21,172,51,88,222,214,234,181,55,217,183,188,54,222,218,220,121,100,239,142,245,255,30,118,76,207,116,29,221,167,96,200,226,242,110,95,247,143,158,182,195,202,54,246,126,212,193,161,205,175,84,174,152,116,164,122,195,160,143,30,173,169,168,188,35,79,207,40,140,136,149,229,109,252,242,117,101,39,219,207,3,245,196,99,95,62,116,125,214,204,107,199,23,95,29,44,42,25,155,31,57,222,176,61,94,191,169,57,250,97,83,77,133,130,140,227,203,123,129,78,36,54,237,120,79,255,82,176,135,131,203,203,153,104,136,16,16,68,8,8,34,4,4,17,2,130,8,1,65,132,128,32,66,64,16,33,32,136,16,16,68,60,246,185,241,173,150,47,130,57,61,255,153,114,148,233,6,152,238,160,227,60,22,144,241,165,156,78,95,232,104,124,233,160,215,46,237,245,88,64,61,109,135,123,218,26,173,207,59,254,245,48,218,0,189,107,182,94,187,99,7,143,5,164,237,121,115,149,197,201,174,166,134,216,167,47,41,71,197,54,191,220,213,180,223,226,176,245,93,115,15,239,5,244,205,187,143,52,110,125,115,216,177,239,123,58,183,60,178,244,68,215,49,229,168,19,157,109,91,30,253,115,223,137,222,97,39,15,126,242,146,222,53,229,53,222,11,72,171,126,234,230,246,131,209,161,103,106,203,255,115,108,255,54,229,2,199,190,217,186,243,249,21,67,207,180,199,234,106,158,190,85,121,144,39,3,210,223,214,27,239,153,241,197,154,197,221,131,125,28,223,129,77,207,85,148,5,14,84,173,87,174,209,240,193,147,21,101,193,3,85,229,3,31,234,110,61,244,249,234,69,27,239,46,238,251,174,75,121,144,79,121,92,102,193,220,80,97,73,112,250,252,238,248,193,120,253,166,150,186,141,35,248,127,104,168,120,225,188,149,102,159,48,186,249,129,171,91,162,31,41,67,105,153,185,193,162,146,80,81,73,122,112,82,124,247,167,241,93,85,173,123,28,62,209,32,228,249,128,206,139,11,22,208,197,135,51,209,16,33,32,136,16,16,68,8,8,34,4,4,17,2,130,8,1,65,132,128,32,66,64,16,33,32,136,16,16,68,8,8,34,4,4,17,2,130,8,1,65,132,128,78,234,136,213,41,67,35,120,202,69,201,147,151,180,158,119,166,119,11,121,241,254,27,155,16,208,41,70,55,112,241,201,30,103,16,208,41,251,54,60,108,125,120,239,219,107,20,18,146,20,18,58,143,236,77,246,7,131,211,230,13,59,185,239,221,71,27,42,215,42,36,16,208,79,154,107,43,115,230,44,77,203,204,25,98,230,248,183,59,182,62,118,3,159,236,113,6,1,157,165,191,79,31,90,186,154,27,66,225,5,73,169,233,231,60,216,219,217,86,91,254,223,29,207,220,70,61,103,227,182,158,65,164,101,230,230,204,89,114,242,6,174,194,18,253,215,150,250,77,241,93,85,141,91,222,224,149,215,64,4,4,17,78,36,66,132,128,32,66,64,16,33,32,136,16,16,68,8,8,34,4,4,17,2,130,8,1,65,132,128,32,66,64,16,33,32,136,16,16,68,8,8,34,4,4,17,2,130,8,1,65,132,128,32,66,64,16,33,32,136,16,16,68,8,8,34,4,4,17,2,130,8,1,65,132,128,32,66,64,16,33,32,136,16,16,68,8,8,34,4,4,17,2,130,8,1,65,132,128,32,66,64,16,249,1,0,0,255,255,57,103,197,235,0,0,0,6,73,68,65,84,3,0,217,133,88,36,68,161,119,155,0,0,0,0,73,69,78,68,174,66,96,130};
+
+static const unsigned char PWA_ICON_512[] = {137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,2,0,0,0,2,0,8,2,0,0,0,123,26,67,173,0,0,16,0,73,68,65,84,120,156,236,221,123,108,94,229,125,192,241,231,117,98,18,163,144,187,73,19,82,135,109,144,208,132,75,46,180,92,210,81,86,149,66,171,65,27,104,72,47,80,164,209,85,145,202,74,181,85,83,186,242,199,90,154,117,72,19,29,45,237,168,70,105,85,180,138,4,180,32,96,20,42,149,113,81,75,130,32,9,151,52,77,128,145,184,198,78,98,59,78,236,130,29,146,198,59,101,82,43,117,162,36,241,123,206,241,123,126,159,143,222,191,28,251,61,143,242,156,223,251,125,207,177,101,143,77,0,132,52,54,1,16,146,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,129,180,76,159,51,99,201,178,9,179,78,27,63,173,173,101,90,219,9,179,23,28,26,28,24,236,109,207,30,67,189,237,191,238,252,229,238,103,214,13,246,236,76,16,67,45,65,213,77,156,179,112,230,57,43,78,92,116,105,246,138,255,182,159,60,208,177,101,207,198,251,186,158,90,219,191,115,115,130,74,19,0,170,108,194,73,243,231,94,241,213,25,103,95,94,171,29,221,169,62,60,60,188,235,169,123,182,223,115,195,107,187,182,39,168,40,1,160,154,178,155,60,243,150,175,158,117,222,39,107,77,77,233,88,29,254,205,161,142,199,239,120,113,221,87,14,244,117,38,168,28,1,160,130,166,159,113,241,162,235,214,52,31,63,41,213,195,193,215,247,111,186,117,69,207,243,15,39,168,150,49,9,170,101,206,69,215,45,92,121,231,152,227,90,82,157,140,105,30,63,235,188,79,12,246,236,24,104,127,54,65,133,8,0,21,82,171,205,255,244,183,230,94,254,143,181,218,177,223,246,121,139,39,110,122,199,217,203,106,99,198,246,110,125,52,65,85,8,0,213,209,246,254,149,217,183,124,83,110,166,158,118,193,80,95,103,255,142,103,18,84,130,0,80,17,83,230,46,93,244,185,53,181,166,124,79,233,214,51,46,233,221,250,223,67,189,237,9,26,95,157,175,148,161,20,227,167,189,115,241,245,235,154,198,54,167,156,101,135,88,124,253,127,102,135,75,208,248,4,128,42,56,227,175,254,125,220,196,214,84,136,236,64,217,225,18,52,62,1,160,225,77,125,215,133,173,103,94,156,10,148,29,46,59,104,130,6,39,0,52,188,121,203,87,167,194,205,189,226,198,4,13,78,0,104,108,51,207,253,248,148,83,207,79,133,155,58,239,189,51,150,124,52,65,35,19,0,26,91,137,175,194,2,64,163,19,0,26,88,211,216,227,90,207,250,80,42,201,244,211,47,74,53,191,76,133,6,38,0,52,176,201,167,158,223,220,50,49,149,100,252,148,89,147,255,236,156,4,13,75,0,104,96,173,103,94,146,74,229,46,16,13,205,95,4,163,129,77,108,91,152,74,85,250,2,96,36,4,128,6,54,110,242,59,82,169,154,143,159,156,160,97,9,0,13,108,220,164,146,3,80,122,129,96,36,4,128,6,54,182,236,55,224,199,149,93,32,24,9,1,160,129,141,105,30,151,74,85,250,2,96,36,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,72,45,211,231,204,88,178,108,194,172,211,198,79,107,107,121,243,145,125,112,176,183,61,123,12,245,182,255,186,243,151,187,159,89,55,216,179,51,209,56,236,41,71,162,150,136,106,226,156,133,51,207,89,113,226,162,75,79,152,189,224,109,63,121,160,99,203,158,141,247,117,61,181,182,127,231,230,52,106,124,248,206,225,84,182,7,175,30,69,67,84,129,61,165,72,2,16,209,132,147,230,207,189,226,171,51,206,190,188,86,59,186,19,96,120,120,120,215,83,247,108,191,231,134,215,118,109,79,163,128,0,252,78,101,246,148,34,9,64,44,217,13,129,121,203,87,207,58,239,147,181,166,166,116,172,14,255,230,80,199,227,119,188,184,238,43,7,250,58,83,169,4,32,85,110,79,41,146,0,4,50,253,140,15,46,186,110,109,243,241,147,82,61,28,124,125,255,166,91,175,236,121,254,39,169,60,2,80,189,61,165,72,199,254,150,129,198,50,231,3,159,123,247,23,31,172,215,43,69,38,123,170,236,9,79,90,122,117,162,36,246,148,17,18,128,16,230,127,250,91,11,174,185,181,214,52,38,213,85,246,132,103,173,252,225,220,143,221,152,106,46,37,139,102,79,25,57,1,168,190,182,247,175,60,249,162,235,82,110,78,249,200,13,239,124,223,103,18,5,178,167,212,133,0,84,220,148,83,207,159,127,245,55,83,206,22,92,243,237,41,115,151,38,10,97,79,169,23,1,168,178,241,83,103,47,254,194,189,77,99,155,83,206,178,67,44,190,126,93,118,184,68,206,236,41,117,36,0,85,118,198,181,183,143,155,216,154,10,145,29,40,59,92,34,103,246,148,58,18,128,202,154,250,174,11,91,207,188,56,21,40,59,92,118,208,68,110,236,41,245,37,0,149,53,111,249,234,84,184,185,87,220,152,200,141,61,165,190,4,160,154,102,158,251,241,236,91,133,169,112,83,231,189,119,198,146,143,38,114,96,79,169,59,1,168,166,18,39,214,139,69,78,236,41,117,231,215,65,87,80,109,76,115,235,89,31,74,37,153,126,250,69,137,122,179,167,228,193,21,64,5,77,153,187,180,185,101,98,42,201,248,41,179,38,159,114,110,162,174,236,41,121,16,128,10,106,61,243,146,84,42,119,12,234,206,158,146,7,183,128,42,104,98,219,194,84,170,210,23,80,61,246,148,60,8,64,5,141,155,252,142,84,170,230,227,39,39,234,202,158,146,7,1,168,160,113,147,74,126,177,40,253,213,170,122,236,41,121,16,128,10,26,91,246,155,181,227,202,126,181,170,30,123,74,30,4,160,130,198,52,143,75,165,42,125,1,213,99,79,201,131,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,240,150,90,166,207,153,177,100,217,132,89,167,141,159,214,214,242,230,35,251,224,96,111,123,246,24,234,109,255,117,231,47,119,63,179,110,176,103,103,2,202,99,78,71,66,0,254,208,196,57,11,103,158,179,226,196,69,151,158,48,123,193,255,255,215,236,131,191,251,248,252,171,190,49,208,177,101,207,198,251,186,158,90,219,191,115,115,2,138,98,78,235,66,0,126,111,194,73,243,231,94,241,213,25,103,95,94,171,213,142,240,75,254,239,60,251,211,75,87,237,122,234,158,237,247,220,240,218,174,237,9,200,147,57,173,35,1,248,173,236,226,113,222,242,213,179,206,251,100,173,169,41,29,189,236,68,156,121,206,242,25,103,47,235,120,252,142,23,215,125,229,64,95,103,2,234,205,156,214,221,177,252,63,86,204,244,51,62,248,231,255,244,220,73,75,175,58,182,179,234,119,154,198,140,109,251,139,207,94,240,207,191,200,158,48,1,117,101,78,243,16,61,0,115,62,240,185,119,127,241,193,230,227,39,165,58,201,158,42,123,194,147,150,94,157,128,58,49,167,57,9,29,128,249,159,254,214,130,107,110,173,53,141,73,117,149,61,225,89,43,127,56,247,99,55,166,35,190,71,9,188,21,115,154,159,184,1,104,123,255,202,147,47,186,46,229,230,148,143,220,240,206,247,125,38,1,35,96,78,115,21,52,0,83,78,61,127,254,213,223,76,57,91,112,205,183,167,204,93,154,128,99,98,78,243,22,49,0,227,167,206,94,252,133,123,155,198,54,167,156,101,135,88,124,253,186,236,112,9,56,74,230,180,0,17,3,112,198,181,183,143,155,216,154,10,145,29,40,59,92,2,142,146,57,45,64,184,0,76,125,215,133,173,103,94,156,10,148,29,46,59,104,2,142,152,57,45,70,184,0,204,91,190,58,21,110,238,21,55,38,224,136,153,211,98,196,10,192,204,115,63,158,125,91,41,21,110,234,188,247,206,88,242,209,4,28,1,115,90,152,88,1,40,113,119,5,0,142,144,57,45,76,160,223,5,84,27,211,220,122,214,135,82,73,166,159,126,81,2,222,142,57,45,82,160,43,128,41,115,151,54,183,76,76,37,25,63,101,214,228,83,206,77,192,31,101,78,139,20,40,0,173,103,94,146,74,229,46,16,188,45,115,90,164,64,183,128,38,182,45,76,165,42,125,1,48,250,153,211,34,5,10,192,184,201,239,72,165,106,62,126,114,2,254,40,115,90,164,72,1,152,84,242,137,85,250,153,13,163,159,57,45,82,160,0,140,45,59,236,199,149,125,102,195,232,103,78,139,20,40,0,99,154,199,165,82,149,190,0,24,253,204,105,145,252,77,96,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,154,82,24,7,95,223,159,74,85,250,2,96,244,51,167,69,10,20,128,3,251,119,165,82,149,190,0,24,253,204,105,145,34,5,96,95,217,39,86,217,11,128,209,207,156,22,41,208,247,0,188,179,128,209,207,156,22,41,208,21,64,127,251,230,84,170,210,23,0,163,159,57,45,82,160,0,244,60,247,80,42,85,233,11,128,209,207,156,22,41,210,21,192,206,205,131,123,59,82,73,134,250,58,179,5,36,224,143,50,167,69,10,20,128,76,239,150,159,166,146,236,217,116,127,2,142,128,57,45,76,172,0,116,151,119,113,215,237,254,15,28,25,115,90,152,88,1,232,90,127,87,127,251,179,169,112,125,47,254,124,247,51,247,38,224,8,152,211,194,196,10,64,102,219,154,85,169,112,219,238,254,114,2,142,152,57,45,70,184,0,100,151,120,189,91,31,75,5,234,126,238,225,189,91,31,77,192,17,51,167,197,8,23,128,204,179,183,93,117,160,191,59,21,226,141,129,158,231,111,191,54,1,71,201,156,22,32,98,0,134,246,118,108,188,101,217,225,67,7,83,206,178,67,60,125,243,165,67,125,175,38,224,40,153,211,2,68,12,64,166,111,251,207,126,113,231,231,83,206,94,184,227,179,251,94,90,159,128,99,98,78,243,22,52,0,153,246,71,110,107,127,228,187,41,55,47,63,112,83,199,19,63,72,192,8,152,211,92,197,13,64,230,133,239,175,220,252,157,79,29,62,244,70,170,171,236,9,55,221,186,162,148,31,99,128,234,49,167,249,9,29,128,76,231,147,63,90,191,250,194,161,190,206,84,39,67,251,186,214,127,237,130,174,13,107,19,80,39,230,52,39,209,3,144,217,247,210,147,79,124,233,244,87,126,124,243,8,223,98,100,95,254,202,67,223,120,98,213,130,125,47,111,72,64,93,153,211,60,8,192,111,29,124,173,111,235,143,254,238,177,191,159,215,249,228,93,195,195,195,233,40,101,95,210,185,126,77,246,229,91,255,227,111,179,167,74,64,14,204,105,221,249,163,240,191,55,216,189,99,243,119,62,241,63,255,117,211,204,247,92,121,226,226,203,78,152,189,224,109,191,100,160,99,203,158,77,247,119,109,88,227,55,125,66,49,204,105,29,9,192,31,202,78,145,236,177,237,238,127,104,153,62,103,198,146,101,19,102,157,54,126,90,91,203,155,143,236,95,7,123,219,179,199,80,111,251,192,171,91,246,108,188,111,176,103,103,2,10,103,78,235,66,0,222,82,118,210,236,120,248,95,19,48,138,153,211,145,16,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,170,41,81,57,7,95,223,159,74,85,250,2,170,199,158,146,7,1,168,160,3,251,119,165,82,149,190,128,234,177,167,228,65,0,42,232,192,190,178,95,44,202,94,64,245,216,83,242,224,123,0,21,228,221,98,245,216,83,242,224,10,160,130,250,219,55,167,82,149,190,128,234,177,167,228,65,0,42,168,231,185,135,82,169,74,95,64,245,216,83,242,32,0,21,212,191,115,243,224,222,142,84,146,161,190,206,108,1,137,186,178,167,228,65,0,170,169,119,203,79,83,73,246,108,186,63,145,3,123,74,221,9,64,53,117,151,119,193,222,237,94,65,62,236,41,117,39,0,213,212,181,254,174,254,246,103,83,225,250,94,252,249,238,103,238,77,228,192,158,82,119,2,80,89,219,214,172,74,133,219,118,247,151,19,185,177,167,212,151,0,84,86,118,217,222,187,245,177,84,160,238,231,30,222,187,245,209,68,110,236,41,245,37,0,85,246,236,109,87,29,232,239,78,133,120,99,160,231,249,219,175,77,228,204,158,82,71,2,80,101,67,123,59,54,222,178,236,240,161,131,41,103,217,33,158,190,249,210,161,190,87,19,57,179,167,212,145,0,84,92,223,246,159,253,226,206,207,167,156,189,112,199,103,247,189,180,62,81,8,123,74,189,8,64,245,181,63,114,91,251,35,223,77,185,121,249,129,155,58,158,248,65,162,64,246,148,186,16,128,16,94,248,254,202,205,223,249,212,225,67,111,164,186,202,158,112,211,173,43,74,249,209,20,236,41,35,39,0,81,116,62,249,163,245,171,47,28,234,235,76,117,50,180,175,107,253,215,46,232,218,176,54,81,18,123,202,8,9,64,32,251,94,122,242,137,47,157,254,202,143,111,30,225,219,198,236,203,95,121,232,27,79,172,90,176,239,229,13,137,82,217,83,70,162,150,136,167,165,245,228,121,203,191,62,243,220,21,181,218,209,157,0,195,195,195,217,219,195,109,107,87,13,118,239,72,163,192,135,239,28,78,101,123,240,234,81,49,68,149,217,83,138,36,0,113,77,156,179,112,230,123,174,60,113,241,101,39,204,94,240,182,159,60,208,177,101,207,166,251,187,54,172,25,85,191,21,82,0,254,64,5,246,148,34,9,0,169,101,250,156,25,75,150,77,152,117,218,248,105,109,45,111,62,178,15,14,246,182,103,143,161,222,246,129,87,183,236,217,120,223,96,207,206,52,250,8,192,91,105,220,61,165,72,2,64,3,19,0,24,9,127,19,24,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,170,41,65,195,58,248,250,254,84,170,210,23,0,35,33,0,52,176,3,251,119,165,82,149,190,0,24,9,1,160,129,29,216,255,197,159,149,0,0,3,69,73,68,65,84,87,118,0,202,94,0,140,132,239,1,208,192,92,1,192,72,184,2,160,129,245,183,111,78,165,42,125,1,48,18,2,64,3,235,121,238,161,84,170,210,23,0,35,33,0,52,176,254,246,103,7,247,118,164,146,12,245,117,102,11,72,208,176,4,128,70,54,60,220,187,229,167,169,36,123,54,221,159,45,32,65,195,18,0,26,91,119,121,55,97,186,221,255,161,193,9,0,141,173,107,253,93,165,220,135,233,123,241,231,187,159,185,55,65,35,19,0,26,222,182,53,171,82,225,182,221,253,229,4,13,78,0,104,120,217,173,152,222,173,143,165,2,117,63,247,240,222,173,143,38,104,112,2,64,21,60,251,221,171,15,244,119,167,66,188,49,208,243,252,247,62,147,160,241,9,0,85,48,212,251,171,141,183,92,126,248,208,193,148,179,236,16,79,223,124,217,80,121,63,123,10,117,52,38,65,37,12,245,182,191,49,208,125,226,162,191,76,121,122,254,123,127,253,219,159,254,132,74,16,0,170,99,255,43,79,143,155,60,115,210,159,156,157,242,241,242,3,55,189,242,224,191,36,168,10,1,160,82,246,108,126,224,181,221,47,101,215,1,181,166,122,158,219,135,15,189,177,249,223,62,181,227,225,91,18,84,72,45,65,229,76,57,245,252,69,127,115,247,248,41,179,82,61,12,237,235,202,190,193,176,239,165,245,9,170,197,21,0,21,52,180,247,87,29,143,127,191,105,76,243,164,63,89,50,146,75,129,236,141,255,142,159,124,115,243,173,43,94,223,253,82,130,202,113,5,64,149,181,180,158,60,111,249,215,103,158,187,162,86,59,186,83,125,120,120,184,107,195,218,109,107,87,13,118,239,72,80,81,2,64,245,77,156,179,112,230,123,174,60,113,241,101,39,204,94,240,182,159,60,208,177,101,207,166,251,187,54,172,233,223,233,119,253,83,113,2,64,32,45,211,231,204,88,178,108,194,172,211,198,79,107,107,153,214,150,245,224,208,224,192,96,111,123,246,24,234,109,31,120,117,203,158,141,247,13,246,236,76,16,131,0,0,4,229,111,2,3,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,255,11,0,0,255,255,156,84,83,158,0,0,0,6,73,68,65,84,3,0,100,20,74,143,110,152,57,168,0,0,0,0,73,69,78,68,174,66,96,130};
+
+static const unsigned char PWA_ICON_MASKABLE_512[] = {137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,2,0,0,0,2,0,8,2,0,0,0,123,26,67,173,0,0,16,0,73,68,65,84,120,156,236,221,123,108,94,229,125,192,241,231,117,98,18,163,144,187,73,19,82,135,109,144,208,132,75,46,180,92,210,81,86,149,66,171,65,27,104,72,47,80,164,209,85,145,202,74,181,85,83,186,242,199,90,154,117,72,19,29,45,237,168,70,105,85,180,138,4,180,32,96,20,42,149,113,81,75,130,32,9,151,52,77,128,145,184,198,78,98,59,78,236,130,29,146,198,59,101,82,43,117,162,36,241,123,206,241,123,126,159,143,222,191,28,251,61,143,242,156,223,251,125,207,177,101,143,77,0,132,52,54,1,16,146,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,129,180,76,159,51,99,201,178,9,179,78,27,63,173,173,101,90,219,9,179,23,28,26,28,24,236,109,207,30,67,189,237,191,238,252,229,238,103,214,13,246,236,76,16,67,45,65,213,77,156,179,112,230,57,43,78,92,116,105,246,138,255,182,159,60,208,177,101,207,198,251,186,158,90,219,191,115,115,130,74,19,0,170,108,194,73,243,231,94,241,213,25,103,95,94,171,29,221,169,62,60,60,188,235,169,123,182,223,115,195,107,187,182,39,168,40,1,160,154,178,155,60,243,150,175,158,117,222,39,107,77,77,233,88,29,254,205,161,142,199,239,120,113,221,87,14,244,117,38,168,28,1,160,130,166,159,113,241,162,235,214,52,31,63,41,213,195,193,215,247,111,186,117,69,207,243,15,39,168,150,49,9,170,101,206,69,215,45,92,121,231,152,227,90,82,157,140,105,30,63,235,188,79,12,246,236,24,104,127,54,65,133,8,0,21,82,171,205,255,244,183,230,94,254,143,181,218,177,223,246,121,139,39,110,122,199,217,203,106,99,198,246,110,125,52,65,85,8,0,213,209,246,254,149,217,183,124,83,110,166,158,118,193,80,95,103,255,142,103,18,84,130,0,80,17,83,230,46,93,244,185,53,181,166,124,79,233,214,51,46,233,221,250,223,67,189,237,9,26,95,157,175,148,161,20,227,167,189,115,241,245,235,154,198,54,167,156,101,135,88,124,253,127,102,135,75,208,248,4,128,42,56,227,175,254,125,220,196,214,84,136,236,64,217,225,18,52,62,1,160,225,77,125,215,133,173,103,94,156,10,148,29,46,59,104,130,6,39,0,52,188,121,203,87,167,194,205,189,226,198,4,13,78,0,104,108,51,207,253,248,148,83,207,79,133,155,58,239,189,51,150,124,52,65,35,19,0,26,91,137,175,194,2,64,163,19,0,26,88,211,216,227,90,207,250,80,42,201,244,211,47,74,53,191,76,133,6,38,0,52,176,201,167,158,223,220,50,49,149,100,252,148,89,147,255,236,156,4,13,75,0,104,96,173,103,94,146,74,229,46,16,13,205,95,4,163,129,77,108,91,152,74,85,250,2,96,36,4,128,6,54,110,242,59,82,169,154,143,159,156,160,97,9,0,13,108,220,164,146,3,80,122,129,96,36,4,128,6,54,182,236,55,224,199,149,93,32,24,9,1,160,129,141,105,30,151,74,85,250,2,96,36,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,72,45,211,231,204,88,178,108,194,172,211,198,79,107,107,121,243,145,125,112,176,183,61,123,12,245,182,255,186,243,151,187,159,89,55,216,179,51,209,56,236,41,71,162,150,136,106,226,156,133,51,207,89,113,226,162,75,79,152,189,224,109,63,121,160,99,203,158,141,247,117,61,181,182,127,231,230,52,106,124,248,206,225,84,182,7,175,30,69,67,84,129,61,165,72,2,16,209,132,147,230,207,189,226,171,51,206,190,188,86,59,186,19,96,120,120,120,215,83,247,108,191,231,134,215,118,109,79,163,128,0,252,78,101,246,148,34,9,64,44,217,13,129,121,203,87,207,58,239,147,181,166,166,116,172,14,255,230,80,199,227,119,188,184,238,43,7,250,58,83,169,4,32,85,110,79,41,146,0,4,50,253,140,15,46,186,110,109,243,241,147,82,61,28,124,125,255,166,91,175,236,121,254,39,169,60,2,80,189,61,165,72,199,254,150,129,198,50,231,3,159,123,247,23,31,172,215,43,69,38,123,170,236,9,79,90,122,117,162,36,246,148,17,18,128,16,230,127,250,91,11,174,185,181,214,52,38,213,85,246,132,103,173,252,225,220,143,221,152,106,46,37,139,102,79,25,57,1,168,190,182,247,175,60,249,162,235,82,110,78,249,200,13,239,124,223,103,18,5,178,167,212,133,0,84,220,148,83,207,159,127,245,55,83,206,22,92,243,237,41,115,151,38,10,97,79,169,23,1,168,178,241,83,103,47,254,194,189,77,99,155,83,206,178,67,44,190,126,93,118,184,68,206,236,41,117,36,0,85,118,198,181,183,143,155,216,154,10,145,29,40,59,92,34,103,246,148,58,18,128,202,154,250,174,11,91,207,188,56,21,40,59,92,118,208,68,110,236,41,245,37,0,149,53,111,249,234,84,184,185,87,220,152,200,141,61,165,190,4,160,154,102,158,251,241,236,91,133,169,112,83,231,189,119,198,146,143,38,114,96,79,169,59,1,168,166,18,39,214,139,69,78,236,41,117,231,215,65,87,80,109,76,115,235,89,31,74,37,153,126,250,69,137,122,179,167,228,193,21,64,5,77,153,187,180,185,101,98,42,201,248,41,179,38,159,114,110,162,174,236,41,121,16,128,10,106,61,243,146,84,42,119,12,234,206,158,146,7,183,128,42,104,98,219,194,84,170,210,23,80,61,246,148,60,8,64,5,141,155,252,142,84,170,230,227,39,39,234,202,158,146,7,1,168,160,113,147,74,126,177,40,253,213,170,122,236,41,121,16,128,10,26,91,246,155,181,227,202,126,181,170,30,123,74,30,4,160,130,198,52,143,75,165,42,125,1,213,99,79,201,131,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,240,150,90,166,207,153,177,100,217,132,89,167,141,159,214,214,242,230,35,251,224,96,111,123,246,24,234,109,255,117,231,47,119,63,179,110,176,103,103,2,202,99,78,71,66,0,254,208,196,57,11,103,158,179,226,196,69,151,158,48,123,193,255,255,215,236,131,191,251,248,252,171,190,49,208,177,101,207,198,251,186,158,90,219,191,115,115,2,138,98,78,235,66,0,126,111,194,73,243,231,94,241,213,25,103,95,94,171,213,142,240,75,254,239,60,251,211,75,87,237,122,234,158,237,247,220,240,218,174,237,9,200,147,57,173,35,1,248,173,236,226,113,222,242,213,179,206,251,100,173,169,41,29,189,236,68,156,121,206,242,25,103,47,235,120,252,142,23,215,125,229,64,95,103,2,234,205,156,214,221,177,252,63,86,204,244,51,62,248,231,255,244,220,73,75,175,58,182,179,234,119,154,198,140,109,251,139,207,94,240,207,191,200,158,48,1,117,101,78,243,16,61,0,115,62,240,185,119,127,241,193,230,227,39,165,58,201,158,42,123,194,147,150,94,157,128,58,49,167,57,9,29,128,249,159,254,214,130,107,110,173,53,141,73,117,149,61,225,89,43,127,56,247,99,55,166,35,190,71,9,188,21,115,154,159,184,1,104,123,255,202,147,47,186,46,229,230,148,143,220,240,206,247,125,38,1,35,96,78,115,21,52,0,83,78,61,127,254,213,223,76,57,91,112,205,183,167,204,93,154,128,99,98,78,243,22,49,0,227,167,206,94,252,133,123,155,198,54,167,156,101,135,88,124,253,186,236,112,9,56,74,230,180,0,17,3,112,198,181,183,143,155,216,154,10,145,29,40,59,92,2,142,146,57,45,64,184,0,76,125,215,133,173,103,94,156,10,148,29,46,59,104,2,142,152,57,45,70,184,0,204,91,190,58,21,110,238,21,55,38,224,136,153,211,98,196,10,192,204,115,63,158,125,91,41,21,110,234,188,247,206,88,242,209,4,28,1,115,90,152,88,1,40,113,119,5,0,142,144,57,45,76,160,223,5,84,27,211,220,122,214,135,82,73,166,159,126,81,2,222,142,57,45,82,160,43,128,41,115,151,54,183,76,76,37,25,63,101,214,228,83,206,77,192,31,101,78,139,20,40,0,173,103,94,146,74,229,46,16,188,45,115,90,164,64,183,128,38,182,45,76,165,42,125,1,48,250,153,211,34,5,10,192,184,201,239,72,165,106,62,126,114,2,254,40,115,90,164,72,1,152,84,242,137,85,250,153,13,163,159,57,45,82,160,0,140,45,59,236,199,149,125,102,195,232,103,78,139,20,40,0,99,154,199,165,82,149,190,0,24,253,204,105,145,252,77,96,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,154,82,24,7,95,223,159,74,85,250,2,96,244,51,167,69,10,20,128,3,251,119,165,82,149,190,0,24,253,204,105,145,34,5,96,95,217,39,86,217,11,128,209,207,156,22,41,208,247,0,188,179,128,209,207,156,22,41,208,21,64,127,251,230,84,170,210,23,0,163,159,57,45,82,160,0,244,60,247,80,42,85,233,11,128,209,207,156,22,41,210,21,192,206,205,131,123,59,82,73,134,250,58,179,5,36,224,143,50,167,69,10,20,128,76,239,150,159,166,146,236,217,116,127,2,142,128,57,45,76,172,0,116,151,119,113,215,237,254,15,28,25,115,90,152,88,1,232,90,127,87,127,251,179,169,112,125,47,254,124,247,51,247,38,224,8,152,211,194,196,10,64,102,219,154,85,169,112,219,238,254,114,2,142,152,57,45,70,184,0,100,151,120,189,91,31,75,5,234,126,238,225,189,91,31,77,192,17,51,167,197,8,23,128,204,179,183,93,117,160,191,59,21,226,141,129,158,231,111,191,54,1,71,201,156,22,32,98,0,134,246,118,108,188,101,217,225,67,7,83,206,178,67,60,125,243,165,67,125,175,38,224,40,153,211,2,68,12,64,166,111,251,207,126,113,231,231,83,206,94,184,227,179,251,94,90,159,128,99,98,78,243,22,52,0,153,246,71,110,107,127,228,187,41,55,47,63,112,83,199,19,63,72,192,8,152,211,92,197,13,64,230,133,239,175,220,252,157,79,29,62,244,70,170,171,236,9,55,221,186,162,148,31,99,128,234,49,167,249,9,29,128,76,231,147,63,90,191,250,194,161,190,206,84,39,67,251,186,214,127,237,130,174,13,107,19,80,39,230,52,39,209,3,144,217,247,210,147,79,124,233,244,87,126,124,243,8,223,98,100,95,254,202,67,223,120,98,213,130,125,47,111,72,64,93,153,211,60,8,192,111,29,124,173,111,235,143,254,238,177,191,159,215,249,228,93,195,195,195,233,40,101,95,210,185,126,77,246,229,91,255,227,111,179,167,74,64,14,204,105,221,249,163,240,191,55,216,189,99,243,119,62,241,63,255,117,211,204,247,92,121,226,226,203,78,152,189,224,109,191,100,160,99,203,158,77,247,119,109,88,227,55,125,66,49,204,105,29,9,192,31,202,78,145,236,177,237,238,127,104,153,62,103,198,146,101,19,102,157,54,126,90,91,203,155,143,236,95,7,123,219,179,199,80,111,251,192,171,91,246,108,188,111,176,103,103,2,10,103,78,235,66,0,222,82,118,210,236,120,248,95,19,48,138,153,211,145,16,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,170,41,81,57,7,95,223,159,74,85,250,2,170,199,158,146,7,1,168,160,3,251,119,165,82,149,190,128,234,177,167,228,65,0,42,232,192,190,178,95,44,202,94,64,245,216,83,242,224,123,0,21,228,221,98,245,216,83,242,224,10,160,130,250,219,55,167,82,149,190,128,234,177,167,228,65,0,42,168,231,185,135,82,169,74,95,64,245,216,83,242,32,0,21,212,191,115,243,224,222,142,84,146,161,190,206,108,1,137,186,178,167,228,65,0,170,169,119,203,79,83,73,246,108,186,63,145,3,123,74,221,9,64,53,117,151,119,193,222,237,94,65,62,236,41,117,39,0,213,212,181,254,174,254,246,103,83,225,250,94,252,249,238,103,238,77,228,192,158,82,119,2,80,89,219,214,172,74,133,219,118,247,151,19,185,177,167,212,151,0,84,86,118,217,222,187,245,177,84,160,238,231,30,222,187,245,209,68,110,236,41,245,37,0,85,246,236,109,87,29,232,239,78,133,120,99,160,231,249,219,175,77,228,204,158,82,71,2,80,101,67,123,59,54,222,178,236,240,161,131,41,103,217,33,158,190,249,210,161,190,87,19,57,179,167,212,145,0,84,92,223,246,159,253,226,206,207,167,156,189,112,199,103,247,189,180,62,81,8,123,74,189,8,64,245,181,63,114,91,251,35,223,77,185,121,249,129,155,58,158,248,65,162,64,246,148,186,16,128,16,94,248,254,202,205,223,249,212,225,67,111,164,186,202,158,112,211,173,43,74,249,209,20,236,41,35,39,0,81,116,62,249,163,245,171,47,28,234,235,76,117,50,180,175,107,253,215,46,232,218,176,54,81,18,123,202,8,9,64,32,251,94,122,242,137,47,157,254,202,143,111,30,225,219,198,236,203,95,121,232,27,79,172,90,176,239,229,13,137,82,217,83,70,162,150,136,167,165,245,228,121,203,191,62,243,220,21,181,218,209,157,0,195,195,195,217,219,195,109,107,87,13,118,239,72,163,192,135,239,28,78,101,123,240,234,81,49,68,149,217,83,138,36,0,113,77,156,179,112,230,123,174,60,113,241,101,39,204,94,240,182,159,60,208,177,101,207,166,251,187,54,172,25,85,191,21,82,0,254,64,5,246,148,34,9,0,169,101,250,156,25,75,150,77,152,117,218,248,105,109,45,111,62,178,15,14,246,182,103,143,161,222,246,129,87,183,236,217,120,223,96,207,206,52,250,8,192,91,105,220,61,165,72,2,64,3,19,0,24,9,127,19,24,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,74,0,0,130,18,0,128,160,4,0,32,40,1,0,8,170,41,65,195,58,248,250,254,84,170,210,23,0,35,33,0,52,176,3,251,119,165,82,149,190,0,24,9,1,160,129,29,216,255,197,159,149,0,0,3,69,73,68,65,84,87,118,0,202,94,0,140,132,239,1,208,192,92,1,192,72,184,2,160,129,245,183,111,78,165,42,125,1,48,18,2,64,3,235,121,238,161,84,170,210,23,0,35,33,0,52,176,254,246,103,7,247,118,164,146,12,245,117,102,11,72,208,176,4,128,70,54,60,220,187,229,167,169,36,123,54,221,159,45,32,65,195,18,0,26,91,119,121,55,97,186,221,255,161,193,9,0,141,173,107,253,93,165,220,135,233,123,241,231,187,159,185,55,65,35,19,0,26,222,182,53,171,82,225,182,221,253,229,4,13,78,0,104,120,217,173,152,222,173,143,165,2,117,63,247,240,222,173,143,38,104,112,2,64,21,60,251,221,171,15,244,119,167,66,188,49,208,243,252,247,62,147,160,241,9,0,85,48,212,251,171,141,183,92,126,248,208,193,148,179,236,16,79,223,124,217,80,121,63,123,10,117,52,38,65,37,12,245,182,191,49,208,125,226,162,191,76,121,122,254,123,127,253,219,159,254,132,74,16,0,170,99,255,43,79,143,155,60,115,210,159,156,157,242,241,242,3,55,189,242,224,191,36,168,10,1,160,82,246,108,126,224,181,221,47,101,215,1,181,166,122,158,219,135,15,189,177,249,223,62,181,227,225,91,18,84,72,45,65,229,76,57,245,252,69,127,115,247,248,41,179,82,61,12,237,235,202,190,193,176,239,165,245,9,170,197,21,0,21,52,180,247,87,29,143,127,191,105,76,243,164,63,89,50,146,75,129,236,141,255,142,159,124,115,243,173,43,94,223,253,82,130,202,113,5,64,149,181,180,158,60,111,249,215,103,158,187,162,86,59,186,83,125,120,120,184,107,195,218,109,107,87,13,118,239,72,80,81,2,64,245,77,156,179,112,230,123,174,60,113,241,101,39,204,94,240,182,159,60,208,177,101,207,166,251,187,54,172,233,223,233,119,253,83,113,2,64,32,45,211,231,204,88,178,108,194,172,211,198,79,107,107,153,214,150,245,224,208,224,192,96,111,123,246,24,234,109,31,120,117,203,158,141,247,13,246,236,76,16,131,0,0,4,229,111,2,3,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,2,0,16,148,0,0,4,37,0,0,65,9,0,64,80,255,11,0,0,255,255,156,84,83,158,0,0,0,6,73,68,65,84,3,0,100,20,74,143,110,152,57,168,0,0,0,0,73,69,78,68,174,66,96,130};

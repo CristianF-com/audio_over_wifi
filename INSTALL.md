@@ -136,6 +136,9 @@ sudo rm -rf /usr/local/lib/sonos_wifi /etc/sonos_wifi /var/lib/sonos_wifi
 sudo systemctl daemon-reload
 ```
 
+### 1.7b Instalar la web como app (PWA)
+Abre `https://IP_DE_LA_RPI:8443` en el móvil, acepta el certificado y elige «Instalar app» (Chrome) o «Añadir a pantalla de inicio» (Safari). Por HTTP (`:8080`) no se ofrece instalar. Para actualizar la Raspberry: `git pull && bash scripts/build.sh && sudo systemctl restart sonos_wifi` (los ESP no cambian).
+
 ### 1.8 Problemas frecuentes
 
 | Síntoma | Causa y solución |

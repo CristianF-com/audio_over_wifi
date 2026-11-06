@@ -18,4 +18,10 @@ c, _ = get("/api/status", "sonos", "s3cret");        check("prefijo de la contra
 c, _ = get("/api/status", "sonos", "s3cret:clave");  check("contraseña correcta (con ':' dentro) -> 200", c == 200, c)
 c, _ = get("/api/status", "otro", "s3cret:clave");   check("el nombre de usuario es libre -> 200", c == 200, c)
 c, _ = get("/calibrate", "sonos", "s3cret:clave");   check("/calibrate con credenciales -> 200", c == 200, c)
+# PWA: manifiesto, service worker e iconos son públicos (el navegador los pide sin credenciales); lo demás sigue protegido
+for path, ct in (("/manifest.webmanifest", "application/manifest+json"), ("/sw.js", "text/javascript"), ("/icon.svg", "image/svg+xml"),
+                 ("/icons/icon-192.png", "image/png"), ("/icons/icon-512.png", "image/png"), ("/icons/icon-maskable-512.png", "image/png"), ("/apple-touch-icon.png", "image/png")):
+    c, h = get(path); check(f"PWA {path} sin contraseña -> 200 ({ct})", c == 200 and h.get("Content-Type", "").startswith(ct), (c, h.get("Content-Type")))
+c, h = get("/sw.js"); check("sw.js con Service-Worker-Allowed: /", h.get("Service-Worker-Allowed") == "/", h.get("Service-Worker-Allowed"))
+c, _ = get("/api/nodes"); check("con los recursos PWA públicos, /api/nodes sigue exigiendo contraseña", c == 401, c)
 print("RESULTADO AUTH:", "TODO OK" if ok else "HAY FALLOS"); sys.exit(0 if ok else 1)
