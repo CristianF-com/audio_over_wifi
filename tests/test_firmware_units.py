@@ -35,6 +35,9 @@ check("país WiFi por defecto = AR (Kconfig)", m and m.group(1) == "AR", m.group
 check("esp_wifi_set_country_code() con CONFIG_SONOS_WIFI_COUNTRY", "esp_wifi_set_country_code(CONFIG_SONOS_WIFI_COUNTRY, false)" in rm)
 check("el país se fija entre esp_wifi_init() y esp_wifi_start()",
       rm.index("esp_wifi_init(&cfg)") < rm.index("apply_country();") < rm.index("esp_wifi_start()"))
+sd = open(f"{here}/../esp32/sdkconfig.defaults").read()
+check("sdkconfig.defaults: partición de aplicación grande (el binario supera 1 MB)",
+      "CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y" in sd)
 check("ble_store_config_init() declarada antes de usarla (ESP-IDF no la expone)",
       "void ble_store_config_init(void);" in c and c.index("void ble_store_config_init(void);") < c.index("    ble_store_config_init();"))
 sys.exit(0 if ok else 1)

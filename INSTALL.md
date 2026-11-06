@@ -200,6 +200,8 @@ idf.py build
 
 `set-target` regenera la configuración desde `sdkconfig.defaults`; ejecútalo la primera vez o si cambias de objetivo (borra el `sdkconfig` actual).
 
+Si ya habías compilado antes y actualizas `sdkconfig.defaults` (por ejemplo para el tamaño de la partición de la app), repite `idf.py set-target esp32c5` o borra `esp32/sdkconfig`; si no, se sigue usando la configuración vieja. El binario supera 1 MB, por eso `sdkconfig.defaults` usa la tabla de particiones de aplicación grande (1,5 MB).
+
 Valores por defecto opcionales (los puedes dejar y configurar después por NVS o Bluetooth):
 
 ```bash
