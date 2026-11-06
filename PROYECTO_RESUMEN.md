@@ -132,3 +132,7 @@ Primer paso al volver: compilar `esp32/` con ESP-IDF 5.5+; arreglar lo que salga
 
 ## v7 — Un ESP por canal
 Ver sección «Historial v7». Archivos tocados: common/protocol.h, rpi/{udp_streamer.h/.cpp, web_server.h/.cpp, web_pages.h}, esp32/main/{receiver_main.c, Kconfig.projbuild, ble_prov.h}, scripts/provision_esp.sh, tests/{fake_esp.py,test_config.cpp}. Pendiente/no verificado: firmware sin compilar con ESP-IDF real ni probado con 10 placas; capacidad Wi-Fi con 10 ESP no medida (airtime ≈ el de 5 estéreo).
+
+## Emparejamiento BLE desde la Raspberry (agente BlueZ)
+* Verificado en hardware real (log del usuario): sin agente, BlueZ rechaza el Just Works y el ESP registra `cifrado FALLÓ (status 1292)` (SM 0x0C); con `agent NoInputNoOutput` a mano, `pair` funciona.
+* `sonos_ble_prov.py` registra un agente `NoInputNoOutput` (dbus_fast, dependencia de bleak) durante `provision`/`identify`, borra antes un emparejamiento viejo (el ESP no hace bonding) y muestra el error real de `pair()` si luego la escritura es rechazada. Probado solo con bleak falso y comprobando la clase del agente; el flujo completo con BlueZ real está sin verificar.
