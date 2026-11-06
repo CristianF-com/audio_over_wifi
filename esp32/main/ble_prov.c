@@ -13,6 +13,9 @@
 #include "store/config/ble_store_config.h"
 #include "protocol.h"          /* MAX_NODES */
 
+/* ESP-IDF no la declara en ningún header público (los ejemplos de NimBLE la declaran a mano). */
+void ble_store_config_init(void);
+
 #ifndef CONFIG_SONOS_BLE_REQUIRE_ENC
   #define CONFIG_SONOS_BLE_REQUIRE_ENC 1
 #endif
