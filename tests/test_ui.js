@@ -53,6 +53,11 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('mono oculta el canal derecho',!(await p.isVisible('#d_crw')));
   ok('«Guardado» visible tras autoguardar',await until(async()=>(await p.textContent('#d_ss'))==='Guardado'));
   ok('cambiar mono/rol marca la distribución como personalizada (mono sí es estructural)',(await J('/api/status')).layout===2);
+  await p.click('#d_eqon');
+  ok('cajón: «Activar» enciende la EQ',await until(async()=>(await J('/api/status')).dsp_eq===true));
+  await p.waitForSelector('#d_eqoff');
+  await p.click('#d_eqoff');
+  ok('cajón: «Desactivar EQ» vuelve a pass-through',await until(async()=>{const s=await J('/api/status');return s.dsp_eq===false&&s.dsp_xover===false;}));
   if(SHOTS)await p.screenshot({path:SHOTS+'/panel_cajon.png'});
   await p.keyboard.press('Escape');ok('Esc cierra el cajón',await until(async()=>!(await p.$('#drawer.on'))));
   await fetch(BASE+'/api/layout',{method:'POST',body:JSON.stringify({layout:'stereo5'})});
@@ -67,6 +72,14 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('apagar solo el crossover deja la EQ activa',await until(async()=>{const s=await J('/api/status');return s.dsp_xover===false&&s.dsp_eq===true;}));
   ok('con solo EQ sigue en modo Procesado',(await p.getAttribute('#t_pass','aria-pressed'))==='false');
   if(SHOTS)await p.screenshot({path:SHOTS+'/panel_sonido_procesado.png'});
+  // Volver a pass-through desde fuera de la pestaña Sonido (aviso en «Tu sala» y enlace del cajón del altavoz)
+  await p.click('[data-tab=spk]');
+  ok('con procesado activo, «Tu sala» muestra el aviso para volver a pass-through',await until(async()=>await p.isVisible('#procbar')));
+  await p.click('#procoff');
+  ok('el aviso «Volver a pass-through» apaga el procesado',await until(async()=>{const s=await J('/api/status');return s.dsp_xover===false&&s.dsp_eq===false;}));
+  ok('y el aviso desaparece',await until(async()=>!(await p.isVisible('#procbar'))));
+  await fetch(BASE+'/api/dsp',{method:'POST',body:JSON.stringify({eq:true})});
+  await p.click('[data-tab=snd]');
   await p.click('#t_pass');
   ok('«Pass-through» apaga ambos',await until(async()=>{const s=await J('/api/status');return s.dsp_xover===false&&s.dsp_eq===false;}));
   if(SHOTS)await p.screenshot({path:SHOTS+'/panel_sonido_passthrough.png'});

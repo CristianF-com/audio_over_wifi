@@ -92,6 +92,8 @@ label,.lbl{display:block;color:var(--mut);font-size:.86rem;margin-bottom:5px}
 .toast.bad{border-left-color:var(--bad)}
 @keyframes tin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.procbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;border-radius:12px;background:var(--ac-bg);border:1px solid var(--ac-ln);color:var(--ac);font-size:.92rem}
+.procbar[hidden]{display:none}
 main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 .top .in{gap:14px}
 .mv{display:flex;align-items:center;gap:10px;margin-left:auto;min-width:210px;flex:0 1 300px}
@@ -252,6 +254,8 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
     <div class="seg" id="lyseg" role="group" aria-label="Distribución">
       <button data-ly="stereo5" aria-pressed="false">5 estéreo</button><button data-ly="mono10" aria-pressed="false">10 mono</button>
     </div></div>
+  <div class="procbar" id="procbar" hidden><span id="proctxt">Procesado activo</span>
+    <button class="btn ghost sm" id="procoff">Volver a pass-through</button></div>
   <div class="meters" id="meters" role="group" aria-label="Niveles de entrada por canal">
     <div class="mh"><b>Entrada</b><span class="hint" id="mtxt">Esperando datos…</span></div>
     <div class="mb" id="mb"></div>
@@ -441,8 +445,9 @@ function modeUI(){const mono=$('d_md').querySelector('[aria-pressed=true]').data
   $('d_cll').textContent=mono?'Canal':'Canal izquierdo';$('d_vll').textContent=mono?'Volumen':'Volumen izquierdo';}
 function rolHint(){const r=+$('d_rl').querySelector('[aria-pressed=true]').dataset.v;
   $('d_rlh').textContent=r===2?'Recibe su canal y los graves de los demás. Solo se usa con el crossover activo.':r===1?'Solo agudos por encima del corte, cuando hay subwoofer en línea.':'Recibe el canal completo.';}
-function eqHint(){const el=$('d_eqh');if(!el)return;el.innerHTML=st.dsp_eq?'Se aplica a este altavoz.':'La EQ está desactivada (pass-through). <a href="#" id="d_eqon">Activar</a>';
-  const a=$('d_eqon');if(a)a.onclick=e=>{e.preventDefault();setDsp({eq:true});};}
+function eqHint(){const el=$('d_eqh');if(!el)return;el.innerHTML=st.dsp_eq?'Se aplica a este altavoz. <a href="#" id="d_eqoff">Desactivar EQ</a>':'La EQ está desactivada (pass-through). <a href="#" id="d_eqon">Activar</a>';
+  const a=$('d_eqon');if(a)a.onclick=e=>{e.preventDefault();setDsp({eq:true});};
+  const b=$('d_eqoff');if(b)b.onclick=e=>{e.preventDefault();setDsp({eq:false});};}
 let saveT=null;
 function queueSave(){clearTimeout(saveT);$('d_ss').textContent='Guardando…';saveT=setTimeout(doSave,450);}
 async function doSave(){
@@ -493,6 +498,8 @@ function drawSound(){
     S('Crossover',xo?(sub?'corte '+Math.round(st.xover_hz||80)+' Hz':'sin sub: inactivo'):'omitido',!xo||!sub)+'<span class="arr">›</span>'+
     S('Ecualizador',eq?'por altavoz':'omitido',!eq)+'<span class="arr">›</span>'+
     S('Volumen y retardo','por altavoz',false)+'<span class="arr">›</span>'+S('Altavoces',on+' activos',false,true);
+  $('procbar').hidden=pass;
+  $('proctxt').textContent='Procesado activo: '+(xo&&eq?'crossover y EQ':xo?'crossover':'EQ');
   $('t_pass').setAttribute('aria-pressed',pass);$('t_proc').setAttribute('aria-pressed',!pass);
   $('tg_pass').style.display=pass?'':'none';$('tg_proc').style.display=pass?'none':'';
   $('tg_pass').className='chip tag ac';$('tg_proc').className='chip tag ac';
@@ -505,6 +512,7 @@ function drawSound(){
   $('eqsum').textContent=adj?adj+(adj===1?' altavoz tiene':' altavoces tienen')+' la EQ ajustada.':'Ningún altavoz tiene la EQ ajustada todavía.';
 }
 $('t_pass').onclick=()=>setDsp({xover:false,eq:false});
+$('procoff').onclick=()=>setDsp({xover:false,eq:false});
 $('t_proc').onclick=()=>{if(st.dsp_xover||st.dsp_eq)return;setDsp({xover:true,eq:true});};
 $('sw_xo').onclick=()=>setDsp({xover:$('sw_xo').getAttribute('aria-checked')!=='true'});
 $('sw_eq').onclick=()=>setDsp({eq:$('sw_eq').getAttribute('aria-checked')!=='true'});
@@ -722,6 +730,8 @@ label,.lbl{display:block;color:var(--mut);font-size:.86rem;margin-bottom:5px}
 .toast.bad{border-left-color:var(--bad)}
 @keyframes tin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.procbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;border-radius:12px;background:var(--ac-bg);border:1px solid var(--ac-ln);color:var(--ac);font-size:.92rem}
+.procbar[hidden]{display:none}
 main{max-width:760px;margin:0 auto;padding:20px 16px 80px;display:flex;flex-direction:column;gap:16px}
 .top .in{max-width:760px}
 .steps{display:flex;gap:8px;align-items:center;color:var(--mut);font-size:.9rem}
@@ -1109,6 +1119,8 @@ label,.lbl{display:block;color:var(--mut);font-size:.86rem;margin-bottom:5px}
 .toast.bad{border-left-color:var(--bad)}
 @keyframes tin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.procbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;border-radius:12px;background:var(--ac-bg);border:1px solid var(--ac-ln);color:var(--ac);font-size:.92rem}
+.procbar[hidden]{display:none}
 main{max-width:600px;margin:0 auto;padding:20px 16px 80px;display:flex;flex-direction:column;gap:16px}
 .top .in{max-width:600px}
 .step{display:flex;gap:14px}
