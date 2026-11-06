@@ -29,8 +29,12 @@ open(os.path.join(tmp, "bleak", "__init__.py"), "w").write(textwrap.dedent('''
         async def __aenter__(self):
             if self.a in CFG.get("unreachable", []): raise RuntimeError("timeout de conexión")
             return self
-        async def __aexit__(self, *x): return False
-        async def pair(self): log(["pair", self.a])
+        async def __aexit__(self, *x):
+            if CFG.get("exit_raises") and CFG.get("applied_flag_file") and os.path.exists(CFG["applied_flag_file"]): raise RuntimeError(CFG["exit_raises"])
+            return False
+        async def pair(self):
+            log(["pair", self.a])
+            if CFG.get("pair_raises"): raise RuntimeError(CFG["pair_raises"])
         async def read_gatt_char(self, u):
             d = CFG["state"][self.a]
             n = u[4:8]
@@ -39,8 +43,11 @@ open(os.path.join(tmp, "bleak", "__init__.py"), "w").write(textwrap.dedent('''
             if n == "0005": return bytearray(json.dumps(d["status"]).encode())
             raise KeyError(u)
         async def write_gatt_char(self, u, data, response=False):
+            if CFG.get("pair_raises"): raise RuntimeError("Insufficient Encryption")
             log(["write", self.a, u[4:8], bytes(data).decode("latin1") if u[4:8] != "0004" else list(data), response])
-            if u[4:8] == "0006" and bytes(data) == b"apply" and CFG.get("apply_raises"): raise RuntimeError("Device disconnected")
+            if u[4:8] == "0006" and bytes(data) == b"apply":
+                if CFG.get("applied_flag_file"): open(CFG["applied_flag_file"], "w").write("1")
+                if CFG.get("apply_raises"): raise RuntimeError(CFG.get("apply_msg", "Device disconnected"))
 '''))
 def mkcfg(**kw):
     cfg = {"scan": [
@@ -134,4 +141,24 @@ check("modo simulado: check -> backend mock", json.loads(r.stdout.decode()).get(
 r = subprocess.run([sys.executable, HELPER, "scan"], input=b"no es json", capture_output=True, env=env, timeout=30)
 check("JSON de entrada inválido -> error y código 2", r.returncode == 2 and "error" in r.stdout.decode(), r.stdout)
 print("RESULTADO BLE-helper: " + ("TODO OK" if not fails else "%d FALLOS" % fails))
+
+res, _ = run("provision", req, mkcfg(pair_raises="AuthenticationFailed"), os.path.join(tmp, "log7.jsonl"))
+check("provision: si el emparejamiento falla, el error lo dice (no se traga)", "emparejamiento: AuthenticationFailed" in res.get("error", "") and "Insufficient Encryption" in res.get("error", ""), res)
+res, _ = run("provision", req, mkcfg(pair_raises="org.bluez.Error.AlreadyExists: Already Exists"), os.path.join(tmp, "log8.jsonl"))
+check("provision: «ya emparejado» no es un error (sigue y escribe)", "emparejamiento" not in res.get("error", ""), res)
+res, _ = run("identify", {"address": "AA:00:00:00:00:02"}, mkcfg(pair_raises="AuthenticationFailed"), os.path.join(tmp, "log9.jsonl"))
+check("identify: el error de emparejamiento también se muestra", "emparejamiento: AuthenticationFailed" in res.get("error", ""), res)
+res, _ = run("provision", req, mkcfg(), os.path.join(tmp, "log10.jsonl"))
+check("provision: sin dbus_fast/BlueZ sigue funcionando (agente opcional)", res == {"ok": True}, res)
+
+flag = os.path.join(tmp, "applied.flag")
+for msg in ("[org.bluez.Error.Failed] le-connection-abort-by-local", "Disconnected before response", "org.freedesktop.DBus.Error.NoReply"):
+    if os.path.exists(flag): os.remove(flag)
+    res, _ = run("provision", req, mkcfg(apply_raises=True, apply_msg=msg), os.path.join(tmp, "log11.jsonl"))
+    check("provision: corte tras «apply» con mensaje de BlueZ «%s» -> ok" % msg, res == {"ok": True}, res)
+if os.path.exists(flag): os.remove(flag)
+res, _ = run("provision", req, mkcfg(applied_flag_file=flag, exit_raises="fallo al desconectar"), os.path.join(tmp, "log12.jsonl"))
+check("provision: error al cerrar la conexión después de «apply» -> ok", res == {"ok": True}, res)
+res, _ = run("provision", req, mkcfg(unreachable=[req["address"]]), os.path.join(tmp, "log13.jsonl"))
+check("provision: un fallo ANTES de «apply» sigue siendo error", "No se pudo configurar" in res.get("error", ""), res)
 sys.exit(1 if fails else 0)

@@ -9,7 +9,7 @@ Lo invoca el servidor web (rpi/src/ble_manager.cpp). Nunca recibe la contraseña
 Modo simulado (pruebas, sin Bluetooth): SONOS_BLE_MOCK=/ruta/mock.json  {"devices":[...], "log":"/ruta/log.jsonl"}
 Dependencia real: python3-bleak (BlueZ).
 """
-import asyncio, json, os, sys
+import asyncio, contextlib, json, os, sys
 
 SVC = "5c0a0001-8e3b-4d5e-9a41-534f4e4f5346"
 def U(n): return "5c0a%04x-8e3b-4d5e-9a41-534f4e4f5346" % n
@@ -108,6 +108,86 @@ async def scan(req):
         d.update(await inspect(bleak.BleakClient, d["address"]))
     return {"devices": annotate(devs, req.get("used"))}
 
+# ─── emparejamiento: agente de BlueZ ─────────────────────────────────────────────
+# Las escrituras exigen enlace cifrado (Just Works). BlueZ, sin ningún agente registrado, rechaza ese emparejamiento
+# («numeric comparison failed» en el ESP). Se registra un agente NoInputNoOutput mientras dura la operación.
+AGENT_PATH = "/sonos/agent"
+
+class _SinAgente:
+    note = None
+    async def forget(self, addr): pass
+
+@contextlib.asynccontextmanager
+async def pairing_agent():
+    """Registra un agente NoInputNoOutput en BlueZ (con dbus_fast, que trae bleak). Si no se puede, sigue sin él y deja el motivo en .note."""
+    try:
+        from dbus_fast import BusType
+        from dbus_fast.aio import MessageBus
+        from dbus_fast.service import ServiceInterface, method
+    except Exception as e:
+        ag = _SinAgente(); ag.note = "sin dbus_fast (%s)" % e
+        yield ag; return
+
+    class Agent(ServiceInterface):                    # acepta todo: es un enlace Just Works sin pantalla ni teclado
+        def __init__(self): super().__init__("org.bluez.Agent1")
+        @method()
+        def Release(self): pass
+        @method()
+        def Cancel(self): pass
+        @method()
+        def RequestConfirmation(self, device: "o", passkey: "u"): pass          # noqa: F821
+        @method()
+        def RequestAuthorization(self, device: "o"): pass                       # noqa: F821
+        @method()
+        def AuthorizeService(self, device: "o", uuid: "s"): pass                # noqa: F821
+
+    class Real:
+        note = None
+        def __init__(self, bus): self.bus = bus
+        async def _iface(self, path, name):
+            intro = await self.bus.introspect("org.bluez", path)
+            return self.bus.get_proxy_object("org.bluez", path, intro).get_interface(name)
+        async def forget(self, addr):
+            """El ESP no guarda el emparejamiento (sin bonding): si BlueZ conserva uno viejo, el cifrado falla. Se borra antes de emparejar."""
+            try:
+                path = "/org/bluez/hci0/dev_" + addr.upper().replace(":", "_")
+                dev = await self._iface(path, "org.freedesktop.DBus.Properties")
+                paired = await dev.call_get("org.bluez.Device1", "Paired")
+                if paired.value:
+                    await (await self._iface("/org/bluez/hci0", "org.bluez.Adapter1")).call_remove_device(path)
+            except Exception:
+                pass                                   # no se conoce el dispositivo / no hay emparejamiento: nada que borrar
+
+    bus = None
+    try:
+        bus = await MessageBus(bus_type=BusType.SYSTEM).connect()
+        bus.export(AGENT_PATH, Agent())
+        mgr = await Real(bus)._iface("/org/bluez", "org.bluez.AgentManager1")
+        await mgr.call_register_agent(AGENT_PATH, "NoInputNoOutput")
+        await mgr.call_request_default_agent(AGENT_PATH)
+    except Exception as e:
+        if bus is not None:
+            with contextlib.suppress(Exception): bus.disconnect()
+        ag = _SinAgente(); ag.note = "no se pudo registrar el agente de BlueZ (%s)" % e
+        yield ag; return
+    try:
+        yield Real(bus)
+    finally:
+        with contextlib.suppress(Exception): await mgr.call_unregister_agent(AGENT_PATH)
+        with contextlib.suppress(Exception): bus.disconnect()
+
+async def ensure_paired(c, ag):
+    """Empareja (cifra el enlace). Devuelve el texto del error si falló, para mostrarlo si luego la escritura es rechazada."""
+    try:
+        await c.pair()
+    except Exception as e:
+        if "already" in str(e).lower(): return None    # ya emparejado
+        return "emparejamiento: %s%s" % (e, " [%s]" % ag.note if ag.note else "")
+    return None
+
+def _with_pair_error(e, perr):
+    return "%s (%s)" % (e, perr) if perr else str(e)
+
 async def write(c, uuid, data):
     await c.write_gatt_char(uuid, data, response=True)
 
@@ -119,31 +199,36 @@ async def provision(req):
     if not isinstance(ident, int) or not 0 <= ident <= 9: return {"error": "ID fuera de rango (0-9)"}
     if not 1 <= len(ssid.encode()) <= 32: return {"error": "SSID vacío o de más de 32 bytes"}
     if pw and not 8 <= len(pw.encode()) <= 63: return {"error": "La contraseña debe tener entre 8 y 63 caracteres"}
+    perr = None
+    applied = False                                   # «apply» enviado: el ESP guarda y se reinicia, así que cualquier corte posterior es normal
     try:
-        async with bleak.BleakClient(addr, timeout=CONNECT_TIMEOUT) as c:
-            try: await c.pair()                       # las escrituras exigen enlace cifrado (Just Works); si ya está emparejado no pasa nada
-            except Exception: pass
-            await write(c, C_ID, bytes([ident]))
-            await write(c, C_SSID, ssid.encode())
-            if rpi: await write(c, C_RPI, rpi.encode())
-            if pw: await write(c, C_PASS, pw.encode())
-            try:
-                await write(c, C_CMD, b"apply")       # el ESP se reinicia y puede cortar la conexión antes de responder
-            except Exception as e:
-                if "disconnect" not in str(e).lower() and "not connected" not in str(e).lower(): raise
+        async with pairing_agent() as ag:
+            await ag.forget(addr)
+            async with bleak.BleakClient(addr, timeout=CONNECT_TIMEOUT) as c:
+                perr = await ensure_paired(c, ag)     # las escrituras exigen enlace cifrado (Just Works)
+                await write(c, C_ID, bytes([ident]))
+                await write(c, C_SSID, ssid.encode())
+                if rpi: await write(c, C_RPI, rpi.encode())
+                if pw: await write(c, C_PASS, pw.encode())
+                applied = True
+                with contextlib.suppress(Exception):  # el reinicio corta la conexión antes de responder (BlueZ usa textos muy variados)
+                    await write(c, C_CMD, b"apply")
     except Exception as e:
-        return {"error": "No se pudo configurar: %s" % (e,)}
+        if applied: return {"ok": True}               # también si falla al cerrar la conexión, que el ESP ya reinició
+        return {"error": "No se pudo configurar: %s" % _with_pair_error(e, perr)}
     return {"ok": True}
 
 async def identify(req):
     bleak = import_bleak()
+    perr = None
     try:
-        async with bleak.BleakClient(req.get("address"), timeout=CONNECT_TIMEOUT) as c:
-            try: await c.pair()
-            except Exception: pass
-            await write(c, C_CMD, b"identify")
+        async with pairing_agent() as ag:
+            await ag.forget(req.get("address") or "")
+            async with bleak.BleakClient(req.get("address"), timeout=CONNECT_TIMEOUT) as c:
+                perr = await ensure_paired(c, ag)
+                await write(c, C_CMD, b"identify")
     except Exception as e:
-        return {"error": "No se pudo conectar: %s" % (e,)}
+        return {"error": "No se pudo conectar: %s" % _with_pair_error(e, perr)}
     return {"ok": True}
 
 def main():
