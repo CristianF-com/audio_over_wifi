@@ -130,6 +130,7 @@ La cabecera del panel indica qué pasa de verdad: **Sin captura de la Traktor** 
 El firmware viene fijado a **solo 5 GHz** (`menuconfig → SonosWiFi receiver → Banda WiFi`; también «automática» o «solo 2.4»).
 Se hace con `esp_wifi_set_band_mode()` justo antes del primer `connect()`. Motivo: el C5 no usa las dos bandas a la vez y,
 si el router comparte SSID entre 2.4 y 5 GHz, el escaneo por señal tiende a elegir 2.4 GHz.
+El país regulatorio del Wi-Fi viene fijado en **Argentina (`AR`)** (`menuconfig → SonosWiFi receiver → Código de país del WiFi`), con `esp_wifi_set_country_code()` antes de arrancar el Wi-Fi; no lo cambia el país que anuncie el router. No está probado en hardware ni confirmado que ESP-IDF tenga tabla propia para AR: si en el log aparece `set_country_code(AR) falló`, avisa.
 Consejos de router (generales, no medidos en tu red):
 * Canal **36–48** (sin DFS): evita que un radar fuerce un cambio de canal y corte el audio un instante.
 * Si puedes, desactiva *Smart Connect*/band steering para este SSID, o usa un SSID de 5 GHz exclusivo.

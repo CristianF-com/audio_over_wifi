@@ -27,4 +27,12 @@ for n in range(1, 8):
     check(f"UUID {n} C == JS (5c0a{n:04x}-…)", uuid == f"5c0a{n:04x}-8e3b-4d5e-9a41-534f4e4f5346", uuid)
 for n in range(2, 8):
     check(f"característica {n} declarada en el servicio GATT", f"SONOS_UUID({n})" in c)
+
+rm = open(f"{here}/../esp32/main/receiver_main.c").read()
+kc = open(f"{here}/../esp32/main/Kconfig.projbuild").read()
+m = re.search(r'config SONOS_WIFI_COUNTRY\s+string "[^"]*"\s+default "([A-Z]{2})"', kc)
+check("país WiFi por defecto = AR (Kconfig)", m and m.group(1) == "AR", m.group(1) if m else "")
+check("esp_wifi_set_country_code() con CONFIG_SONOS_WIFI_COUNTRY", "esp_wifi_set_country_code(CONFIG_SONOS_WIFI_COUNTRY, false)" in rm)
+check("el país se fija entre esp_wifi_init() y esp_wifi_start()",
+      rm.index("esp_wifi_init(&cfg)") < rm.index("apply_country();") < rm.index("esp_wifi_start()"))
 sys.exit(0 if ok else 1)
