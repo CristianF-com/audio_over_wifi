@@ -1,6 +1,10 @@
 # Target (XIAO ESP32-C5). Requiere ESP-IDF >= 5.5
 CONFIG_IDF_TARGET="esp32c5"
 
+# Partición de aplicación grande (factory 1,5 MB): con NimBLE + WiFi el binario pasa de 1 MB
+# (la tabla por defecto de ESP-IDF da solo 1 MB y la compilación falla: "app partition is too small")
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
+
 # Tick de 1 ms (la sincronía usa vTaskDelay/timeouts finos)
 CONFIG_FREERTOS_HZ=1000
 
