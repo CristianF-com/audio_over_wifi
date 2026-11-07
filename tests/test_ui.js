@@ -39,24 +39,37 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   // Estado de transmisión y vúmetros (datos reales del arnés: ch0/1 −6 dBFS, ch2 y ch4 −12 dBFS, el resto en silencio)
   ok('estado: «Transmitiendo · 5 altavoces»',await until(async()=>(await p.textContent('#hs')).includes('Transmitiendo · 5 altavoces')),await p.textContent('#hs'));
   ok('estado: punto verde',(await p.getAttribute('#dot','class')).includes('ok'));
-  const lit=await p.evaluate(()=>[...document.querySelectorAll('#mb .bar')].map(b=>b.querySelectorAll('.led.on').length));
-  ok('vúmetros LED: 10 canales x 20 segmentos',await p.evaluate(()=>[...document.querySelectorAll('#mb .bar')].every(b=>b.children.length===20))&&lit.length===10);
-  ok('vúmetros LED: FL/FR ≈ 18 LED (−6 dBFS), C y canal 4 ≈ 16 (−12 dBFS), LFE apagado',Math.abs(lit[0]-18)<=1&&Math.abs(lit[1]-18)<=1&&Math.abs(lit[2]-16)<=1&&lit[4]>=15&&lit[4]<=17&&lit[3]===0,lit);
-  const cs=await p.evaluate(()=>{const b=document.querySelector('#mb .bar'),sg=b.children[0],bs=getComputedStyle(b),ss=getComputedStyle(sg);
-    return {cls:[...b.children].map(x=>x.className.split(' ')[1]).join(''),rb:bs.borderRadius,rs:ss.borderRadius,bg:ss.backgroundImage,cl:getComputedStyle(document.getElementById('mcl0')).borderRadius,
-      col:[...b.children].filter((x,i)=>[0,14,18].includes(i)).map(x=>getComputedStyle(x).backgroundColor)};});
-  ok('vúmetros LED: 14 verdes (hasta −18 dB), 4 amarillos (hasta −6 dB), 2 rojos',cs.cls==='g'.repeat(14)+'y'.repeat(4)+'r'.repeat(2),cs.cls);
-  ok('vúmetros LED: colores estándar verde/amarillo/rojo, planos (sin degradado) y sin esquinas redondeadas',cs.col.join('|')==='rgb(48, 209, 88)|rgb(255, 214, 10)|rgb(255, 69, 58)'&&cs.bg==='none'&&cs.rb==='0px'&&cs.rs==='0px'&&cs.cl==='0px',cs);
+  // Fila superior: un cuadrado por canal (rojo y parpadeando si hay señal, apagado si no) con el nivel debajo
+  const lamps=await p.evaluate(()=>[...document.querySelectorAll('#mb .mc')].map(m=>({on:m.querySelector('.lamp').classList.contains('on'),num:m.querySelector('.lvn').textContent})));
+  ok('vúmetros: 10 cuadrados indicadores, uno por canal',lamps.length===10);
+  ok('vúmetros: encendidos solo FL, FR, C y canal 4 (los que tienen señal); el resto apagado',lamps.map(l=>+l.on).join('')==='1110100000',lamps);
+  ok('vúmetros: el número bajo cada cuadrado es el nivel (−6, −6, −12, —, −12)',lamps.slice(0,5).map(l=>l.num).join('|')==='−6|−6|−12|—|−12',lamps);
+  const lp=await p.evaluate(()=>{const on=getComputedStyle(document.getElementById('lp0')),off=getComputedStyle(document.getElementById('lp3'));
+    return {onBg:on.backgroundColor,offBg:off.backgroundColor,anim:on.animationName,animOff:off.animationName,r:on.borderRadius,w:on.width,h:on.height};});
+  ok('vúmetros: cuadrado rojo con parpadeo si hay señal; apagado y quieto si no',lp.onBg==='rgb(255, 69, 58)'&&lp.anim==='lampblink'&&lp.offBg!==lp.onBg&&lp.animOff==='none'&&lp.w===lp.h,lp);
+  ok('plano: ya no está la barra de 20 LED por canal en la tarjeta Entrada',(await p.locator('#mb .bar').count())===0);
+  // Vúmetro junto a cada altavoz, con la misma altura que el dibujo
+  const vu=await p.evaluate(()=>[...document.querySelectorAll('#spks .spk')].map(b=>{const c=b.querySelector('.cab').getBoundingClientRect(),v=b.querySelector('.vu').getBoundingClientRect();
+    return {ch:b.querySelector('.ch').textContent,dh:Math.abs(c.height-v.height),side:v.left>=c.right,lit:b.querySelectorAll('.vu .led.on').length,n:b.querySelectorAll('.vu .led').length};}));
+  ok('plano: cada altavoz tiene su vúmetro a un lado',vu.length>=5&&vu.every(x=>x.side&&x.n===12),vu);
+  ok('plano: el vúmetro mide lo mismo que el altavoz (±1 px)',vu.every(x=>x.dh<=1),vu);
+  const vl=Object.fromEntries(vu.map(x=>[x.ch,x.lit]));
+  ok('plano: FL/FR (−6 dBFS) ≈ 11 LED, C (−12) ≈ 9 y los canales en silencio, apagados',vl.FL>=10&&vl.FL<=12&&vl.FR>=10&&vl.FR<=12&&vl.C>=8&&vl.C<=10&&vl.LFE===0,vl);
+  const cs=await p.evaluate(()=>{const v=document.querySelector('#spks .vu');return {cls:[...v.children].map(x=>x.className.split(' ')[1]).join(''),
+      col:[...v.children].filter((x,i)=>[0,8,11].includes(i)).map(x=>getComputedStyle(x).backgroundColor),bg:getComputedStyle(v.children[0]).backgroundImage};});
+  ok('plano: vúmetro de 12 LED: 8 verdes (hasta −20 dB), 2 amarillos (hasta −10 dB), 2 rojos',cs.cls==='g'.repeat(8)+'y'.repeat(2)+'r'.repeat(2),cs.cls);
+  if(SHOTS){await p.locator('#meters').screenshot({path:SHOTS+'/entrada_leds.png'});await p.locator('#room').screenshot({path:SHOTS+'/plano_vumetros.png'});}
+  ok('plano: colores estándar verde/amarillo/rojo y planos (sin degradado)',cs.col.join('|')==='rgb(48, 209, 88)|rgb(255, 214, 10)|rgb(255, 69, 58)'&&cs.bg==='none',cs);
   ok('vúmetros: texto de pico ≈ −6 dBFS',(await p.textContent('#mtxt')).includes('−')===false&&(await p.textContent('#mtxt')).includes('-6'),await p.textContent('#mtxt'));
   const fake=async(o)=>{await p.route('**/api/levels',r=>r.fulfill({contentType:'application/json',body:JSON.stringify(Object.assign({capturing:true,signal:true,signal_age_ms:10,pps:900,sending:true,nodes_online:5,db:[-6,-6,-12,-90,-12,-90,-90,-90,-90,-90]},o))}));};
   await fake({capturing:false,signal:false,sending:false,db:[-90,-90,-90,-90,-90,-90,-90,-90,-90,-90]});
-  ok('estado: sin captura -> «Sin captura de la Traktor» (rojo) y barras atenuadas',await until(async()=>(await p.textContent('#hs'))==='Sin captura de la Traktor'&&(await p.getAttribute('#dot','class')).includes('bad')&&(await p.getAttribute('#meters','class')).includes('off')&&(await p.locator('#mb .led.on').count())===0));
+  ok('estado: sin captura -> «Sin captura de la Traktor» (rojo) y todo apagado',await until(async()=>(await p.textContent('#hs'))==='Sin captura de la Traktor'&&(await p.getAttribute('#dot','class')).includes('bad')&&(await p.getAttribute('#meters','class')).includes('off')&&(await p.locator('#mb .lamp.on').count())===0&&(await p.locator('#spks .vu .led.on').count())===0));
   await fake({signal:false,sending:false,db:[-90,-90,-90,-90,-90,-90,-90,-90,-90,-90]});
   ok('estado: silencio -> «Traktor conectada, sin señal» (ámbar)',await until(async()=>(await p.textContent('#hs'))==='Traktor conectada, sin señal'&&(await p.getAttribute('#dot','class')).includes('warn')&&(await p.textContent('#mtxt'))==='Silencio'));
   await fake({sending:false,nodes_online:0});
   ok('estado: señal sin altavoces -> «Hay señal, ningún altavoz en línea»',await until(async()=>(await p.textContent('#hs'))==='Hay señal, ningún altavoz en línea'));
   await fake({db:[-0.5,-6,-12,-90,-12,-90,-90,-90,-90,-90]});
-  ok('vúmetros: clip (≥ −1 dBFS) enciende el indicador del canal y los 2 LED rojos',await until(async()=>(await p.getAttribute('#mcl0','class')).includes('on')&&(await p.locator('#mb .bar').first().locator('.led.r.on').count())===2));
+  ok('vúmetros: clip (≥ −1 dBFS) muestra «0» bajo el cuadrado y los 2 LED rojos del altavoz FL',await until(async()=>(await p.textContent('#nm0'))==='0'&&await p.evaluate(()=>{const b=[...document.querySelectorAll('#spks .spk')].find(x=>x.querySelector('.ch').textContent==='FL');return !!b&&b.querySelectorAll('.vu .led.r.on').length===2;})));
   if(SHOTS)await p.screenshot({path:SHOTS+'/panel_vumetros_clip.png'});
   await p.unroute('**/api/levels');
   ok('estado: vuelve a «Transmitiendo» al restablecerse',await until(async()=>(await p.textContent('#hs')).startsWith('Transmitiendo')));
@@ -164,7 +177,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('ningún texto por debajo de 11 px (mínimo de iOS)',small.length===0,small);
   ok('el texto base es 17 px y sigue el tamaño de letra del navegador (rem)',await p.evaluate(()=>getComputedStyle(document.body).fontSize==='17px'&&getComputedStyle(document.documentElement).fontSize==='17px'));
   await p.click('#tab_lat');const sb=await p.locator('#plseg button').first().boundingBox();await p.click('#tab_spk');
-  ok('controles segmentados visibles (no se pisan con los LED del vúmetro)',sb&&sb.height>=30&&sb.width>=60,sb);
+  ok('controles segmentados visibles (no se pisan con los indicadores de señal)',sb&&sb.height>=30&&sb.width>=60,sb);
   ok('el cajón cerrado es inerte y está oculto (el teclado no entra en él)',await p.evaluate(()=>document.getElementById('drawer').inert===true&&document.getElementById('bdrawer').inert===true&&document.getElementById('drawer').getAttribute('aria-hidden')==='true'));
   ok('los cajones son diálogos modales con título',await p.evaluate(()=>['drawer','bdrawer'].every(i=>{const d=document.getElementById(i);return d.getAttribute('role')==='dialog'&&d.getAttribute('aria-modal')==='true'&&document.getElementById(d.getAttribute('aria-labelledby'))!==null;})));
   await p.click('#spks .spk[data-id="2"]');await p.waitForSelector('#drawer.on');
@@ -182,7 +195,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   const m=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
   const q=await m.newPage();await q.goto(BASE+'/');await q.waitForSelector('#spks .spk');await sleep(800);
   ok('móvil: sin scroll horizontal',await q.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
-  if(SHOTS)await q.screenshot({path:SHOTS+'/movil_altavoces.png'});
+  if(SHOTS){await q.screenshot({path:SHOTS+'/movil_altavoces.png'});await q.locator('#meters').screenshot({path:SHOTS+'/movil_entrada_leds.png'});await q.locator('#room').scrollIntoViewIfNeeded();await q.locator('#room').screenshot({path:SHOTS+'/movil_plano_vumetros.png'});}
   ok('móvil: la navegación es una píldora flotante abajo (separada de los bordes) con icono y una sola palabra por pestaña',await q.evaluate(()=>{const t=document.querySelector('.tabs'),r=t.getBoundingClientRect(),cs=getComputedStyle(t);
     return cs.position==='fixed'&&r.bottom<=innerHeight-8&&r.left>=8&&r.right<=innerWidth-8&&parseFloat(cs.borderTopLeftRadius)>=24&&[...t.querySelectorAll('.tab')].every(b=>b.querySelector('svg')&&getComputedStyle(b.querySelector('svg')).display!=='none'&&b.textContent.trim().split(/\s+/).length===1);}));
   ok('móvil: objetivos táctiles de 44 px como mínimo (botones, segmentos, pestañas, selector, campo)',await q.evaluate(()=>['#lble','#lcal','.tab','#spks .spk','#mvs'].every(s=>{const e=document.querySelector(s);const r=e.getBoundingClientRect();return r.height>=44-.5;})));
@@ -274,7 +287,22 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('Plano: 5 ESP estéreo = 10 altavoces dibujados (uno por canal)',await p.locator('#spks .spk').count()===10&&await p.locator('#spks .spk .cab svg').count()===10);
   const lab=await p.evaluate(()=>[...document.querySelectorAll('#spks .spk')].map(e=>[e.dataset.id,e.dataset.side,e.querySelector('.ch').textContent,e.querySelector('.cap').textContent]));
   ok('Plano: cada altavoz muestra su canal, el ESP y el estado (ESP 0: FL y FR, «En línea»)',lab.some(x=>x[0]==='0'&&x[1]==='0'&&x[2]==='FL'&&x[3]==='ESP 0 · En línea')&&lab.some(x=>x[0]==='0'&&x[1]==='1'&&x[2]==='FR'&&x[3]==='ESP 0 · En línea'),lab);
-  ok('Plano: sin líneas ni canales fantasma ni anillos',await p.locator('#room line,#room ellipse,#room .gd,#room .ln').count()===0);
+  ok('Plano: sin líneas entre altavoces ni canales fantasma',await p.locator('#spks line,#spks ellipse,#room .gd,#room .ln').count()===0);
+  // Fondo de radar: anillos cada 0,5 m centrados en «Escucha» (el ancho del plano son 5 m)
+  const rd=await p.evaluate(()=>{const r=document.getElementById('room').getBoundingClientRect(),m=document.querySelector('.me').getBoundingClientRect(),cs=[...document.querySelectorAll('#radar circle')],
+      rad=cs.map(c=>+c.getAttribute('r')),cx=+cs[0].getAttribute('cx'),cy=+cs[0].getAttribute('cy');
+    return {n:cs.length,step:rad[1]-rad[0],stepOK:rad.every((v,i)=>Math.abs(v-(i+1)*document.getElementById('room').clientWidth/10)<0.6),ex:Math.abs(cx-(m.left+m.width/2-r.left)),ey:Math.abs(cy-(m.top+m.height/2-r.top)),
+      labels:[...document.querySelectorAll('#radar text')].map(x=>x.textContent),major:document.querySelectorAll('#radar .ring.m').length,mw:m.width,z:getComputedStyle(document.getElementById('radar')).zIndex,w:r.width};});
+  ok('Plano radar: anillos cada 0,5 m (ancho/10 px) y centrados en «Escucha»',rd.n>=6&&rd.stepOK&&rd.ex<1.5&&rd.ey<1.5,rd);
+  ok('Plano radar: marca cada metro («1 m», «2 m»…) con el anillo del metro más marcado',rd.labels[0]==='1 m'&&rd.labels[1]==='2 m'&&rd.major>=3,rd);
+  ok('Plano radar: queda detrás de los altavoces y «Escucha» es más grande (≥ 60 px)',rd.z==='0'&&rd.mw>=60,rd);
+  // Volumen y retardo de la calibración en cada altavoz
+  const calTxt=async(id,sd)=>p.evaluate(([i,s])=>document.querySelector('#spks .spk[data-id="'+i+'"][data-side="'+s+'"] .cal').textContent.replace(/\s+/g,' ').trim(),[id,sd]);
+  ok('Plano: cada altavoz muestra volumen y retardo con formato «NN% · N,N ms»',/^\d+% · −?\d+,\d ms$/.test(await calTxt(0,0))&&await p.locator('#spks .spk .cal').count()===10,await calTxt(0,0));
+  await p.evaluate(async()=>{await fetch('/api/node',{method:'POST',body:JSON.stringify({id:0,volume_l:128,volume_r:64})});await fetch('/api/calibrate',{method:'POST',body:JSON.stringify({esp_id:0,latency_us:2500})});});
+  ok('Plano: el volumen (por lado) y el retardo calibrados se actualizan solos (FL 50 %, FR 25 %, 2,5 ms)',await until(async()=>(await calTxt(0,0))==='50% · 2,5 ms'&&(await calTxt(0,1))==='25% · 2,5 ms'),await calTxt(0,0)+' | '+await calTxt(0,1));
+  await p.evaluate(async()=>{await fetch('/api/node',{method:'POST',body:JSON.stringify({id:0,volume_l:255,volume_r:255})});await fetch('/api/calibrate',{method:'POST',body:JSON.stringify({esp_id:0,latency_us:0})});});
+  ok('Plano: al restablecer vuelve a «100% · 0,0 ms»',await until(async()=>(await calTxt(0,0))==='100% · 0,0 ms'));
   ok('Plano: el estado no depende solo del color (punto + texto)',await p.locator('#spks .spk .cap .dot').count()===10&&lab.every(x=>/En línea|Sin conexión/.test(x[3])));
   ok('Plano: fuera del modo mover, tocar un altavoz abre el cajón de su ESP',await (async()=>{await p.click(U(0,1));const o=await p.evaluate(()=>document.getElementById('drawer').classList.contains('on'));await p.click('#drawer .x');return o;})());
   const before0=await spkPos(0,0),before1=await spkPos(0,1);const vol00=(await J('/api/nodes'))[0].volume_l;
@@ -310,6 +338,47 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   if(SHOTS)await p.screenshot({path:SHOTS+'/plano_mover.png',fullPage:true});
   await p.reload();await p.waitForSelector('.spk');
   const rl=await spkPos(0,0);ok('Plano: tras recargar el altavoz sigue en su sitio',Math.abs(rl[0]-n0.pos_x)<1.5&&Math.abs(rl[1]-n0.pos_y)<1.5,[rl,n0.pos_x,n0.pos_y]);
+  // Zoom del plano: cambia la distancia entre cosas (y los anillos de metros), nunca el tamaño de los altavoces ni de «Escucha»
+  const geo=async()=>p.evaluate(()=>{const R=document.getElementById('room').getBoundingClientRect(),c=e=>{const b=e.getBoundingClientRect();return [b.left+b.width/2-R.left,b.top+b.height/2-R.top,b.width,b.height];},cs=[...document.querySelectorAll('#radar circle')].map(x=>+x.getAttribute('r'));
+    return {fr:c(document.querySelector('#spks .spk[data-id="0"][data-side="1"]')),me:c(document.querySelector('#room .me')),step:cs[1]-cs[0],z:document.getElementById('zval').textContent,W:document.getElementById('room').clientWidth,H:document.getElementById('room').clientHeight,
+      zin:document.getElementById('zin').disabled,zout:document.getElementById('zout').disabled,zoomed:document.getElementById('room').classList.contains('zoomed')};});
+  const vec=g=>[g.fr[0]-g.me[0],g.fr[1]-g.me[1]];
+  const same=(a,b)=>Math.abs(a.fr[2]-b.fr[2])<0.6&&Math.abs(a.fr[3]-b.fr[3])<0.6&&Math.abs(a.me[2]-b.me[2])<0.6&&Math.abs(a.me[3]-b.me[3])<0.6;
+  const g0=await geo();
+  const zsz=await p.evaluate(()=>['zin','zout','zval'].map(i=>{const b=document.getElementById(i).getBoundingClientRect();return [b.width,b.height];}));
+  ok('zoom: controles − / % / + con objetivos ≥ 44 px y marca «100%»',g0.z==='100%'&&zsz.every(x=>x[0]>=44&&x[1]>=44)&&!g0.zoomed,[g0.z,zsz]);
+  await p.click('#zin');await sleep(120);const g1=await geo();
+  ok('zoom: «+» acerca a 125 %: FR se aleja de «Escucha» ×1,25 y los anillos también',g1.z==='125%'&&Math.abs(vec(g1)[0]/vec(g0)[0]-1.25)<0.03&&Math.abs(vec(g1)[1]/vec(g0)[1]-1.25)<0.03&&Math.abs(g1.step/g0.step-1.25)<0.02,[vec(g0),vec(g1),g0.step,g1.step]);
+  ok('zoom: los altavoces y «Escucha» conservan su tamaño y «Escucha» no se mueve',same(g0,g1)&&Math.abs(g1.me[0]-g0.me[0])<0.6&&Math.abs(g1.me[1]-g0.me[1])<0.6,[g0.fr,g1.fr,g0.me,g1.me]);
+  for(let i=0;i<6;i++)if(!(await geo()).zin)await p.click('#zin');
+  const g3=await geo();
+  ok('zoom: máximo 300 % (el botón + se desactiva) y sigue sin cambiar el tamaño de los altavoces',g3.z==='300%'&&g3.zin&&g3.zoomed&&same(g0,g3),[g3.z,g3.zin]);
+  const bgPt=async()=>p.evaluate(()=>{const R=document.getElementById('room').getBoundingClientRect();for(let fy=0.55;fy<0.95;fy+=0.05)for(let fx=0.1;fx<0.95;fx+=0.05){const x=R.left+R.width*fx,y=R.top+R.height*fy;if(document.elementFromPoint(x,y)===document.getElementById('room'))return [x,y];}return null;});
+  const bp0=await bgPt();await p.mouse.move(bp0[0],bp0[1]);await p.mouse.down();await p.mouse.move(bp0[0]-80,bp0[1]-60,{steps:6});await p.mouse.up();await sleep(100);const g4=await geo();
+  ok('zoom: con zoom, arrastrar el fondo mueve el plano (≈ −80, −60 px) sin mover «Escucha» de sitio relativo a los anillos',Math.abs(g4.fr[0]-g3.fr[0]+80)<2&&Math.abs(g4.fr[1]-g3.fr[1]+60)<2&&Math.abs(g4.me[0]-g3.me[0]+80)<2,[g3.fr,g4.fr]);
+  for(let i=0;i<12;i++)if(!(await geo()).zout)await p.click('#zout');
+  const gm=await geo();
+  ok('zoom: mínimo 50 % (el botón − se desactiva): «Escucha» no se mueve, el plano se encoge y los altavoces se achican (≈ 55 %) para despejar',gm.z==='50%'&&gm.zout&&Math.abs(gm.me[0]-g0.me[0])<1&&Math.abs(gm.me[1]-g0.me[1])<1&&Math.hypot(...vec(gm))<Math.hypot(...vec(g0))&&gm.fr[2]<g0.fr[2]*0.6&&gm.me[2]<g0.me[2]*0.6,[gm.z,gm.fr[2],g0.fr[2]]);
+  ok('zoom: alejado se ocultan el estado y el volumen/retardo (queda canal y vúmetro); a 100 % o más están visibles',await p.evaluate(()=>[...document.querySelectorAll('#spks .spk .cap,#spks .spk .cal')].every(e=>getComputedStyle(e).display==='none'&&true))&&await p.evaluate(()=>getComputedStyle(document.querySelector('#spks .spk .ch')).display!=='none'&&getComputedStyle(document.querySelector('#spks .spk .vu')).display!=='none'));
+  await p.click('#zval');await sleep(100);const gr=await geo();
+  ok('zoom: pulsar el porcentaje vuelve a 100 % y todo al sitio de antes',gr.z==='100%'&&!gr.zoomed&&Math.abs(gr.fr[0]-g0.fr[0])<1&&Math.abs(gr.fr[1]-g0.fr[1])<1&&Math.abs(gr.step-g0.step)<0.5,[gr.fr,g0.fr]);
+  await p.evaluate(()=>{const r=document.getElementById('room'),b=r.getBoundingClientRect();r.dispatchEvent(new WheelEvent('wheel',{deltaY:-60,ctrlKey:true,clientX:b.left+300,clientY:b.top+300,bubbles:true,cancelable:true}));});
+  await sleep(100);const gw=await geo();
+  ok('zoom: Ctrl + rueda (o pellizco del trackpad) acerca el plano',parseInt(gw.z)>150,gw.z);
+  await p.click('#zval');
+  await p.evaluate(()=>{const r=document.getElementById('room'),b=r.getBoundingClientRect(),mk=(t,id,x,y)=>r.dispatchEvent(new PointerEvent(t,{pointerId:id,pointerType:'touch',clientX:b.left+x,clientY:b.top+y,bubbles:true,isPrimary:id===11}));
+    mk('pointerdown',11,500,450);mk('pointerdown',12,600,450);for(let i=1;i<=5;i++){mk('pointermove',11,500-i*20,450);mk('pointermove',12,600+i*20,450);}mk('pointerup',11,400,450);mk('pointerup',12,700,450);});
+  await sleep(100);const gp=await geo();
+  ok('zoom: el pellizco con dos dedos acerca el plano (abrir los dedos ×3)',parseInt(gp.z)>=250&&same(g0,gp),gp.z);
+  await p.click('#zval');
+  // Con zoom también se mueven los altavoces: 1 px en pantalla = 1/(ancho × zoom) de la sala
+  await p.evaluate(()=>setZoom(2));await p.click('#medit');await sleep(150);
+  const nz0=(await J('/api/nodes'))[0],gz=await geo(),cabz=await p.locator(U(0,1)+' .cab').boundingBox();
+  await p.mouse.move(cabz.x+cabz.width/2,cabz.y+cabz.height/2);await p.mouse.down();await p.mouse.move(cabz.x+cabz.width/2+60,cabz.y+cabz.height/2,{steps:6});await p.mouse.up();
+  await until(async()=>(await J('/api/nodes'))[0].pos2_x!==nz0.pos2_x);const nz1=(await J('/api/nodes'))[0];
+  ok('zoom: al arrastrar un altavoz con zoom 200 %, 60 px equivalen a 60/(2·ancho) de la sala',Math.abs((nz1.pos2_x-nz0.pos2_x)-60/(gz.W*2)*100)<0.6&&Math.abs(nz1.pos2_y-nz0.pos2_y)<0.6,[nz0.pos2_x,nz1.pos2_x,60/(gz.W*2)*100]);
+  await p.click('#medit');await p.evaluate(()=>setZoom(1));await p.click('#zval');await sleep(100);
+  await fetch(BASE+'/api/node',{method:'POST',body:JSON.stringify({id:0,pos2_x:nz0.pos2_x,pos2_y:nz0.pos2_y})});await p.reload();await p.waitForSelector('.spk');
   await p.click('#medit');await p.click('#mreset');
   await until(async()=>(await J('/api/nodes')).every(n=>n.pos_x<0&&n.pos2_x<0));
   ok('Plano: «Restablecer posiciones» devuelve ambos canales de todos al lugar de su canal',(await J('/api/nodes')).every(n=>n.pos_x<0&&n.pos_y<0&&n.pos2_x<0&&n.pos2_y<0));
@@ -334,6 +403,20 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('Móvil: arrastre táctil mueve el altavoz (≈70 %, 45 %) sin desplazar la página',okT&&Math.abs(m2.pos_x-70)<4&&Math.abs(m2.pos_y-45)<7&&await mp.evaluate(()=>scrollY)===sy0,[m2.pos_x,m2.pos_y,sy0]);
   ok('Móvil: ningún altavoz se corta por los bordes del plano ni tapa la pantalla',await mp.evaluate(()=>{const r=document.getElementById('room').getBoundingClientRect(),sc=document.querySelector('.screen').getBoundingClientRect();return [...document.querySelectorAll('#spks .spk')].every(e=>{const b=e.getBoundingClientRect();return b.left>=r.left-1&&b.right<=r.right+1&&b.bottom<=r.bottom+1&&b.top>=sc.bottom-1;});}));
   if(SHOTS)await mp.screenshot({path:SHOTS+'/movil_claro_plano.png'});
+  // Zoom en el móvil: más espacio entre altavoces sin agrandarlos
+  const mg=async()=>mp.evaluate(()=>{const R=document.getElementById('room').getBoundingClientRect(),bs=[...document.querySelectorAll('#spks .spk')].map(e=>e.getBoundingClientRect());
+    let ov=0;for(let i=0;i<bs.length;i++)for(let j=i+1;j<bs.length;j++){const a=bs[i],b=bs[j];if(a.left<b.right-2&&b.left<a.right-2&&a.top<b.bottom-2&&b.top<a.bottom-2)ov++;}
+    const m=document.querySelector('#room .me').getBoundingClientRect();
+    return {cap:getComputedStyle(document.querySelector('#spks .spk .cap')).display,w:bs[0].width,h:bs[0].height,mw:m.width,ov,z:document.getElementById('zval').textContent,ta:getComputedStyle(document.getElementById('room')).touchAction};});
+  const zm0=await mg();await mp.locator('#room').scrollIntoViewIfNeeded();
+  await mp.tap('#zin');await mp.tap('#zin');await sleep(150);const zm1=await mg();
+  ok('Móvil: tocar «+» dos veces acerca a 156 % sin cambiar el tamaño de altavoces ni de «Escucha»; el fondo deja de deslizar la página',zm1.z==='156%'&&Math.abs(zm1.w-zm0.w)<0.6&&Math.abs(zm1.h-zm0.h)<0.6&&zm1.mw===zm0.mw&&zm1.ta==='none'&&zm0.ta==='pan-y',[zm0,zm1]);
+  if(SHOTS){await mp.screenshot({path:SHOTS+'/movil_zoom_mas.png'});}
+  await mp.tap('#zval');await mp.tap('#zout');await mp.tap('#zout');await sleep(150);const zm2=await mg();
+  ok('Móvil: alejar a 64 % achica los altavoces (≈ 64 %), oculta las etiquetas y se solapan bastantes menos (5 → ≤ 1)',zm2.z==='64%'&&zm2.w<zm0.w*0.75&&zm2.ov<zm0.ov&&zm2.ov<=1&&zm2.cap==='none',[zm0,zm2]);
+  if(SHOTS){await mp.screenshot({path:SHOTS+'/movil_zoom_menos.png'});}
+  await mp.tap('#zval');await sleep(100);
+  ok('Móvil: el control de zoom no tapa el plano ni se sale de la pantalla (≥ 44 px)',await mp.evaluate(()=>{const z=document.querySelector('.zoomctl').getBoundingClientRect(),r=document.getElementById('room').getBoundingClientRect();return z.right<=r.right&&z.top>=r.top&&z.height>=44&&innerWidth>=z.right;}));
   await fetch(BASE+'/api/node',{method:'POST',body:JSON.stringify({id:2,pos_auto:true})});
   await mp.close();
   ok('Panel sin errores de JS (tema y plano)',errs.length===0,errs);

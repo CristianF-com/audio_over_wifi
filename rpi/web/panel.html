@@ -31,21 +31,29 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 /* Plano de sala: cada canal es un altavoz dibujado; se coloca donde está en la sala */
 .roombar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .roombar .hint{margin-right:auto;min-width:200px;flex:1}
-.room{--hw:64px;--ht:80px;--hb:58px;user-select:none;-webkit-user-select:none;position:relative;width:100%;aspect-ratio:16/9;min-height:360px;border:1px solid var(--line);border-radius:var(--r-sheet);overflow:hidden;
-  background:
-    linear-gradient(var(--line) 1px,transparent 1px) 0 0/10% 12.5%,linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/10% 12.5%,
-    radial-gradient(ellipse 70% 60% at 50% 62%,var(--glow),transparent 70%),var(--panel)}
+.room{--hw:64px;--ht:80px;--hb:72px;user-select:none;-webkit-user-select:none;position:relative;width:100%;aspect-ratio:16/9;min-height:360px;border:1px solid var(--line);border-radius:var(--r-sheet);overflow:hidden;
+  background:radial-gradient(circle at 50% 78%,var(--glow),transparent 62%),var(--panel)}
 .room>*{z-index:1}
+.room{touch-action:pan-y}                       /* la página sigue deslizándose; el pellizco lo gestiona el plano */
+.room.zoomed{touch-action:none;cursor:grab}
+.room.lod .spk .cap,.room.lod .spk .cal{display:none}   /* alejado: solo el altavoz, su canal y su vúmetro */
+.room.zoomed.panning{cursor:grabbing}
+.room>.radar{position:absolute;left:0;top:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.radar .ring{fill:none;stroke:var(--line);stroke-width:1}
+.radar .ring.m{stroke:var(--line2)}
+.radar .ax{stroke:var(--line2);stroke-width:1;stroke-dasharray:2 5}
+.radar .walls{fill:none;stroke:var(--ctl);stroke-width:1.5;stroke-dasharray:6 5}
+.radar text{font-size:11px;font-weight:600;fill:var(--mut);paint-order:stroke;stroke:var(--panel);stroke-width:3px;stroke-linejoin:round}
 .dragging,.dragging *{user-select:none!important;-webkit-user-select:none!important}
 .room.edit{border-color:var(--ac-ln);box-shadow:0 0 0 3px var(--ac-bg)}
 .rl{position:absolute;font-size:.72rem;color:var(--mut);pointer-events:none}
 .rl.back{left:50%;bottom:6px;transform:translateX(-50%)}
-.me{position:absolute;left:50%;top:78%;transform:translate(-50%,-50%);width:46px;height:46px;border-radius:50%;border:1px solid var(--line2);background:var(--raise);
+.me{--s:1;position:absolute;left:50%;top:78%;transform:translate(-50%,-50%) scale(var(--s));width:64px;height:64px;box-shadow:0 0 0 6px var(--ac-bg);border-radius:50%;border:1px solid var(--line2);background:var(--raise);
   display:grid;place-items:center;color:var(--mut)}
-.me svg{width:22px;height:22px}
-.me small{position:absolute;top:calc(100% + 3px);left:50%;transform:translateX(-50%);font-size:.7rem;color:var(--mut);white-space:nowrap}
+.me svg{width:32px;height:32px;color:var(--ac)}
+.me small{position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);font-size:.8rem;font-weight:600;color:var(--mut);white-space:nowrap}
 .screen{position:absolute;left:30%;right:30%;top:1.5%;height:18px;border-radius:5px;background:var(--ctl);display:grid;place-items:center;font-size:.68rem;font-weight:600;color:var(--bg);letter-spacing:.03em}
-.spk{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:0;padding:4px 6px;color:var(--fg);z-index:2;border-radius:12px}
+.spk{--s:1;position:absolute;transform:translate(-50%,-50%) scale(var(--s));display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:0;padding:4px 6px;color:var(--fg);z-index:2;border-radius:12px}
 .cab{position:relative;display:block;width:46px;height:62px;transition:transform .12s}
 .spk.sub .cab{width:56px;height:56px}
 .cab svg{width:100%;height:100%;display:block;overflow:visible}
@@ -62,9 +70,16 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 .spk .ch{font-size:1.02rem;font-weight:700;letter-spacing:.01em;line-height:1.1}
 .spk .cap{display:flex;align-items:center;gap:5px;font-size:.72rem;color:var(--mut);background:var(--cap-bg);padding:1px 6px;border-radius:6px;white-space:nowrap}
 .spk .cap .dot{width:7px;height:7px}
+.spk .cal{display:block;text-align:center;font:500 .72rem/1.2 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;color:var(--fg);background:var(--cap-bg);padding:1px 7px;border-radius:6px;white-space:nowrap}
+.spk .cal i{font-style:normal;color:var(--mut)}
 .room.edit .spk{cursor:grab;touch-action:none;outline:1.5px dashed var(--ac-ln);outline-offset:0}
 .room.edit .spk.drag{cursor:grabbing;z-index:5;outline:2px solid var(--ac);background:var(--ac-bg)}
 .room.edit .spk.drag .cab{transform:scale(1.1)}
+.room>.zoomctl{position:absolute;right:10px;top:10px;z-index:6;display:flex;align-items:center;background:var(--raise);border:1px solid var(--line2);border-radius:999px;padding:2px;box-shadow:0 6px 18px -8px rgba(0,0,0,.5);touch-action:manipulation}
+.zoomctl button{appearance:none;border:0;background:none;color:var(--fg);min-width:44px;min-height:44px;border-radius:999px;font-size:1.4rem;font-weight:600;line-height:1;display:grid;place-items:center}
+.zoomctl button:hover:not(:disabled){background:var(--ac-bg)}
+.zoomctl button:disabled{opacity:.35;cursor:default}
+.zoomctl .zv{font:500 .8rem ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;min-width:60px;color:var(--mut)}
 .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;color:var(--mut);font-size:.85rem}
 .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
 .chips button{appearance:none;background:var(--raise);border:1px solid var(--line2);border-radius:999px;padding:7px 16px 7px 13px;display:flex;align-items:center;gap:8px;min-height:38px}
@@ -76,15 +91,21 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 .meters{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-card);padding:12px 14px 10px;margin-bottom:14px}
 .mh{display:flex;align-items:baseline;gap:10px;margin-bottom:8px}.mh b{font-weight:650}.mh .hint{margin-left:auto}
 .mb{display:grid;grid-template-columns:repeat(10,1fr);gap:8px}
-.mc{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
-.mc .bar{display:flex;flex-direction:column-reverse;gap:2px;width:100%;max-width:34px;padding:2px;background:var(--bar-bg);border:1px solid var(--line2);border-radius:0}
-.led{display:block;height:5px;border-radius:0;background:var(--c);opacity:.16}   /* LED apagado: el mismo color, muy tenue */
+.mc{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
+.mc .lab{font-size:.72rem;font-weight:600;color:var(--mut);line-height:1}
+/* Indicador de señal: cuadrado rojo (parpadea) si entra señal en ese canal, apagado si no */
+.lamp{display:block;width:22px;height:22px;border-radius:5px;background:var(--bar-bg);border:1.5px solid var(--ctl)}
+.lamp.on{background:var(--led-r);border-color:var(--led-r);box-shadow:0 0 10px 1px var(--led-r);animation:lampblink .7s ease-in-out infinite alternate}
+@keyframes lampblink{from{opacity:1}to{opacity:.4}}
+@media (prefers-reduced-motion:reduce){.lamp.on{animation:none}}
+.mc .lvn{font:300 .78rem/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;color:var(--fg);min-height:1em}
+.ms{color:var(--mut);font-size:.74rem;margin-top:10px}
+.meters.off .lamp.on{animation:none;opacity:.4}
+/* Vúmetro vertical junto a cada altavoz: misma altura que el dibujo */
+.vu{position:absolute;left:calc(100% + 8px);top:0;bottom:0;width:9px;display:flex;flex-direction:column-reverse;gap:1px;padding:1px;background:var(--bar-bg);border:1px solid var(--ctl);border-radius:3px;pointer-events:none}
+.led{display:block;flex:1 1 0;min-height:0;border-radius:1px;background:var(--c);opacity:.16}   /* LED apagado: el mismo color, muy tenue */
 .led.on{opacity:1}
 .led.g{--c:var(--led-g)}.led.y{--c:var(--led-y)}.led.r{--c:var(--led-r)}
-.mc .lab{font-size:.68rem;color:var(--mut);line-height:1}
-.mc .cl{width:8px;height:8px;border-radius:0;background:var(--cl-off)}.mc .cl.on{background:var(--led-r)}
-.ms{color:var(--mut);font-size:.74rem;margin-top:8px}
-.meters.off .led.on{opacity:.16}
 /* Cajón del altavoz */
 .scrim{position:fixed;inset:0;background:var(--scrim);z-index:40;opacity:0;pointer-events:none;transition:opacity .18s}
 .scrim.on{opacity:1;pointer-events:auto}
@@ -165,8 +186,8 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   .top .in{padding:8px 12px;gap:8px}
   .mv{order:5;flex:1 1 100%;margin-left:0}
   .links{margin-left:auto}
-  .room{aspect-ratio:9/16;min-height:640px;--hw:54px;--ht:78px;--hb:56px}
-  .cab{width:40px;height:54px}.spk.sub .cab{width:48px;height:48px}.spk .ch{font-size:.92rem}.spk .cap{font-size:.66rem;padding:1px 4px}
+  .room{aspect-ratio:9/16;min-height:640px;--hw:60px;--ht:78px;--hb:70px}
+  .cab{width:40px;height:54px}.spk.sub .cab{width:48px;height:48px}.spk .ch{font-size:.92rem}.spk .cap{font-size:.66rem;padding:1px 4px}.spk .cal{font-size:.7rem;padding:1px 5px}
   .tiles,.cards{grid-template-columns:1fr}
   .drawer{top:auto;left:0;right:0;bottom:0;width:100%;max-height:88vh;border-bottom:0;box-shadow:0 -20px 50px -24px rgba(0,0,0,.6);border-top:1px solid var(--line2);border-radius:var(--r-sheet) var(--r-sheet) 0 0;transform:translateY(calc(100% + 40px))}
   .drawer.on{transform:none}
@@ -202,17 +223,23 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   <div class="meters" id="meters" role="group" aria-label="Niveles de entrada por canal">
     <div class="mh"><b>Entrada</b><span class="hint" id="mtxt">Esperando datos…</span></div>
     <div class="mb" id="mb"></div>
-    <div class="ms">Cada LED son 3 dB (de −60 a 0 dBFS): verde hasta −18, amarillo hasta −6 y rojo por encima. El LED suelto por encima de la barra es el pico reciente.</div>
+    <div class="ms">El cuadrado rojo parpadea cuando entra señal en ese canal (por encima de −70 dBFS) y el número es su nivel en dBFS. El vúmetro de cada altavoz del plano marca de −60 a 0 dBFS: verde hasta −20, amarillo hasta −10 y rojo por encima; el segmento suelto es el pico reciente.</div>
   </div>
   <div class="roombar"><span class="hint" id="mhint">Toca un altavoz para ajustarlo. Los cambios se guardan solos.</span>
     <button class="btn ghost sm" id="mreset" hidden>Restablecer posiciones</button>
     <button class="btn ghost sm" id="medit" aria-pressed="false" aria-describedby="mhint">Mover altavoces</button></div>
   <div class="room" id="room" aria-label="Plano de la sala con los altavoces">
+    <svg class="radar" id="radar" aria-hidden="true"></svg>
     <div class="screen" title="Pantalla">Pantalla</div><span class="rl back">Atrás</span>
     <div class="me" title="Posición de escucha"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg><small>Escucha</small></div>
     <div id="spks"></div>
+    <div class="zoomctl" role="group" aria-label="Zoom del plano">
+      <button type="button" id="zout" aria-label="Alejar el plano">−</button>
+      <button type="button" class="zv" id="zval" aria-label="Zoom actual. Pulsa para volver al 100 %">100%</button>
+      <button type="button" id="zin" aria-label="Acercar el plano">+</button>
+    </div>
   </div>
-  <div class="legend"><span>Cada altavoz muestra su canal, el ESP que lo maneja y su estado</span><span>Los graves (subwoofer) se dibujan como caja cuadrada</span></div>
+  <div class="legend"><span>Cada altavoz muestra su canal, el ESP que lo maneja, su estado y, debajo, su volumen y retardo de calibración</span><span>Los graves (subwoofer) se dibujan como caja cuadrada</span><span>Zoom: pellizca o usa + y −; con zoom, arrastra el fondo para moverte. Al acercar, los altavoces no crecen; al alejar, se achican para despejar el plano</span></div>
   <div class="chips" id="chips"></div>
 </section>
 
@@ -352,7 +379,7 @@ async function loadNodes(){
   if(drag||pend.size)return;                                  // no pisar una posición recién movida que aún no se guardó
   try{nodes=await (await fetch('/api/nodes')).json();}catch(e){return;}
   const vis=nodes.filter(isKnown);
-  const s=JSON.stringify(vis.map(n=>[n.id,n.enabled,n.online,n.ch_left,n.ch_right,n.mono,n.role,n.ip,n.pos_x,n.pos_y,n.pos2_x,n.pos2_y,n.known]))+openId+editRoom;
+  const s=JSON.stringify(vis.map(n=>[n.id,n.enabled,n.online,n.ch_left,n.ch_right,n.mono,n.role,n.ip,n.pos_x,n.pos_y,n.pos2_x,n.pos2_y,n.known,n.volume_l,n.volume_r,n.latency_offset_us]))+openId+editRoom;
   if(s!==sig){sig=s;drawRoom();}
   else vis.forEach(n=>{const l=document.querySelector('#spks [data-id="'+n.id+'"] .lv i');if(l)l.style.width=Math.max(0,Math.min(100,n.fill_pct||0))+'%';});
   const on=nodes.filter(n=>n.enabled&&n.online).length,tot=nodes.filter(n=>n.enabled&&isKnown(n)).length;
@@ -373,16 +400,90 @@ function unitPos(u){
   if(hasPos(n,u.side))return u.side?[n.pos2_x,n.pos2_y]:[n.pos_x,n.pos_y];
   return POS[u.ch]||[50,50];
 }
+const fmtMs=us=>{const v=Math.round((us||0)/100)/10;return(v<0?'−':'')+Math.abs(v).toFixed(1).replace('.',',')+' ms';};
 function nodeLabel(n){return n.mono||n.ch_left===n.ch_right?CH[n.ch_left]:CH[n.ch_left]+' + '+CH[n.ch_right];}
-const posCss=(x,y)=>'left:clamp(var(--hw),'+x+'%,calc(100% - var(--hw)));top:clamp(var(--ht),'+y+'%,calc(100% - var(--hb)))';
-function clampPos(x,y){   // el altavoz entero (dibujo + etiquetas) debe quedar dentro del plano
-  const r=$('room').getBoundingClientRect(),cs=getComputedStyle($('room')),g=k=>parseFloat(cs.getPropertyValue(k))||60;
-  const hw=g('--hw')/r.width*100,ht=g('--ht')/r.height*100,hb=g('--hb')/r.height*100;
-  return [clampN(x,hw,100-hw),clampN(y,ht,100-hb)];
+/* Zoom del plano: se escala la distancia entre cosas (y los anillos de metros), nunca el tamaño de los altavoces ni de «Escucha».
+   El punto fijo del zoom es quien escucha; las posiciones guardadas siguen en % de la sala a 100 %. */
+const ZMIN=0.5,ZMAX=3;
+const unitScale=()=>zoom<1?Math.max(0.55,zoom):1;   // al acercar los altavoces no crecen; al alejar se achican (y pierden las etiquetas) para despejar el plano
+let zoom=1,panX=0,panY=0;
+try{const z=parseFloat(localStorage.getItem('sonos_zoom'));if(z>=ZMIN&&z<=ZMAX)zoom=z;}catch(e){}
+const saveZoom=()=>{try{localStorage.setItem('sonos_zoom',String(Math.round(zoom*1000)/1000));}catch(e){}};
+const vw=()=>{const el=$('room');return {W:el.clientWidth,H:el.clientHeight};};
+const LXY=(W,H)=>[W/2,H*0.78];
+function toPx(X,Y){const {W,H}=vw(),[lx,ly]=LXY(W,H);return [lx+(X/100*W-lx)*zoom+panX,ly+(Y/100*H-ly)*zoom+panY];}
+function toWorld(px,py){const {W,H}=vw(),[lx,ly]=LXY(W,H);return [((px-panX-lx)/zoom+lx)/W*100,((py-panY-ly)/zoom+ly)/H*100];}
+function clampPos(x,y){   // el altavoz entero (dibujo + etiquetas) debe quedar dentro de la sala; con zoom caben más cerca de las paredes
+  const {W,H}=vw(),cs=getComputedStyle($('room')),g=k=>parseFloat(cs.getPropertyValue(k))||60;
+  const sc=unitScale(),mx=g('--hw')*sc/(W*zoom)*100,mt=g('--ht')*sc/(H*zoom)*100,mb=g('--hb')*sc/(H*zoom)*100;
+  return [clampN(x,mx,100-mx),clampN(y,mt,100-mb)];
 }
+function clampPan(){
+  const {W,H}=vw(),[lx,ly]=LXY(W,H);
+  if(zoom<=1){panX=0;panY=0;return;}
+  panX=clampN(panX,(W-lx)*(1-zoom),lx*(zoom-1));panY=clampN(panY,(H-ly)*(1-zoom),ly*(zoom-1));
+}
+function placeUnit(b,x,y){const [px,py]=toPx(x,y);b.style.left=px.toFixed(1)+'px';b.style.top=py.toFixed(1)+'px';}
+function placeAll(){
+  const {W,H}=vw();if(!W||!H)return;
+  clampPan();
+  const us=unitScale();$('room').classList.toggle('lod',zoom<0.85);
+  document.querySelectorAll('#spks .spk').forEach(b=>{b.style.setProperty('--s',us);const [x,y]=clampPos(+b.dataset.x,+b.dataset.y);placeUnit(b,x,y);});
+  const me=document.querySelector('#room .me'),[mx,my]=toPx(50,78);me.style.setProperty('--s',us);me.style.left=mx.toFixed(1)+'px';me.style.top=my.toFixed(1)+'px';
+  const sc=document.querySelector('#room .screen'),[sl,st]=toPx(30,1.5),[sr]=toPx(70,0);sc.style.left=sl.toFixed(1)+'px';sc.style.width=Math.max(0,sr-sl).toFixed(1)+'px';sc.style.right='auto';sc.style.top=st.toFixed(1)+'px';
+  const rl=document.querySelector('#room .rl.back'),[bx,by]=toPx(50,100);rl.style.left=bx.toFixed(1)+'px';rl.style.top=(by-6).toFixed(1)+'px';rl.style.bottom='auto';rl.style.transform='translate(-50%,-100%)';
+  $('zval').textContent=Math.round(zoom*100)+'%';$('zin').disabled=zoom>=ZMAX-0.001;$('zout').disabled=zoom<=ZMIN+0.001;
+  $('room').classList.toggle('zoomed',Math.abs(zoom-1)>0.001);
+  drawRadar();
+}
+function setZoom(z2,cx,cy){   // (cx,cy): punto de la vista que se queda quieto (por defecto, quien escucha)
+  z2=clampN(z2,ZMIN,ZMAX);const {W,H}=vw(),[lx,ly]=LXY(W,H);if(cx===undefined){cx=lx+panX;cy=ly+panY;}
+  const f=z2/zoom;panX=(cx-lx)-(cx-lx-panX)*f;panY=(cy-ly)-(cy-ly-panY)*f;zoom=z2;saveZoom();placeAll();
+}
+function resetZoom(){zoom=1;panX=0;panY=0;saveZoom();placeAll();}
+$('zin').onclick=()=>setZoom(zoom*1.25);$('zout').onclick=()=>setZoom(zoom/1.25);$('zval').onclick=resetZoom;
+const roomPt=e=>{const el=$('room'),r=el.getBoundingClientRect();return [e.clientX-r.left-el.clientLeft,e.clientY-r.top-el.clientTop];};
+$('room').addEventListener('wheel',e=>{if(!(e.ctrlKey||e.metaKey))return;e.preventDefault();const [x,y]=roomPt(e);setZoom(zoom*Math.exp(-e.deltaY*0.01),x,y);},{passive:false});
+const pts=new Map();
+$('room').addEventListener('pointerdown',e=>{
+  if(e.target.closest('.spk,.zoomctl'))return;
+  pts.set(e.pointerId,{x:e.clientX,y:e.clientY});try{$('room').setPointerCapture(e.pointerId);}catch(x){}
+  if(zoom!==1)$('room').classList.add('panning');
+});
+$('room').addEventListener('pointermove',e=>{
+  const prev=pts.get(e.pointerId);if(!prev)return;
+  const cur={x:e.clientX,y:e.clientY};
+  if(pts.size===2){
+    const o=[...pts.entries()].find(([k])=>k!==e.pointerId)[1],d0=Math.hypot(prev.x-o.x,prev.y-o.y),d1=Math.hypot(cur.x-o.x,cur.y-o.y);pts.set(e.pointerId,cur);
+    if(d0>0){const r=$('room').getBoundingClientRect(),el=$('room');setZoom(zoom*d1/d0,(cur.x+o.x)/2-r.left-el.clientLeft,(cur.y+o.y)/2-r.top-el.clientTop);}
+  }else{
+    pts.set(e.pointerId,cur);
+    if(zoom>1){panX+=cur.x-prev.x;panY+=cur.y-prev.y;placeAll();}
+  }
+});
+const endPan=e=>{pts.delete(e.pointerId);if(!pts.size)$('room').classList.remove('panning');};
+$('room').addEventListener('pointerup',endPan);$('room').addEventListener('pointercancel',endPan);
 const spkSvg=sub=>sub
   ?'<svg viewBox="0 0 56 56" aria-hidden="true"><rect class="body" x="2" y="2" width="52" height="52" rx="8"/><circle class="wf" cx="28" cy="28" r="19"/><circle class="cone" cx="28" cy="28" r="7"/></svg>'
   :'<svg viewBox="0 0 46 62" aria-hidden="true"><rect class="body" x="2" y="2" width="42" height="58" rx="8"/><circle class="tw" cx="23" cy="17" r="6"/><circle class="wf" cx="23" cy="42" r="13"/><circle class="cone" cx="23" cy="42" r="4.5"/></svg>';
+
+/* Fondo de radar: anillos cada 0,5 m centrados en quien escucha (el ancho del plano son 5 m; es solo una referencia visual) */
+const ROOM_M=5,RING_M=0.5;
+function drawRadar(){
+  const el=$('room'),svg=$('radar');if(!el||!svg)return;
+  const w=el.clientWidth,h=el.clientHeight;if(!w||!h)return;
+  const ppm=w/ROOM_M*zoom,[lx,ly]=LXY(w,h),cx=lx+panX,cy=ly+panY,
+    maxR=Math.max(Math.hypot(cx,cy),Math.hypot(w-cx,cy),Math.hypot(cx,h-cy),Math.hypot(w-cx,h-cy)),n=Math.floor(maxR/(ppm*RING_M)),
+    ly2=clampN(cy-5,14,h-8),dy=ly2-cy;
+  const [x0,y0]=toPx(0,0),[x1,y1]=toPx(100,100);
+  let o='<rect class="walls" x="'+x0.toFixed(1)+'" y="'+y0.toFixed(1)+'" width="'+(x1-x0).toFixed(1)+'" height="'+(y1-y0).toFixed(1)+'" rx="2"/>'+
+    '<line class="ax" x1="0" y1="'+cy+'" x2="'+w+'" y2="'+cy+'"/><line class="ax" x1="'+cx+'" y1="0" x2="'+cx+'" y2="'+h+'"/>';
+  for(let k=1;k<=n;k++){const r=k*ppm*RING_M,m=k%2===0;
+    o+='<circle class="ring'+(m?' m':'')+'" cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+r.toFixed(1)+'"/>';
+    if(m&&Math.abs(dy)<r){const x=cx+Math.sqrt(r*r-dy*dy)+4;if(x>4&&x<w-30)o+='<text x="'+x.toFixed(1)+'" y="'+ly2.toFixed(1)+'">'+(k/2)+' m</text>';}}
+  svg.setAttribute('viewBox','0 0 '+w+' '+h);svg.innerHTML=o;
+}
+if(window.ResizeObserver)new ResizeObserver(placeAll).observe($('room'));else addEventListener('resize',placeAll);
 
 function drawRoom(){
   const ae=document.activeElement,fk=ae&&ae.closest&&ae.closest('#spks .spk')?[ae.dataset.id,ae.dataset.side]:null;   // conserva el foco del teclado al redibujar
@@ -393,14 +494,16 @@ function drawRoom(){
       let [x,y]=unitPos(u);
       if(!hasPos(n,u.side)){const k=Math.round(x)+','+Math.round(y);used[k]=(used[k]||0)+1;x+=(used[k]-1)*7;y+=(used[k]-1)*9;}
       const nm=CH[u.ch],sub=n.role===2,live=n.enabled&&n.online,state=!n.enabled?'Desactivado':n.online?'En línea':'Sin conexión';
-      h+='<button class="spk'+(sub?' sub':'')+(live?'':' off')+'" data-id="'+n.id+'" data-side="'+u.side+'" aria-expanded="'+(openId===n.id)+'" style="'+posCss(x,y)+'" '+
-        'aria-label="Altavoz '+nm+' ('+CHN[u.ch]+'), ESP '+n.id+', '+state.toLowerCase()+(editRoom?'. Mover con las flechas del teclado':'. Pulsa para ajustarlo')+'">'+
-        '<span class="cab">'+spkSvg(sub)+'<i class="st'+(live?' on':'')+'"></i></span>'+
-        '<b class="ch">'+nm+'</b><span class="cap"><i class="dot '+(live?'ok':'bad')+'"></i>ESP '+n.id+' · '+state+'</span></button>';
+      h+='<button class="spk'+(sub?' sub':'')+(live?'':' off')+'" data-id="'+n.id+'" data-side="'+u.side+'" aria-expanded="'+(openId===n.id)+'" data-x="'+x+'" data-y="'+y+'" '+
+        'aria-label="Altavoz '+nm+' ('+CHN[u.ch]+'), ESP '+n.id+', '+state.toLowerCase()+', volumen '+pct(u.side?n.volume_r:n.volume_l)+' %, retardo '+fmtMs(n.latency_offset_us)+(editRoom?'. Mover con las flechas del teclado':'. Pulsa para ajustarlo')+'">'+
+        '<span class="cab">'+spkSvg(sub)+'<i class="st'+(live?' on':'')+'"></i>'+vuHtml(u.ch)+'</span>'+
+        '<b class="ch">'+nm+'</b><span class="cap"><i class="dot '+(live?'ok':'bad')+'"></i>ESP '+n.id+' · '+state+'</span>'+
+        '<span class="cal" title="Volumen · retardo de este altavoz (los de la calibración)">'+pct(u.side?n.volume_r:n.volume_l)+'% <i>·</i> '+fmtMs(n.latency_offset_us)+'</span></button>';
     });
   });
   $('spks').innerHTML=h||'<div class="empty" style="position:absolute;inset:0;display:grid;place-items:center">Aún no hay altavoces. Enciende un ESP32 o añádelo con «Añadir altavoz».</div>';
   $('chips').innerHTML=vis.map(n=>'<button data-id="'+n.id+'" aria-expanded="'+(openId===n.id)+'"><i class="dot '+(n.online?'ok':'bad')+'"></i>ESP '+n.id+' · '+nodeLabel(n)+(n.enabled?'':' · apagado')+'</button>').join('');
+  placeAll();collectVus();
   if(fk){const f=unitEl(+fk[0],+fk[1]);if(f)f.focus({preventScroll:true});}
   document.querySelectorAll('#spks .spk,#chips button').forEach(b=>b.onclick=()=>{if(editRoom&&b.classList.contains('spk'))return;openDrawer(+b.dataset.id);});
 }
@@ -437,9 +540,9 @@ $('spks').addEventListener('pointerdown',e=>{
 });
 $('spks').addEventListener('pointermove',e=>{
   if(!drag||e.pointerId!==drag.pid)return;
-  const r=$('room').getBoundingClientRect(),n=find(drag.id);
-  const [x,y]=clampPos((e.clientX+drag.dx-r.left)/r.width*100,(e.clientY+drag.dy-r.top)/r.height*100);
-  setLocal(n,drag.side,x,y);drag.moved=true;drag.b.style.cssText=posCss(x,y);
+  const n=find(drag.id),[px,py]=roomPt({clientX:e.clientX+drag.dx,clientY:e.clientY+drag.dy});
+  const [x,y]=clampPos(...toWorld(px,py));
+  setLocal(n,drag.side,x,y);drag.moved=true;drag.b.dataset.x=x;drag.b.dataset.y=y;placeUnit(drag.b,x,y);
 });
 const endDrag=async e=>{
   if(!drag||e.pointerId!==drag.pid)return;
@@ -647,23 +750,33 @@ async function bleProvAll(){const todo=[];bdevs.forEach((d,i)=>{if(d.new&&d.stat
 /* Estado de la transmisión y vúmetros (consulta ligera /api/levels) */
 const CHS=['FL','FR','C','LFE','SL','SR','SBL','SBR','AXL','AXR'];
 const MDB=60;                                   // la escala va de −60 a 0 dBFS
-let lvOK=false,lastDraw=0,lvTxt='',holdV=new Array(10).fill(-90),holdT=new Array(10).fill(0),clipT=new Array(10).fill(0);
-const NSEG=20,SEGDB=MDB/NSEG;                  // 20 LED por canal, 3 dB cada uno
-const segCls=i=>{const top=-MDB+SEGDB*(i+1);return top<=-18?'g':top<=-6?'y':'r';};   // verde hasta −18 dB, amarillo hasta −6 dB, rojo por encima
-$('mb').innerHTML=CHS.map((c,i)=>'<div class="mc"><i class="cl" id="mcl'+i+'"></i><div class="bar" title="'+CH[i]+' · '+CHN[i]+'">'+Array.from({length:NSEG},(_,k)=>'<i class="led '+segCls(k)+'"></i>').join('')+'</div><span class="lab">'+c+'</span></div>').join('');
-const SEGS=[...document.querySelectorAll('#mb .bar')].map(b=>[...b.children]),segIdx=db=>db<=-MDB?-1:Math.min(NSEG-1,Math.ceil((db+MDB)/SEGDB)-1);
+let lvOK=false,lastDraw=0,lvTxt='',holdV=new Array(10).fill(-90),holdT=new Array(10).fill(0);
+const NSEG=12,SEGDB=MDB/NSEG;                  // 12 LED por altavoz, 5 dB cada uno
+const segCls=i=>{const top=-MDB+SEGDB*(i+1);return top<=-20?'g':top<=-10?'y':'r';};   // verde hasta −20 dB, amarillo hasta −10 dB, rojo por encima
+const VUSEGS=Array.from({length:NSEG},(_,k)=>'<i class="led '+segCls(k)+'"></i>').join('');
+const vuHtml=ch=>'<span class="vu" aria-hidden="true" data-ch="'+ch+'">'+VUSEGS+'</span>';
+$('mb').innerHTML=CHS.map((c,i)=>'<div class="mc" title="'+CH[i]+' · '+CHN[i]+'"><span class="lab">'+c+'</span><i class="lamp" id="lp'+i+'"></i><span class="lvn" id="nm'+i+'">—</span></div>').join('');
+const segIdx=db=>db<=-MDB?-1:Math.min(NSEG-1,Math.ceil((db+MDB)/SEGDB)-1);
+const LV=new Array(10).fill(-1),PK=new Array(10).fill(-1);
+let VUS=[];
+function collectVus(){VUS=[...document.querySelectorAll('#spks .vu')].map(v=>({ch:+v.dataset.ch,segs:[...v.children]}));applyVu();}
+function applyVu(){   // el vúmetro de cada altavoz sigue el nivel de su canal; el segmento de pico queda 1,2 s
+  VUS.forEach(u=>{const lv=LV[u.ch],pk=PK[u.ch];
+    for(let k=0;k<NSEG;k++){const on2=k<=lv||k===pk;if(u.segs[k].classList.contains('on')!==on2)u.segs[k].classList.toggle('on',on2);}});
+}
+const dbTxt=db=>{const v=Math.round(db);return v>=0?'0':'−'+Math.abs(v);};
 function setTx(dot,txt,title){const t=txt;if(t!==lvTxt){lvTxt=t;$('hs').textContent=t;}$('dot').className='dot '+dot;$('st').title=title||'';}
 function drawMeters(d){
   const now=performance.now(),on=d.capturing,dt=Math.min(0.5,(now-lastDraw)/1000);
   $('meters').classList.toggle('off',!on);
   for(let i=0;i<10;i++){
-    const db=on?d.db[i]:-90;
-    if(db>=holdV[i]){holdV[i]=db;holdT[i]=now;}else if(now-holdT[i]>1200)holdV[i]=Math.max(db,holdV[i]-20*dt);   // el LED de pico se mantiene 1,2 s y baja a 20 dB/s
-    const lv=segIdx(db),pk=segIdx(holdV[i]),sg=SEGS[i];
-    for(let k=0;k<NSEG;k++){const on2=k<=lv||k===pk;if(sg[k].classList.contains('on')!==on2)sg[k].classList.toggle('on',on2);}
-    if(db>=-1)clipT[i]=now;$('mcl'+i).className='cl'+(now-clipT[i]<3000&&clipT[i]?' on':'');
+    const db=on?d.db[i]:-90,sig=on&&db>-70;
+    if(db>=holdV[i]){holdV[i]=db;holdT[i]=now;}else if(now-holdT[i]>1200)holdV[i]=Math.max(db,holdV[i]-20*dt);   // el pico se mantiene 1,2 s y baja a 20 dB/s
+    LV[i]=segIdx(db);PK[i]=segIdx(holdV[i]);
+    const lp=$('lp'+i);if(lp.classList.contains('on')!==sig)lp.classList.toggle('on',sig);
+    const t=sig?dbTxt(db):'—',nm=$('nm'+i);if(nm.textContent!==t)nm.textContent=t;
   }
-  lastDraw=now;
+  applyVu();lastDraw=now;
   const mx=on?Math.max.apply(null,d.db):-90;
   $('mtxt').textContent=!on?'Sin captura de la Traktor':mx<-70?'Silencio':'Pico '+mx.toFixed(1).replace('.',',')+' dBFS';
 }
