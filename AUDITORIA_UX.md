@@ -15,6 +15,7 @@ La interfaz ya tenía buena base (negro + azul, español, autoguardado). Los pro
 
 ## Mejoras
 * **Tamaño de texto** (`accessibility.md › Text size`): base de 17 px (106,25 %), mínimo 11 px; la pila tipográfica empieza por `system-ui`.
+* **Navegación v9.11**: la barra inferior es fija y pegada a los bordes (no flota); en móvil horizontal pasa a un riel izquierdo; modales a pantalla completa en horizontal con rejilla de 2–3 columnas; subpestañas de Sonido con indicador ‹ › de contenido fuera de pantalla; cabecera sólida sin degradado. Excepción: en horizontal los botones de la cabecera (tema, Calibrar, Añadir altavoces) son solo icono (≥ 44 px, con `aria-label` y `title`) para que quepan en una fila.
 * **Navegación móvil** (`tab-bars.md`): en ≤ 760 px las cuatro secciones pasan a una barra inferior fija con icono + etiqueta (4 pestañas, dentro del máximo de 5). Pestañas con `role=tablist`, `aria-controls`, tabindex móvil y flechas/Inicio/Fin.
 * **Movimiento y transparencia**: `prefers-reduced-motion` y `prefers-reduced-transparency` respetados.
 * **Feedback** (`feedback.md`): los errores usan `role=alert` y duran 7 s (antes 3 s, poco para leerlos); los avisos son tocables para cerrarlos. Los LED de nivel pasan a la clase `.led` (chocaba con el control segmentado `.seg`, un bug real que ocultaba segmentos).

@@ -102,7 +102,7 @@ label,.lbl{display:block;color:var(--mut);font-size:.74rem;font-weight:600;lette
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mut);flex:none}
 .dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
 
-.top{position:sticky;top:0;z-index:30;background:var(--top-bg);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
+.top{position:sticky;top:0;z-index:30;background:var(--top-solid);border-bottom:1px solid var(--line);
   padding-top:env(safe-area-inset-top)}               /* en la app instalada (barra de estado translúcida) el contenido no queda bajo la muesca */
 .top .in{max-width:1180px;margin:auto;display:flex;align-items:center;gap:18px;padding:10px 18px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.05rem;color:var(--fg)}

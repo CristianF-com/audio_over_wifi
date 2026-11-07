@@ -163,7 +163,7 @@ label,.lbl{display:block;color:var(--mut);font-size:.74rem;font-weight:600;lette
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mut);flex:none}
 .dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
 
-.top{position:sticky;top:0;z-index:30;background:var(--top-bg);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
+.top{position:sticky;top:0;z-index:30;background:var(--top-solid);border-bottom:1px solid var(--line);
   padding-top:env(safe-area-inset-top)}               /* en la app instalada (barra de estado translúcida) el contenido no queda bajo la muesca */
 .top .in{max-width:1180px;margin:auto;display:flex;align-items:center;gap:18px;padding:10px 18px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.05rem;color:var(--fg)}
@@ -221,6 +221,8 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 .mv svg{width:20px;height:20px;flex:none;color:var(--mut)}
 .mv .rng{flex:1}.mv b{min-width:42px;text-align:right;font-weight:600}
 .links{display:flex;gap:6px}
+.links .btn{display:inline-flex;align-items:center;gap:6px}.links .ic{display:none;width:20px;height:20px;flex:none}
+#st{min-width:0}#hs{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tabs{display:inline-flex;gap:4px;overflow-x:auto;margin:6px 0 20px;padding:4px;background:var(--code-bg);border:1px solid var(--line);border-radius:999px;scrollbar-width:none;max-width:100%}
 .tabs::-webkit-scrollbar{display:none}
 .tab{appearance:none;background:none;border:0;color:var(--mut);padding:9px 20px;font-weight:600;border-radius:999px;white-space:nowrap;transition:background .12s,color .12s}
@@ -323,7 +325,7 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 .drawer header h2{font-size:1.15rem;margin-right:auto}
 .x{appearance:none;border:0;background:var(--raise);width:36px;height:36px;border-radius:50%;font-size:1.1rem;color:var(--mut)}
 .x:hover{color:var(--fg)}
-.dbody{overflow-y:auto;padding:16px 18px 30px;display:flex;flex-direction:column;gap:18px}
+.dbody{flex:1 1 auto;min-height:0;overscroll-behavior:contain;overflow-y:auto;padding:16px 18px 30px;display:flex;flex-direction:column;gap:18px}
 .fld .top2{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .fld .top2 label{margin:0}.fld .top2 b{font-weight:600}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -386,15 +388,14 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line2);border-top-color:var(--ac);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:6px}
 @keyframes sp{to{transform:rotate(360deg)}}
 @media (max-width:760px){
-  main{padding:12px 12px calc(104px + env(safe-area-inset-bottom))}
-  /* Barra de pestañas inferior (al alcance del pulgar), con icono y una sola palabra */
-  /* flotante, como una píldora: no toca los bordes de la pantalla */
-  .tabs{position:fixed;left:calc(14px + env(safe-area-inset-left));right:calc(14px + env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom));z-index:35;margin:0;gap:2px;overflow:visible;justify-content:space-around;
-    border:1px solid var(--line2);border-radius:32px;background:var(--tabs-bg);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
-    padding:6px;box-shadow:0 14px 34px -12px rgba(0,0,0,.55)}
-  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;font-size:.72rem;min-height:52px;border-radius:26px}
+  main{padding:12px 12px calc(76px + env(safe-area-inset-bottom))}
+  /* Barra de pestañas fija abajo, pegada a los bordes (patrón de app web); icono y una palabra */
+  .tabs{position:fixed;left:0;right:0;bottom:0;z-index:35;margin:0;gap:0;overflow:visible;justify-content:space-around;
+    border:0;border-top:1px solid var(--line2);border-radius:0;background:var(--top-solid);
+    padding:4px calc(6px + env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom)) calc(6px + env(safe-area-inset-left))}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 2px;font-size:.72rem;min-height:52px;border-radius:var(--r-tab,14px)}
   .tab svg{display:block}
-  .toasts{bottom:calc(88px + env(safe-area-inset-bottom))}
+  .toasts{bottom:calc(68px + env(safe-area-inset-bottom))}
   .grab{display:block}
   .drawer{padding-bottom:env(safe-area-inset-bottom)}
   .top{position:static}                                /* la navegación ya va en la barra inferior: la cabecera no ocupa pantalla fija */
@@ -404,12 +405,64 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   .room{aspect-ratio:9/16;min-height:640px;--hw:60px;--ht:78px;--hb:70px}
   .spk{min-width:90px}.cab{width:40px;height:54px}.spk.sub .cab{width:48px;height:48px}.spk .ch{font-size:.92rem}.spk .cap{font-size:.66rem;padding:1px 4px}.spk .cal{font-size:.7rem;padding:1px 5px}
   .tiles,.cards{grid-template-columns:1fr}
-  .drawer{top:auto;left:0;right:0;bottom:0;width:100%;max-height:88vh;border-bottom:0;box-shadow:0 -20px 50px -24px rgba(0,0,0,.6);border-top:1px solid var(--line2);border-radius:var(--r-sheet) var(--r-sheet) 0 0;transform:translateY(calc(100% + 40px))}
+  .drawer{top:auto;left:0;right:0;bottom:0;width:100%;max-height:88vh;max-height:calc(100dvh - 24px - env(safe-area-inset-top));border-bottom:0;box-shadow:0 -20px 50px -24px rgba(0,0,0,.6);border-top:1px solid var(--line2);border-radius:var(--r-sheet) var(--r-sheet) 0 0;transform:translateY(calc(100% + 40px))}
   .drawer.on{transform:none}
   .flow{flex-wrap:nowrap}
 }
+/* Móvil en horizontal: la navegación pasa a un riel a la izquierda y la cabecera forma parte de la página */
+@media (orientation:landscape) and (max-height:500px){
+  body{padding-left:calc(84px + env(safe-area-inset-left))}
+  .tabs{position:fixed;display:flex;flex-direction:column;justify-content:flex-start;top:0;bottom:0;left:0;right:auto;width:calc(84px + env(safe-area-inset-left));margin:0;gap:4px;overflow-x:hidden;overflow-y:auto;
+    border:0;border-right:1px solid var(--line2);border-radius:0;background:var(--top-solid);z-index:35;
+    padding:calc(8px + env(safe-area-inset-top)) 6px calc(8px + env(safe-area-inset-bottom)) calc(6px + env(safe-area-inset-left))}
+  .tab{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:100%;min-height:56px;padding:6px 2px;font-size:.72rem;border-radius:var(--r-tab,14px)}
+  .tab svg{display:block}
+  .top{position:static}
+  /* cabecera en una sola fila: iconos en lugar de textos para que no se amontone */
+  .top .in{flex-wrap:nowrap;gap:10px;padding:6px 12px}
+  .brand{flex:none}
+  .mv{order:0;flex:1 1 120px;min-width:96px;margin-left:auto}
+  .links{margin-left:0;flex:none}
+  .links .btn{min-width:44px;min-height:44px;justify-content:center;padding-left:10px;padding-right:10px}
+  .links .ic{display:block}.links .tl,.themebtn .tl{display:none}
+  main{padding:12px 12px calc(16px + env(safe-area-inset-bottom))}
+  .toasts{bottom:calc(12px + env(safe-area-inset-bottom))}
+  .room{aspect-ratio:16/9;min-height:300px}
+  /* los modales ocupan todo el alto, sin pasar bajo la muesca ni el indicador de inicio */
+  .drawer{top:0;bottom:0;left:0;right:0;width:100%;max-height:none;height:100vh;height:100dvh;border-radius:0;border:0;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);transform:translateX(calc(100% + 40px));box-shadow:-20px 0 50px -24px rgba(0,0,0,.6)}
+  .drawer.on{transform:none}
+  .grab{display:none}
+  .drawer header{padding:10px 14px}
+  /* contenido del modal en rejilla: 2 columnas (3 si la pantalla es ancha); lo largo ocupa la fila entera */
+  .dbody{display:grid;grid-template-columns:1fr 1fr;gap:14px 22px;align-content:start;padding:14px 18px 22px}
+  .dbody>.wide,.dbody>.sep,.dbody>.hint,.dbody>.savestate,.dbody>.note,.dbody>p{grid-column:1/-1}
+  .dbody>.two{grid-column:span 2}
+  .dbody>*{align-self:start}
+  .tiles,.cards{grid-template-columns:1fr 1fr}
+}
+@media (orientation:landscape) and (max-height:500px) and (min-width:900px){
+  .dbody{grid-template-columns:repeat(3,1fr)}
+  .tiles,.cards{grid-template-columns:repeat(3,1fr)}
+}
+/* Subpestañas con indicador de que hay más a los lados */
+.sbwrap{position:relative;margin:0 0 16px}
+.subtabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--line);-webkit-overflow-scrolling:touch}
+.subtabs::-webkit-scrollbar{display:none}
+.sub{appearance:none;background:none;border:0;border-bottom:3px solid transparent;margin-bottom:-1px;color:var(--mut);font-weight:600;padding:10px 16px;min-height:44px;white-space:nowrap}
+.sub:hover{color:var(--fg)}
+.sub[aria-selected=true]{color:var(--ac);border-bottom-color:var(--ac)}
+.sbm{appearance:none;position:absolute;top:0;bottom:1px;width:44px;border:0;background:var(--bg);color:var(--fg);font-size:1.5rem;font-weight:700;display:none;align-items:center;justify-content:center}
+.sbm.on{display:flex}.sbm.l{left:0;border-right:1px solid var(--line)}.sbm.r{right:0;border-left:1px solid var(--line)}
+.subpane[hidden],.cards[hidden]{display:none}
+/* Selector de modo: dos opciones grandes, solo una activa */
+.modeseg{display:grid;grid-template-columns:1fr 1fr;margin:14px 0 8px}
+.modeseg button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:12px 8px;min-height:60px;text-align:center}
+.modeseg button b{font-size:1.02rem}.modeseg button span{font-size:.8rem;color:var(--mut)}
+.modeseg button[aria-pressed=true] span{color:inherit}
+.modedesc{color:var(--mut);margin:0 0 16px}
 @media (pointer:coarse){.x{width:44px;height:44px}.chips button{min-height:44px}}   /* aquí, después de las reglas base de estos componentes */
-@media (prefers-reduced-transparency:reduce){.tabs{background:var(--panel);backdrop-filter:none;-webkit-backdrop-filter:none}}
+
 </style>
 </head><body>
 <div class="top"><div class="in">
@@ -419,7 +472,7 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
     <input class="rng" id="mvs" type="range" min="0" max="100" value="100" aria-label="Volumen maestro"><b id="mvd">100%</b>
   </div>
-  <div class="links"><button class="btn ghost sm themebtn" data-theme-btn type="button"></button><a class="btn ghost sm" id="lcal" href="#">Calibrar</a><button class="btn ghost sm" id="lble">Añadir altavoces</button></div>
+  <div class="links"><button class="btn ghost sm themebtn" data-theme-btn type="button"></button><a class="btn ghost sm" id="lcal" href="#" aria-label="Calibrar" title="Calibrar"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h3l2-6 4 12 2-6h5"/></svg><span class="tl">Calibrar</span></a><button class="btn ghost sm" id="lble" aria-label="Añadir altavoces" title="Añadir altavoces"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="tl">Añadir altavoces</span></button></div>
 </div></div>
 
 <main>
@@ -460,53 +513,75 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
 
 <section class="pane" id="p_snd" role="tabpanel" aria-labelledby="tab_snd" hidden>
   <div class="head"><h1>Sonido</h1></div>
-  <div class="flow" id="flow"></div>
-  <div class="tiles">
-    <button class="tile" id="t_pass" aria-pressed="false">
-      <h2>Pass-through</h2><p>Los canales llegan ya separados. El audio sale tal cual, solo con volumen y retardo por altavoz.</p>
-      <span class="chip tag" id="tg_pass">Activo</span></button>
-    <button class="tile" id="t_proc" aria-pressed="false">
-      <h2>Procesado</h2><p>Llega una señal estéreo o mezclada. Se filtran los graves hacia el subwoofer y se aplica la EQ de cada altavoz.</p>
-      <span class="chip tag" id="tg_proc">Activo</span></button>
-  </div>
-  <div class="cards">
+  <div class="sbwrap"><div class="subtabs" id="snd_sub" role="tablist" aria-label="Apartados de Sonido">
+    <button class="sub" role="tab" id="sb_mode" aria-controls="sp_mode" data-sub="mode" aria-selected="true">Modo</button>
+    <button class="sub" role="tab" id="sb_mix" aria-controls="sp_mix" data-sub="mix" aria-selected="false" tabindex="-1">Mezcla</button>
+    <button class="sub" role="tab" id="sb_pf" aria-controls="sp_pf" data-sub="pf" aria-selected="false" tabindex="-1">Perfiles</button>
+    <button class="sub" role="tab" id="sb_in" aria-controls="sp_in" data-sub="in" aria-selected="false" tabindex="-1">Entradas</button>
+  </div><button class="sbm l" type="button" tabindex="-1" aria-hidden="true" data-dir="-1">‹</button><button class="sbm r" type="button" tabindex="-1" aria-hidden="true" data-dir="1">›</button></div>
+
+  <div class="subpane" id="sp_mode" role="tabpanel" aria-labelledby="sb_mode">
+    <div class="flow" id="flow"></div>
+    <div class="seg block modeseg" id="modeseg" role="radiogroup" aria-label="Modo de audio">
+      <button id="t_pass" role="radio" aria-checked="false" aria-pressed="false"><b>Pass-through</b><span>Sin procesar</span></button>
+      <button id="t_proc" role="radio" aria-checked="false" aria-pressed="false"><b>Procesado</b><span>Crossover y EQ</span></button>
+    </div>
+    <p class="modedesc" id="modedesc"></p>
+    <div class="cards" id="mode_pass">
+      <div class="card"><div><b>Pass-through activo</b><span class="hint">Cada canal llega ya separado y sale tal cual, solo con volumen y retardo por altavoz. No hay crossover ni EQ que ajustar.</span></div>
+        <button class="btn" id="go_proc" type="button">Activar procesado</button></div>
+    </div>
+    <div class="cards" id="mode_proc">
     <div class="card" id="c_xo">
-      <div class="sw"><div><b>Crossover de graves</b><span class="hint">Pasa-altos en satélites, pasa-bajos en el sub</span></div>
-        <button class="switch" id="sw_xo" role="switch" aria-checked="false" aria-label="Crossover de graves"></button></div>
-      <div class="fld"><div class="top2"><label for="xos">Frecuencia de corte</label><b id="xod">80 Hz</b></div>
-        <input class="rng" id="xos" type="range" min="40" max="200" step="5" value="80"></div>
-      <div class="fld"><label for="subsel">Subwoofer</label>
-        <select class="sel" id="subsel"></select></div>
-      <p id="xohint">Sin subwoofer, todos los altavoces reciben el canal completo.</p>
-    </div>
+          <div class="sw"><div><b>Crossover de graves</b><span class="hint">Pasa-altos en satélites, pasa-bajos en el sub</span></div>
+            <button class="switch" id="sw_xo" role="switch" aria-checked="false" aria-label="Crossover de graves"></button></div>
+          <div class="fld"><div class="top2"><label for="xos">Frecuencia de corte</label><b id="xod">80 Hz</b></div>
+            <input class="rng" id="xos" type="range" min="40" max="200" step="5" value="80"></div>
+          <div class="fld"><label for="subsel">Subwoofer</label>
+            <select class="sel" id="subsel"></select></div>
+          <p id="xohint">Sin subwoofer, todos los altavoces reciben el canal completo.</p>
+        </div>
     <div class="card" id="c_eq">
-      <div class="sw"><div><b>Ecualizador por altavoz</b><span class="hint">6 bandas, de 354 Hz a 9,8 kHz</span></div>
-        <button class="switch" id="sw_eq" role="switch" aria-checked="false" aria-label="Ecualizador"></button></div>
-      <p id="eqhint">Ajusta cada altavoz desde el plano, o deja que <a id="lcal2" href="#">Calibrar</a> proponga la EQ con el micrófono del móvil.</p>
-      <div id="eqsum" class="hint"></div>
+          <div class="sw"><div><b>Ecualizador por altavoz</b><span class="hint">6 bandas, de 354 Hz a 9,8 kHz</span></div>
+            <button class="switch" id="sw_eq" role="switch" aria-checked="false" aria-label="Ecualizador"></button></div>
+          <p id="eqhint">Ajusta cada altavoz desde el plano, o deja que <a id="lcal2" href="#">Calibrar</a> proponga la EQ con el micrófono del móvil.</p>
+          <div id="eqsum" class="hint"></div>
+        </div>
     </div>
+  </div>
+  <div class="subpane" id="sp_mix" role="tabpanel" aria-labelledby="sb_mix" hidden>
+    <div class="cards">
     <div class="card" id="c_nt">
-      <div><b>Modo noche</b><span class="hint">Reduce los golpes fuertes (explosiones, música) para no molestar. Los diálogos suenan igual.</span></div>
-      <div class="seg block" id="ntseg" role="group" aria-label="Modo noche"><button data-v="0" aria-pressed="true">Apagado</button><button data-v="1" aria-pressed="false">Suave</button><button data-v="2" aria-pressed="false">Medio</button><button data-v="3" aria-pressed="false">Fuerte</button></div>
-      <p id="nth">Apagado: el audio sale sin comprimir.</p>
-    </div>
+          <div><b>Modo noche</b><span class="hint">Reduce los golpes fuertes (explosiones, música) para no molestar. Los diálogos suenan igual.</span></div>
+          <div class="seg block" id="ntseg" role="group" aria-label="Modo noche"><button data-v="0" aria-pressed="true">Apagado</button><button data-v="1" aria-pressed="false">Suave</button><button data-v="2" aria-pressed="false">Medio</button><button data-v="3" aria-pressed="false">Fuerte</button></div>
+          <p id="nth">Apagado: el audio sale sin comprimir.</p>
+        </div>
     <div class="card" id="c_lfe">
-      <div class="sw"><div><b>Graves del canal LFE en los frontales</b><span class="hint">Para cuando no hay subwoofer: el canal LFE se suma a los altavoces frontales</span></div>
-        <button class="switch" id="sw_lfe" role="switch" aria-checked="false" aria-label="Graves del LFE en los frontales"></button></div>
-      <div class="fld"><div class="top2"><label for="lfes">Nivel del LFE</label><b id="lfed">0 dB</b></div>
-        <input class="rng" id="lfes" type="range" min="-12" max="10" step="1" value="0"></div>
-      <p id="lfeh"></p>
+          <div class="sw"><div><b>Graves del canal LFE en los frontales</b><span class="hint">Para cuando no hay subwoofer: el canal LFE se suma a los altavoces frontales</span></div>
+            <button class="switch" id="sw_lfe" role="switch" aria-checked="false" aria-label="Graves del LFE en los frontales"></button></div>
+          <div class="fld"><div class="top2"><label for="lfes">Nivel del LFE</label><b id="lfed">0 dB</b></div>
+            <input class="rng" id="lfes" type="range" min="-12" max="10" step="1" value="0"></div>
+          <p id="lfeh"></p>
+        </div>
     </div>
+  </div>
+  <div class="subpane" id="sp_pf" role="tabpanel" aria-labelledby="sb_pf" hidden>
+    <div class="cards">
     <div class="card" id="c_pf">
-      <div><b>Perfiles</b><span class="hint">Guardan volumen, procesado, modo noche, EQ, retardos y volumen de cada altavoz</span></div>
-      <div id="pflist" class="pflist"></div>
-      <div class="fld"><label for="pfname">Guardar el ajuste actual como</label>
-        <div class="pfnew"><input class="txt" id="pfname" type="text" maxlength="24" placeholder="Cine, Música, Noche…" autocomplete="off"><button class="btn sm" id="pfsave" type="button">Guardar perfil</button></div></div>
+          <div><b>Perfiles</b><span class="hint">Guardan volumen, procesado, modo noche, EQ, retardos y volumen de cada altavoz</span></div>
+          <div id="pflist" class="pflist"></div>
+          <div class="fld"><label for="pfname">Guardar el ajuste actual como</label>
+            <div class="pfnew"><input class="txt" id="pfname" type="text" maxlength="24" placeholder="Cine, Música, Noche…" autocomplete="off"><button class="btn sm" id="pfsave" type="button">Guardar perfil</button></div></div>
+        </div>
     </div>
+  </div>
+  <div class="subpane" id="sp_in" role="tabpanel" aria-labelledby="sb_in" hidden>
+    <div class="cards">
     <div class="card" id="c_names">
-      <div><b>Nombres de las entradas</b><span class="hint">Los 10 canales de audio que llegan por la entrada. El nombre se ve en el plano, en los indicadores y al elegir qué canal toma cada altavoz (hasta 12 caracteres)</span></div>
-      <div class="nmgrid" id="nmgrid"></div>
-      <div class="nmbtns"><button class="btn sm" id="nmsave" type="button">Guardar nombres</button><button class="btn sm" id="nmreset" type="button">Restablecer</button></div>
+          <div><b>Nombres de las entradas</b><span class="hint">Los 10 canales de audio que llegan por la entrada. El nombre se ve en el plano, en los indicadores y al elegir qué canal toma cada altavoz (hasta 12 caracteres)</span></div>
+          <div class="nmgrid" id="nmgrid"></div>
+          <div class="nmbtns"><button class="btn sm" id="nmsave" type="button">Guardar nombres</button><button class="btn sm" id="nmreset" type="button">Restablecer</button></div>
+        </div>
     </div>
   </div>
 </section>
@@ -595,12 +670,12 @@ function setSw(el,on){el.setAttribute('aria-checked',on?'true':'false');}
 /* Pestañas */
 function showTab(t){document.querySelectorAll('.tab').forEach(b=>{const on=b.dataset.tab===t;b.setAttribute('aria-selected',on);b.tabIndex=on?0:-1;});
   ['spk','snd','lat','log'].forEach(k=>$('p_'+k).hidden=(k!==t));
-  try{history.replaceState(null,'','#'+t);}catch(e){}if(t==='lat')updLat();}
+  try{history.replaceState(null,'','#'+t);}catch(e){}if(t==='lat')updLat();if(t==='snd')document.querySelectorAll('.sbwrap').forEach(subHint);}
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 document.querySelector('.tabs').addEventListener('keydown',e=>{               // flechas, Inicio y Fin como en cualquier barra de pestañas
-  if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;
+  if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(e.key))return;
   const tabs=[...document.querySelectorAll('.tab')];let i=tabs.indexOf(document.activeElement);if(i<0)return;
-  i=e.key==='Home'?0:e.key==='End'?tabs.length-1:(i+(e.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;
+  i=e.key==='Home'?0:e.key==='End'?tabs.length-1:(i+(e.key==='ArrowRight'||e.key==='ArrowDown'?1:-1)+tabs.length)%tabs.length;
   e.preventDefault();tabs[i].focus();showTab(tabs[i].dataset.tab);});
 
 /* Hojas (cajón del altavoz y Bluetooth): modales de verdad. El resto de la página queda inerte (teclado y lector de pantalla),
@@ -861,7 +936,7 @@ function buildDrawer(){
    '<p class="hint" style="margin-top:6px" id="d_rlh"></p></div>'+
    '<div class="fld"><label for="d_dist">Distancia a quien escucha (m, opcional)</label><input class="num" id="d_dist" type="number" min="0.2" max="30" step="0.1" value="'+(n.dist_m>0?n.dist_m:'')+'" placeholder="—"></div>'+
    '<div class="fld"><label for="d_lat">Retardo extra (ms; positivo lo retrasa)</label><input class="num" id="d_lat" type="number" min="-500" max="500" step="0.01" value="'+((n.latency_offset_us||0)/1000)+'"></div>'+
-   '<hr class="sep"><div class="fld"><div class="top2"><b>Ecualizador</b><button class="btn ghost sm" id="d_eqz">Plano</button></div><p class="hint" id="d_eqh" style="margin:4px 0 8px"></p>'+
+   '<hr class="sep"><div class="fld wide"><div class="top2"><b>Ecualizador</b><button class="btn ghost sm" id="d_eqz">Plano</button></div><p class="hint" id="d_eqh" style="margin:4px 0 8px"></p>'+
    EQF.map((f,i)=>'<div class="eqrow"><span>'+f+'</span><input class="rng mid" type="range" min="-12" max="12" step="0.5" id="d_eq'+i+'" value="'+(eq[i]||0)+'" aria-label="EQ '+f+'"><output id="d_eo'+i+'"></output></div>').join('')+'</div>'+
    '<hr class="sep"><div class="hint" id="d_stats"></div><div class="savestate" id="d_ss"></div>'+
    '<div class="fld" id="d_fgw"><button class="btn danger sm" id="d_fg" type="button">Quitar este ESP del panel</button><p class="hint" style="margin-top:6px">Solo si está apagado. Si vuelve a conectarse, aparece de nuevo con su configuración.</p></div>';
@@ -933,8 +1008,9 @@ function drawSound(){
   $('procbar').hidden=pass;
   $('proctxt').textContent='Procesado activo: '+(xo&&eq?'crossover y EQ':xo?'crossover':'EQ');
   $('t_pass').setAttribute('aria-pressed',pass);$('t_proc').setAttribute('aria-pressed',!pass);
-  $('tg_pass').style.display=pass?'':'none';$('tg_proc').style.display=pass?'none':'';
-  $('tg_pass').className='chip tag ac';$('tg_proc').className='chip tag ac';
+  $('t_pass').setAttribute('aria-checked',pass);$('t_proc').setAttribute('aria-checked',!pass);
+  $('modedesc').textContent=pass?'Los canales llegan ya separados. El audio sale tal cual, solo con volumen y retardo por altavoz.':'Llega una señal estéreo o mezclada. Se filtran los graves hacia el subwoofer y se aplica la EQ de cada altavoz.';
+  $('mode_pass').hidden=!pass;$('mode_proc').hidden=pass;
   setSw($('sw_xo'),xo);setSw($('sw_eq'),eq);
   $('c_xo').classList.toggle('dim',!xo);$('c_eq').classList.toggle('dim',!eq);
   $('xohint').textContent=!sub?'Elige un subwoofer para que el crossover tenga efecto. Sin él, todos reciben el canal completo.':'El sub recibe su canal y los graves de los demás, que pasan a satélite (24 dB/oct). Si el sub se desconecta, los satélites vuelven al canal completo.';
@@ -948,6 +1024,21 @@ function drawSound(){
   $('eqsum').textContent=adj?adj+(adj===1?' altavoz tiene':' altavoces tienen')+' la EQ ajustada.':'Ningún altavoz tiene la EQ ajustada todavía.';
 }
 $('t_pass').onclick=()=>setDsp({xover:false,eq:false});
+$('go_proc').onclick=()=>{if(!(st.dsp_xover||st.dsp_eq))setDsp({xover:true,eq:true});};
+/* Subpestañas (Sonido): una sola visible; las flechas ‹ › avisan de que hay más fuera de la pantalla */
+function subHint(w){const t=w.querySelector('.subtabs'),l=w.querySelector('.sbm.l'),r=w.querySelector('.sbm.r');
+  l.classList.toggle('on',t.scrollLeft>2);r.classList.toggle('on',t.scrollLeft+t.clientWidth<t.scrollWidth-2);}
+function subSel(w,b){const t=w.querySelector('.subtabs');
+  t.querySelectorAll('.sub').forEach(x=>{const on=x===b;x.setAttribute('aria-selected',on);x.tabIndex=on?0:-1;
+    const pn=document.getElementById(x.getAttribute('aria-controls'));if(pn)pn.hidden=!on;});
+  b.scrollIntoView({block:'nearest',inline:'nearest'});subHint(w);}
+document.querySelectorAll('.sbwrap').forEach(w=>{const t=w.querySelector('.subtabs');
+  t.addEventListener('click',e=>{const b=e.target.closest('.sub');if(b)subSel(w,b);});
+  t.addEventListener('keydown',e=>{const k=[...t.querySelectorAll('.sub')],i=k.indexOf(document.activeElement);if(i<0)return;
+    let j=-1;if(e.key==='ArrowRight')j=(i+1)%k.length;else if(e.key==='ArrowLeft')j=(i+k.length-1)%k.length;else if(e.key==='Home')j=0;else if(e.key==='End')j=k.length-1;
+    if(j<0)return;e.preventDefault();k[j].focus();subSel(w,k[j]);});
+  w.querySelectorAll('.sbm').forEach(m=>m.addEventListener('click',()=>t.scrollBy({left:+m.dataset.dir*t.clientWidth*.6,behavior:'smooth'})));
+  t.addEventListener('scroll',()=>subHint(w),{passive:true});addEventListener('resize',()=>subHint(w));subHint(w);});
 $('procoff').onclick=()=>setDsp({xover:false,eq:false});
 $('t_proc').onclick=()=>{if(st.dsp_xover||st.dsp_eq)return;setDsp({xover:true,eq:true});};
 $('sw_xo').onclick=()=>setDsp({xover:$('sw_xo').getAttribute('aria-checked')!=='true'});
@@ -1352,7 +1443,7 @@ label,.lbl{display:block;color:var(--mut);font-size:.74rem;font-weight:600;lette
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mut);flex:none}
 .dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
 
-.top{position:sticky;top:0;z-index:30;background:var(--top-bg);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
+.top{position:sticky;top:0;z-index:30;background:var(--top-solid);border-bottom:1px solid var(--line);
   padding-top:env(safe-area-inset-top)}               /* en la app instalada (barra de estado translúcida) el contenido no queda bajo la muesca */
 .top .in{max-width:1180px;margin:auto;display:flex;align-items:center;gap:18px;padding:10px 18px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.05rem;color:var(--fg)}
@@ -1862,7 +1953,7 @@ label,.lbl{display:block;color:var(--mut);font-size:.74rem;font-weight:600;lette
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mut);flex:none}
 .dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
 
-.top{position:sticky;top:0;z-index:30;background:var(--top-bg);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
+.top{position:sticky;top:0;z-index:30;background:var(--top-solid);border-bottom:1px solid var(--line);
   padding-top:env(safe-area-inset-top)}               /* en la app instalada (barra de estado translúcida) el contenido no queda bajo la muesca */
 .top .in{max-width:1180px;margin:auto;display:flex;align-items:center;gap:18px;padding:10px 18px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.05rem;color:var(--fg)}
@@ -2070,8 +2161,8 @@ static const char PWA_MANIFEST[] = R"HTML({
 static const char PWA_SW[] = R"HTML(/* Service worker de AStream. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * 9d164b46db lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-9d164b46db';
+ * 8efdd09a16 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-8efdd09a16';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png', '/fonts/roboto-400.woff2', '/fonts/roboto-500.woff2'];
 
 self.addEventListener('install', e => {
