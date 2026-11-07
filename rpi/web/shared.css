@@ -13,7 +13,7 @@
   --on-ac:#04121f; --ac-hi:#9ad0ff; --ac-lo:#2f6fb3; --bad-fg:#ffb0b0; --bad-ln:rgba(255,107,107,.45); --warn-ln:rgba(245,184,74,.4);
   --top-bg:rgba(0,0,0,.88); --top-solid:#000; --tabs-bg:rgba(10,13,19,.94); --scrim:rgba(0,0,0,.55); --code-bg:#05070b; --bar-bg:#000; --cl-off:#3a1512;
   --thumb:#fff; --thumb-ring:rgba(74,163,255,.38); --cap-bg:rgba(0,0,0,.65); --glow:rgba(74,163,255,.09); --orb-glow:rgba(74,163,255,.35);
-  --led-g:#30d158; --led-y:#ffd60a; --led-r:#ff453a;
+  --room-bg:#000; --led-g:#30d158; --led-y:#ffd60a; --led-r:#ff453a;
   color-scheme:dark;
 }
 /* Temas alternativos: data-theme="graphite" (gris grafito, de bajo brillo) y "light" (claro suave, sin blanco puro).
@@ -25,7 +25,7 @@ html[data-theme=graphite]{
   --on-ac:#06121f; --ac-hi:#a5d3ff; --ac-lo:#3478b8; --bad-fg:#ffb4ae; --bad-ln:rgba(255,123,114,.5); --warn-ln:rgba(240,182,74,.45);
   --top-bg:rgba(28,28,30,.9); --top-solid:#1c1c1e; --tabs-bg:rgba(43,43,45,.95); --scrim:rgba(0,0,0,.5); --code-bg:#1f1f21; --bar-bg:#18181a; --cl-off:#4a2a28;
   --thumb:#f2f2f4; --thumb-ring:rgba(90,174,255,.4); --cap-bg:rgba(28,28,30,.78); --glow:rgba(90,174,255,.07); --orb-glow:rgba(90,174,255,.35);
-  --led-g:#34c759; --led-y:#ffd60a; --led-r:#ff5a50;
+  --room-bg:#2b2b2d; --led-g:#34c759; --led-y:#ffd60a; --led-r:#ff5a50;
   color-scheme:dark;
 }
 html[data-theme=light]{
@@ -35,7 +35,7 @@ html[data-theme=light]{
   --on-ac:#ffffff; --ac-hi:#4aa3ff; --ac-lo:#7fa9d6; --bad-fg:#8f1a16; --bad-ln:rgba(179,42,37,.5); --warn-ln:rgba(138,83,0,.45);
   --top-bg:rgba(213,217,224,.92); --top-solid:#d5d9e0; --tabs-bg:rgba(228,231,236,.95); --scrim:rgba(26,31,39,.35); --code-bg:#cfd4dc; --bar-bg:#0b0e14; --cl-off:#e0c3c1;
   --thumb:#f4f5f8; --thumb-ring:rgba(10,88,172,.35); --cap-bg:rgba(228,231,236,.88); --glow:rgba(10,88,172,.06); --orb-glow:rgba(10,88,172,.3);
-  --led-g:#1fa84a; --led-y:#d9a400; --led-r:#e0342b;
+  --room-bg:#e4e7ec; --led-g:#1fa84a; --led-y:#d9a400; --led-r:#e0342b;
   color-scheme:light;
 }
 *{box-sizing:border-box;margin:0}
@@ -149,5 +149,7 @@ label,.lbl{display:block;color:var(--mut);font-size:.74rem;font-weight:600;lette
 html[data-shape=square]{--r-card:0px;--r-sheet:0px}
 html[data-shape=square] :not(#room *),html[data-shape=square] :not(#room *)::before,html[data-shape=square] :not(#room *)::after{border-radius:0!important}
 html[data-shape=square] .zoomctl,html[data-shape=square] .zoomctl *{border-radius:0!important}
+/* el recuadro de selección del altavoz (y sus rótulos) también es recto; el dibujo, el vúmetro y «Escucha» conservan sus formas */
+html[data-shape=square] .spk,html[data-shape=square] .spk .cap,html[data-shape=square] .spk .cal{border-radius:0!important}
 html[data-shape=square] input[type=range]::-webkit-slider-thumb,html[data-shape=square] input[type=range]::-webkit-slider-runnable-track{border-radius:0!important}
 html[data-shape=square] input[type=range]::-moz-range-thumb,html[data-shape=square] input[type=range]::-moz-range-track,html[data-shape=square] input[type=range]::-moz-range-progress{border-radius:0!important}

@@ -146,7 +146,7 @@ void UdpStreamer::markOffline() {
 void UdpStreamer::handleHello(const uint8_t* b, int n, const sockaddr_in& src) {
     if (n < (int)sizeof(HelloPacket)) return;
     HelloPacket h; memcpy(&h, b, sizeof(h));
-    if (h.esp_id >= MAX_NODES) return;
+    if (h.esp_id >= MAX_NODES && h.esp_id != ESP_ID_AUTO) return;
     if (h.version != PROTOCOL_VERSION) {
         fprintf(stderr, "[Control] ESP%d con protocolo v%u (esperado v%u) — ignorado\n",
                 h.esp_id, h.version, PROTOCOL_VERSION);
@@ -155,9 +155,31 @@ void UdpStreamer::handleHello(const uint8_t* b, int n, const sockaddr_in& src) {
     char ip[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &src.sin_addr, ip, sizeof(ip));
 
+    uint64_t mac = 0;
+    for (int i = 0; i < 6; i++) mac = (mac << 8) | h.mac[i];
+    uint8_t assigned = 0;
     WelcomePacket w{};
     {
         std::lock_guard<std::mutex> lk(nodes_mtx_);
+        if (h.esp_id == ESP_ID_AUTO) {                 // sin número: la casilla se asigna por MAC (la misma de siempre, o la primera libre)
+            int slot = -1;
+            if (mac != 0) {
+                for (int i = 0; i < MAX_NODES && slot < 0; i++) if (nodes_[i].mac == mac) slot = i;
+                for (int i = 0; i < MAX_NODES && slot < 0; i++) if (!nodes_[i].known && !nodes_[i].online && nodes_[i].mac == 0) slot = i;
+            }
+            if (slot < 0) {
+                fprintf(stderr, "[Control] ESP sin ID (%s): no hay casillas libres o no envía MAC — ignorado\n", ip);
+                return;
+            }
+            h.esp_id = (uint8_t)slot; assigned = WELCOME_F_ASSIGNED;
+            if (nodes_[slot].mac != mac)
+                fprintf(stderr, "[Control] ESP %02X:%02X:%02X:%02X:%02X:%02X -> casilla %d (automática)\n",
+                        h.mac[0], h.mac[1], h.mac[2], h.mac[3], h.mac[4], h.mac[5], slot);
+        }
+        if (mac != 0) {                                 // recuerda quién ocupa cada casilla (también con número fijo) y libera la anterior de ese ESP
+            for (int i = 0; i < MAX_NODES; i++) if (i != h.esp_id && nodes_[i].mac == mac) { nodes_[i].mac = 0; dirty_.store(true); }
+            if (nodes_[h.esp_id].mac != mac) { nodes_[h.esp_id].mac = mac; dirty_.store(true); }
+        }
         ESPNode& node = nodes_[h.esp_id];
         if (node.online && node.ip != ip)
             fprintf(stderr, "[Control] AVISO: dos placas con ID %u (%s y %s)\n",
@@ -187,6 +209,7 @@ void UdpStreamer::handleHello(const uint8_t* b, int n, const sockaddr_in& src) {
         w.ch_left = node.ch_left; w.ch_right = node.ch_right;
         w.volume_l = node.volume_l; w.volume_r = node.volume_r;
         w.enabled = node.enabled ? 1 : 0;
+        w.reserved = assigned;
         w.sample_rate = AUDIO_SAMPLE_RATE;
         w.playout_delay_us = playout_us_.load();
     }
@@ -613,6 +636,7 @@ bool UdpStreamer::forgetNode(uint8_t id) {
     std::lock_guard<std::mutex> lk(nodes_mtx_);
     if (nodes_[id].online) return false;
     nodes_[id].known = false;
+    nodes_[id].mac = 0;                  // la casilla queda libre para otro ESP (o para el mismo, si vuelve)
     dirty_.store(true);
     return true;
 }
@@ -758,6 +782,7 @@ bool UdpStreamer::saveConfig() {
     for (const auto& n : nodes) {
         fprintf(f, "node%d.role=%d\nnode%d.known=%d\nnode%d.pos_x=%.2f\nnode%d.pos_y=%.2f\nnode%d.pos2_x=%.2f\nnode%d.pos2_y=%.2f\n", n.id, n.role, n.id, n.known ? 1 : 0, n.id, n.pos_x, n.id, n.pos_y, n.id, n.pos2_x, n.id, n.pos2_y);
         fprintf(f, "node%d.dist_m=%.2f\n", n.id, n.dist_m);
+        if (n.mac) fprintf(f, "node%d.mac=%llu\n", n.id, (unsigned long long)n.mac);
         for (int b = 0; b < EQ_BANDS; b++) fprintf(f, "node%d.eq%d=%.2f\n", n.id, b, n.eq_db[b]);
     }
     bool ok = (fflush(f) == 0) & (ferror(f) == 0);
@@ -800,6 +825,7 @@ bool UdpStreamer::loadConfig() {
         else if (!strcmp(field, "volume_l") && v >= 0 && v <= 255) { n.volume_l = (uint8_t)v; applied++; }
         else if (!strcmp(field, "volume_r") && v >= 0 && v <= 255) { n.volume_r = (uint8_t)v; applied++; }
         else if (!strcmp(field, "known"))    { n.known = (v != 0); applied++; }
+        else if (!strcmp(field, "mac") && dv >= 0 && dv < 281474976710656.0) { n.mac = (uint64_t)dv; applied++; }
         else if (!strcmp(field, "dist_m") && (dv < 0 || (dv >= 0.2 && dv <= 30))) { n.dist_m = dv < 0 ? -1.0f : (float)dv; applied++; }
         else if (!strcmp(field, "pos_x") && dv >= -1 && dv <= 100) { n.pos_x = (float)dv; applied++; }
         else if (!strcmp(field, "pos_y") && dv >= -1 && dv <= 100) { n.pos_y = (float)dv; applied++; }

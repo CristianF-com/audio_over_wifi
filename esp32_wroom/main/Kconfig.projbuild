@@ -1,9 +1,12 @@
 menu "SonosWiFi receiver"
 
     config RECEIVER_ID
-        int "ID del receptor por defecto (0-9); el NVS lo sobreescribe"
-        range 0 9
-        default 0
+        int "ID del receptor (0-9; 255 = automático, lo asigna la Raspberry por MAC)"
+        range 0 255
+        default 255
+        help
+            255 (recomendado): el ESP no lleva número; la Raspberry le da una casilla según su MAC y la recuerda.
+            0-9: número fijo (compatible con versiones anteriores). Si el NVS tiene un número, manda el del NVS.
 
     config WIFI_SSID_DEFAULT
         string "SSID por defecto (el NVS lo sobreescribe)"

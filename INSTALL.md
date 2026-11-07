@@ -219,20 +219,21 @@ Ahí se cambia: ID por defecto, SSID y contraseña por defecto, banda (solo 5 GH
 idf.py -p /dev/ttyACM0 flash
 ```
 
-El **mismo binario** sirve para todas las placas: lo que las distingue es su número (ID) y su WiFi, que se guardan aparte en la memoria NVS.
+El **mismo binario** sirve para todas las placas: lo que las distingue es su WiFi (que se guarda aparte en la memoria NVS) y su MAC, de fábrica. **No hace falta darle un número a cada ESP**: la Raspberry le asigna una casilla (0–9) según su MAC, la recuerda y se la devuelve siempre igual. Qué señal de audio recibe cada uno se elige en el panel, no en el ESP.
 
-### 2.5 Darle número y WiFi (elige una opción)
+### 2.5 Darle la WiFi (elige una opción)
 
 **A. Por consola, con el script (sin recompilar)**
 
 ```bash
 cd ~/audio_over_wifi
-./scripts/provision_esp.sh <id 0-9> "<nombre-de-la-wifi>" "<contraseña>" /dev/ttyACM0
+./scripts/provision_esp.sh auto "<nombre-de-la-wifi>" "<contraseña>" /dev/ttyACM0
 # ejemplo:
-./scripts/provision_esp.sh 0 "MiRed5G" "clave-larga" /dev/ttyACM0
+./scripts/provision_esp.sh auto "MiRed5G" "clave-larga" /dev/ttyACM0
+# (opcional: un número fijo 0-9 en vez de «auto»)
 ```
 
-Escribe el ID y la WiFi directamente en la partición NVS (0x9000). Necesita el entorno ESP-IDF activo.
+Escribe la WiFi (y el número solo si no es `auto`) directamente en la partición NVS (0x9000). Necesita el entorno ESP-IDF activo.
 
 **B. Por Bluetooth, sin cable**
 
@@ -240,7 +241,7 @@ Con la placa encendida aparece como `SonosWiFi-XXXX`. Se configura desde el bot�
 
 **C. En el propio firmware**
 
-`idf.py menuconfig` → *SonosWiFi receiver* → ID, SSID y contraseña por defecto, y vuelve a compilar y grabar. Solo se usan si la NVS está vacía.
+`idf.py menuconfig` → *SonosWiFi receiver* → SSID y contraseña por defecto (el ID por defecto es 255 = automático), y vuelve a compilar y grabar. Solo se usan si la NVS está vacía.
 
 ### 2.6 Comprobar que funciona
 
@@ -250,7 +251,7 @@ idf.py -p /dev/ttyACM0 monitor        # Ctrl+] para salir
 
 En el registro deberías ver, en orden:
 
-1. `=== SonosWiFi Receiver (protocolo v5) ===` y `ID=<n> ch=…`
+1. `=== SonosWiFi Receiver (protocolo v5) ===` y `ID=255 (automático) ch=…` (luego `ID asignado por la RPi: <n>`)
 2. `Conectando a WiFi '<red>'...`, luego `AP canal … (5 GHz) RSSI …` y `IP: <dirección>`
 3. `I2S OK …` y `Sockets OK | control :5005 | audio :5006`
 4. `Listo. Esperando WELCOME de la RPi...` y después `WELCOME: …` cuando la Raspberry lo reconoce

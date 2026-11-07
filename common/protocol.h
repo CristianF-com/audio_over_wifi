@@ -72,6 +72,12 @@
 #define HELLO_FW_CHIP(r)     (((r) >> 6) & 0x03)
 #define HELLO_PACK(ver, chip) ((uint8_t)(((ver) & 0x3F) | (((chip) & 0x03) << 6)))
 
+/* ID automático (v9.8, ampliación compatible): un ESP sin número configurado anuncia esp_id = ESP_ID_AUTO en el HELLO.
+ * La RPi le asigna la primera casilla libre por su MAC (se guarda en su configuración: el mismo ESP vuelve a la misma casilla)
+ * y la devuelve en el WELCOME con WELCOME_F_ASSIGNED en `reserved`. El ESP la usa solo en RAM; no se graba en su NVS. */
+#define ESP_ID_AUTO          0xFF
+#define WELCOME_F_ASSIGNED   0x01
+
 #define NACK_MAX_SEQS       8
 #define TX_HISTORY_PACKETS  128   /* RPi: paquetes recordados por nodo (potencia de 2; 128 = 0.6 s mono / 0.3 s estéreo) */
 
@@ -80,7 +86,7 @@
 typedef struct {
     uint32_t magic;
     uint8_t  pkt_type;     /* PKT_HELLO */
-    uint8_t  esp_id;       /* 0..9 */
+    uint8_t  esp_id;       /* 0..9, o ESP_ID_AUTO (255) = que lo asigne la RPi por MAC */
     uint8_t  version;      /* PROTOCOL_VERSION */
     uint8_t  reserved;     /* HELLO_PACK(fw_version, chip); 0 = firmware sin esta información */
     uint16_t audio_port;   /* host order */
@@ -96,7 +102,7 @@ typedef struct {
     uint8_t  volume_l;
     uint8_t  volume_r;
     uint8_t  enabled;
-    uint8_t  reserved;
+    uint8_t  reserved;     /* bit0 = WELCOME_F_ASSIGNED: esp_id lo ha asignado la RPi (respuesta a un HELLO con ESP_ID_AUTO) */
     uint32_t sample_rate;
     uint32_t playout_delay_us;
 } WelcomePacket;           /* 20 */

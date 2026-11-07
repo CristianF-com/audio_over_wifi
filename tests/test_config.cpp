@@ -64,6 +64,18 @@ int main() {
         CHECK("known persiste tras guardar y recargar (3 quitado, 4 conservado); enabled=0 se conserva", !k2.getNodes()[3].known && k2.getNodes()[4].known && !k2.getNodes()[3].enabled);
         remove(kp);
     }
+    {   // MAC por casilla (ID automático): se persiste, forgetNode la libera, valores fuera de rango se ignoran
+        const char* mp = "/tmp/sonos_cfg_mac.txt";
+        FILE* f = fopen(mp, "w"); fputs("node1.known=1\nnode1.mac=2345912259942\nnode2.mac=-5\nnode3.mac=999999999999999999\nnode4.mac=abc\n", f); fclose(f);
+        UdpStreamer m; m.setConfigPath(mp);
+        CHECK("mac cargada (0x022233445566 de 48 bits)", m.loadConfig() && m.getNodes()[1].mac == 2345912259942ULL);
+        CHECK("mac negativa, de más de 48 bits o no numérica se ignora", m.getNodes()[2].mac == 0 && m.getNodes()[3].mac == 0 && m.getNodes()[4].mac == 0);
+        CHECK("saveConfig con mac", m.saveConfig());
+        UdpStreamer m2; m2.setConfigPath(mp); m2.loadConfig();
+        CHECK("la mac persiste tras guardar y recargar", m2.getNodes()[1].mac == 2345912259942ULL && m2.getNodes()[0].mac == 0);
+        CHECK("forgetNode libera la casilla (mac = 0)", m2.forgetNode(1) && m2.getNodes()[1].mac == 0 && !m2.getNodes()[1].known);
+        remove(mp);
+    }
     {   // fichero con basura, valores fuera de rango y claves desconocidas
         FILE* f = fopen(path, "w");
         fputs("version=1\nmaster_volume=99\nplayout_us=5\nnode9.ch_left=1\nnode1.ch_left=77\nnode1.volume_l=abc\n"

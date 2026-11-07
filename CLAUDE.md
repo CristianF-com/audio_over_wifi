@@ -19,7 +19,7 @@ Audio multicanal inalámbrico: Traktor Audio 10 (USB, 10 canales) → Raspberry 
 * Estilo: tema oscuro por defecto (fondo negro `#000`, acento azul `#4aa3ff`) y temas opcionales Grafito y Claro suave (nunca blanco puro); sin morado; interfaz en español.
 
 ## Reglas del proyecto
-* Protocolo en `common/protocol.h` (versión 5). Si cambia, hay que reflashear todos los ESP: actualiza `PROTOCOL_VERSION`, el firmware y los tests. Las ampliaciones compatibles (`HELLO.reserved`, `REPORT.rssi_dbm`, `PKT_OTA`) no suben la versión.
+* Protocolo en `common/protocol.h` (versión 5). Si cambia, hay que reflashear todos los ESP: actualiza `PROTOCOL_VERSION`, el firmware y los tests. Las ampliaciones compatibles (`HELLO.reserved`, `REPORT.rssi_dbm`, `PKT_OTA`, ID automático: `ESP_ID_AUTO`=255 en `HELLO.esp_id` y `WELCOME_F_ASSIGNED`) no suben la versión. El ESP no necesita ID: la RPi lo asigna por MAC (`ESPNode.mac`, persistido como `nodeN.mac`); el ESP lo guarda solo en RAM.
 * El procesado (crossover y EQ) está en pass-through por defecto; se activa con `POST /api/dsp`.
 * El firmware del **ESP32-C5 compila y se flashea** con ESP-IDF real (confirmado por el usuario, v9.7); el **WROOM no se ha compilado ni probado**. El comportamiento en placa (audio, sync, OTA, BLE) solo está confirmado si el usuario lo dice: lo demás sigue sin verificar, y el Bluetooth desde la RPi (`scripts/sonos_ble_prov.py`) solo se ha probado simulado. Dilo siempre que se afirme que algo funciona "de verdad".
 * La WiFi de los altavoces se guarda en `config.txt.ble` (0600); nunca la devuelvas por la API ni la subas al repo.

@@ -15,6 +15,7 @@ SVC = "5c0a0001-8e3b-4d5e-9a41-534f4e4f5346"
 def U(n): return "5c0a%04x-8e3b-4d5e-9a41-534f4e4f5346" % n
 C_SSID, C_PASS, C_ID, C_ST, C_CMD, C_RPI = U(2), U(3), U(4), U(5), U(6), U(7)
 NAME_PREFIX = "SonosWiFi-"
+AUTO_ID = 255                                         # ESP sin número configurado (lo asigna la Raspberry por MAC)
 CONNECT_TIMEOUT = 12.0
 
 def annotate(devs, used):
@@ -79,7 +80,8 @@ async def inspect(BleakClient, address):
     try:
         async with BleakClient(address, timeout=CONNECT_TIMEOUT) as c:
             try:
-                info["id"] = bytes(await c.read_gatt_char(C_ID))[0]
+                v = bytes(await c.read_gatt_char(C_ID))[0]
+                info["id"] = None if v == AUTO_ID else v
                 info["ssid"] = dec(await c.read_gatt_char(C_SSID))
                 st = dec(await c.read_gatt_char(C_ST))
                 try: info["status"] = json.loads(st)
@@ -196,7 +198,8 @@ async def provision(req):
     addr = req.get("address"); ident = req.get("id"); ssid = req.get("ssid") or ""
     pw = req.get("pass") or ""; rpi = (req.get("rpi_ip") or "").strip()
     if not addr: return {"error": "Falta la dirección del dispositivo"}
-    if not isinstance(ident, int) or not 0 <= ident <= 9: return {"error": "ID fuera de rango (0-9)"}
+    if ident is None: ident = AUTO_ID                    # sin número: la Raspberry le asigna la casilla por MAC
+    if not isinstance(ident, int) or not (0 <= ident <= 9 or ident == AUTO_ID): return {"error": "ID fuera de rango (0-9 o 255 = automático)"}
     if not 1 <= len(ssid.encode()) <= 32: return {"error": "SSID vacío o de más de 32 bytes"}
     if pw and not 8 <= len(pw.encode()) <= 63: return {"error": "La contraseña debe tener entre 8 y 63 caracteres"}
     perr = None

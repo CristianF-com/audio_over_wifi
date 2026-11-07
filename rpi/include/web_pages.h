@@ -74,7 +74,7 @@ static const char PAGE_PANEL[] = R"HTML(<!DOCTYPE html>
   --on-ac:#04121f; --ac-hi:#9ad0ff; --ac-lo:#2f6fb3; --bad-fg:#ffb0b0; --bad-ln:rgba(255,107,107,.45); --warn-ln:rgba(245,184,74,.4);
   --top-bg:rgba(0,0,0,.88); --top-solid:#000; --tabs-bg:rgba(10,13,19,.94); --scrim:rgba(0,0,0,.55); --code-bg:#05070b; --bar-bg:#000; --cl-off:#3a1512;
   --thumb:#fff; --thumb-ring:rgba(74,163,255,.38); --cap-bg:rgba(0,0,0,.65); --glow:rgba(74,163,255,.09); --orb-glow:rgba(74,163,255,.35);
-  --led-g:#30d158; --led-y:#ffd60a; --led-r:#ff453a;
+  --room-bg:#000; --led-g:#30d158; --led-y:#ffd60a; --led-r:#ff453a;
   color-scheme:dark;
 }
 /* Temas alternativos: data-theme="graphite" (gris grafito, de bajo brillo) y "light" (claro suave, sin blanco puro).
@@ -86,7 +86,7 @@ html[data-theme=graphite]{
   --on-ac:#06121f; --ac-hi:#a5d3ff; --ac-lo:#3478b8; --bad-fg:#ffb4ae; --bad-ln:rgba(255,123,114,.5); --warn-ln:rgba(240,182,74,.45);
   --top-bg:rgba(28,28,30,.9); --top-solid:#1c1c1e; --tabs-bg:rgba(43,43,45,.95); --scrim:rgba(0,0,0,.5); --code-bg:#1f1f21; --bar-bg:#18181a; --cl-off:#4a2a28;
   --thumb:#f2f2f4; --thumb-ring:rgba(90,174,255,.4); --cap-bg:rgba(28,28,30,.78); --glow:rgba(90,174,255,.07); --orb-glow:rgba(90,174,255,.35);
-  --led-g:#34c759; --led-y:#ffd60a; --led-r:#ff5a50;
+  --room-bg:#2b2b2d; --led-g:#34c759; --led-y:#ffd60a; --led-r:#ff5a50;
   color-scheme:dark;
 }
 html[data-theme=light]{
@@ -96,7 +96,7 @@ html[data-theme=light]{
   --on-ac:#ffffff; --ac-hi:#4aa3ff; --ac-lo:#7fa9d6; --bad-fg:#8f1a16; --bad-ln:rgba(179,42,37,.5); --warn-ln:rgba(138,83,0,.45);
   --top-bg:rgba(213,217,224,.92); --top-solid:#d5d9e0; --tabs-bg:rgba(228,231,236,.95); --scrim:rgba(26,31,39,.35); --code-bg:#cfd4dc; --bar-bg:#0b0e14; --cl-off:#e0c3c1;
   --thumb:#f4f5f8; --thumb-ring:rgba(10,88,172,.35); --cap-bg:rgba(228,231,236,.88); --glow:rgba(10,88,172,.06); --orb-glow:rgba(10,88,172,.3);
-  --led-g:#1fa84a; --led-y:#d9a400; --led-r:#e0342b;
+  --room-bg:#e4e7ec; --led-g:#1fa84a; --led-y:#d9a400; --led-r:#e0342b;
   color-scheme:light;
 }
 *{box-sizing:border-box;margin:0}
@@ -210,6 +210,8 @@ label,.lbl{display:block;color:var(--mut);font-size:.74rem;font-weight:600;lette
 html[data-shape=square]{--r-card:0px;--r-sheet:0px}
 html[data-shape=square] :not(#room *),html[data-shape=square] :not(#room *)::before,html[data-shape=square] :not(#room *)::after{border-radius:0!important}
 html[data-shape=square] .zoomctl,html[data-shape=square] .zoomctl *{border-radius:0!important}
+/* el recuadro de selección del altavoz (y sus rótulos) también es recto; el dibujo, el vúmetro y «Escucha» conservan sus formas */
+html[data-shape=square] .spk,html[data-shape=square] .spk .cap,html[data-shape=square] .spk .cal{border-radius:0!important}
 html[data-shape=square] input[type=range]::-webkit-slider-thumb,html[data-shape=square] input[type=range]::-webkit-slider-runnable-track{border-radius:0!important}
 html[data-shape=square] input[type=range]::-moz-range-thumb,html[data-shape=square] input[type=range]::-moz-range-track,html[data-shape=square] input[type=range]::-moz-range-progress{border-radius:0!important}
 main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
@@ -231,8 +233,7 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 /* Plano de sala: cada canal es un altavoz dibujado; se coloca donde está en la sala */
 .roombar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .roombar .hint{margin-right:auto;min-width:200px;flex:1}
-.room{--hw:64px;--ht:80px;--hb:72px;user-select:none;-webkit-user-select:none;position:relative;width:100%;aspect-ratio:16/9;min-height:360px;border:1px solid var(--line);border-radius:var(--r-sheet);overflow:hidden;
-  background:radial-gradient(circle at 50% 78%,var(--glow),transparent 62%),var(--panel)}
+.room{--hw:64px;--ht:80px;--hb:72px;user-select:none;-webkit-user-select:none;position:relative;width:100%;aspect-ratio:16/9;min-height:360px;border:1px solid var(--line);border-radius:var(--r-sheet);overflow:hidden;background:var(--room-bg)}
 .room>*{z-index:1}
 .room{touch-action:pan-y}                       /* la página sigue deslizándose; el pellizco lo gestiona el plano */
 .room.zoomed{touch-action:none;cursor:grab}
@@ -293,14 +294,13 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 .mb{display:grid;grid-template-columns:repeat(10,1fr);gap:8px}
 .mc{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
 .mc .lab{font-size:.72rem;font-weight:600;color:var(--mut);line-height:1}
-/* Indicador de señal: cuadrado rojo (parpadea) si entra señal en ese canal, apagado si no */
+/* Indicador de entrada por canal: apagado (< −70 dBFS), verde fijo = cable conectado sin sonido (−70 a −40) y, con sonido (−40 a 0),
+   verde que destella en rojo cada vez que el nivel sube ~3 dB; al bajar se apaga y vuelve a destellar en la siguiente subida */
 .lamp{display:block;width:22px;height:22px;border-radius:5px;background:var(--bar-bg);border:1.5px solid var(--ctl)}
-.lamp.on{background:var(--led-r);border-color:var(--led-r);box-shadow:0 0 10px 1px var(--led-r);animation:lampblink .7s ease-in-out infinite alternate}
-@keyframes lampblink{from{opacity:1}to{opacity:.4}}
-@media (prefers-reduced-motion:reduce){.lamp.on{animation:none}}
+.lamp[data-st=cable],.lamp[data-st=sig]{background:var(--led-g);border-color:var(--led-g);opacity:.55}
+.lamp.on{background:var(--led-r);border-color:var(--led-r);box-shadow:0 0 10px 1px var(--led-r);opacity:1}
 .mc .lvn{font:300 .78rem/1 var(--font);font-variant-numeric:tabular-nums;color:var(--fg);min-height:1em}
 .ms{color:var(--mut);font-size:.74rem;margin-top:10px}
-.meters.off .lamp.on{animation:none;opacity:.4}
 /* Vúmetro vertical junto a cada altavoz: misma altura que el dibujo */
 .vu{position:absolute;left:calc(100% + 8px);top:0;bottom:0;width:9px;display:flex;flex-direction:column-reverse;gap:1px;padding:1px;background:var(--bar-bg);border:1px solid var(--ctl);border-radius:3px;pointer-events:none}
 .led{display:block;flex:1 1 0;min-height:0;border-radius:1px;background:var(--c);opacity:.16}   /* LED apagado: el mismo color, muy tenue */
@@ -433,7 +433,7 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   <div class="meters" id="meters" role="group" aria-label="Niveles de entrada por canal">
     <div class="mh"><b>Entrada</b><span class="hint" id="mtxt">Esperando datos…</span></div>
     <div class="mb" id="mb"></div>
-    <div class="ms">El cuadrado rojo parpadea cuando entra señal en ese canal (por encima de −70 dBFS) y el número es su nivel en dBFS. El vúmetro de cada altavoz del plano marca de −60 a 0 dBFS: verde hasta −20, amarillo hasta −10 y rojo por encima; el segmento suelto es el pico reciente.</div>
+    <div class="ms">Cada cuadrado es un canal: vacío = sin cable ni señal (por debajo de −70 dBFS); verde fijo = cable conectado pero sin sonido (de −70 a −40); con sonido (por encima de −40) destella en rojo cada vez que el nivel sube unos 3 dB y se apaga al bajar. El número es su nivel en dBFS. El vúmetro de cada altavoz del plano marca de −60 a 0 dBFS: verde hasta −20, amarillo hasta −10 y rojo por encima; el segmento suelto es el pico reciente.</div>
   </div>
   <div class="roombar"><span class="hint" id="mhint">Toca un altavoz para ajustarlo. Los cambios se guardan solos.</span>
     <button class="btn ghost sm" id="mreset" hidden>Restablecer posiciones</button>
@@ -888,7 +888,7 @@ function wireDrawer(){
   $('d_eqz').onclick=()=>{for(let i=0;i<6;i++){$('d_eq'+i).value=0;fillRng($('d_eq'+i));eqOut(i);}q();};
 }
 function updDrawerStats(){const n=find(openId),s=$('d_stats');if(!n||!s)return;
-  $('dst').className='chip '+(n.online?'ac':'bad');$('dst').textContent=n.online?(n.ip||'en línea'):'sin conexión';
+  $('dst').className='chip '+(n.online?'ac':'bad');$('dst').textContent=n.online?(n.ip||'en línea'):'sin conexión';$('dst').title=n.mac?'MAC '+n.mac+' · casilla '+n.id+' (asignada por la Raspberry)':'';
   s.textContent=n.online?'RTT '+((n.rtt_us||0)/1000).toFixed(1)+' ms · jitter '+(n.jitter_us||0)+' µs · perdidos '+(n.lost_packets||0)+' · recuperados '+(n.recovered_packets||0)+' · vacíos '+(n.underruns||0)+' · '+wifiTxt(n)+' · '+fwTxt(n):'Este altavoz no responde ahora mismo.';}
 
 
@@ -1045,17 +1045,14 @@ function bleBuild(){
      '<div style="display:flex;gap:8px;align-items:center;margin-top:10px"><button class="btn sm" id="b_save">Guardar WiFi</button><span class="hint" id="b_ss">'+(credsOk?'Guardada: «'+esc(bs.ssid)+'»':'Falta guardarla')+'</span></div></div>'+
      '<hr class="sep"><div><button class="btn" id="b_scan"'+(!bs.available||bscan?' disabled':'')+'>'+(bscan?'<span class="spin"></span>Buscando…':'Buscar altavoces por Bluetooth')+'</button>'+
      '<p class="hint" style="margin-top:6px" id="b_hint">'+(bscan?'Puede tardar hasta 40 s. Los ESP32 deben estar encendidos y cerca.':'Enciende los ESP32 nuevos cerca de la Raspberry y busca.')+'</p></div>';
-  const used=onlineIds();
   h+=bdevs.map((d,i)=>{
     const r=bres[d.address]||{},st=d.status||{},isNew=d.new,own=!isNew&&d.id!=null;
-    const chip=d.error&&!d.status?'<span class="chip bad">No se pudo leer</span>':isNew?'<span class="chip ac">Nuevo, sin WiFi</span>':'<span class="chip">En la red · #'+d.id+'</span>';
-    const opts=[0,1,2,3,4,5,6,7,8,9].map(k=>'<option value="'+k+'"'+(k===d.suggested_id?' selected':'')+'>'+k+(used.has(k)&&!(own&&k===d.id)?' (en uso)':'')+'</option>').join('');
+    const chip=d.error&&!d.status?'<span class="chip bad">No se pudo leer</span>':isNew?'<span class="chip ac">Nuevo, sin WiFi</span>':'<span class="chip">En la red'+(d.id!=null?' · #'+d.id:'')+'</span>';
     return '<div class="found'+(r.ok?' done':'')+'" data-i="'+i+'"><div class="hd"><b>'+esc(d.name)+'</b>'+chip+'<span class="hint">'+rssiTxt(d.rssi)+(d.rssi!=null?' ('+d.rssi+' dBm)':'')+'</span></div>'+
       (d.error&&!d.status?'<div class="res bad">'+esc(d.error)+'</div>':'')+
-      '<div class="ac"><label style="margin:0">Número</label><select class="sel" data-sel="'+i+'" aria-label="Número del altavoz">'+opts+'</select>'+
-      '<button class="btn ghost sm" data-id="'+i+'">Sonar</button><button class="btn sm" data-pv="'+i+'"'+(credsOk?'':' disabled')+'>'+(isNew?'Configurar':'Reconfigurar')+'</button></div>'+
+      '<div class="ac"><button class="btn ghost sm" data-id="'+i+'">Sonar</button><button class="btn sm" data-pv="'+i+'"'+(credsOk?'':' disabled')+'>'+(isNew?'Configurar':'Reconfigurar')+'</button></div>'+
       '<div class="res'+(r.ok?' ok':r.err?' bad':'')+'" id="b_r'+i+'">'+(r.ok?'Enviado. Aparecerá en el panel en unos segundos.':r.err?esc(r.err):'')+'</div></div>';}).join('');
-  const nn=bdevs.filter(d=>d.new&&d.status&&d.suggested_id!=null&&!(bres[d.address]||{}).ok);
+  const nn=bdevs.filter(d=>d.new&&d.status&&!(bres[d.address]||{}).ok);
   if(nn.length>1)h+='<button class="btn" id="b_all"'+(credsOk?'':' disabled')+'>Configurar los '+nn.length+' nuevos</button>';
   if(bs.available&&!bscan&&bdevs.length===0&&bleScanned)h+='<div class="empty">No se encontró ningún altavoz. Comprueba que está encendido y cerca, o que su Bluetooth sigue activo (se cierra a los 5 minutos de arrancar si ya tiene WiFi: reinícialo).</div>';
   h+='<p class="hint">¿Prefieres usar el móvil? <a href="'+(window._bleHref||'#')+'">Configurar desde el móvil</a>.</p>';
@@ -1074,17 +1071,16 @@ async function bleDoScan(){bscan=true;bleScanned=true;bleBuild();const r=await J
   else{bdevs=[];toast(r.error||'No se pudo buscar. Comprueba el Bluetooth de la Raspberry.',false);log('Bluetooth: '+(r.error||'error'));}
   bleBuild();if(r.error&&$('b_hint')){$('b_hint').textContent=r.error;$('b_hint').style.color='var(--bad)';}}
 async function bleIdent(i){const d=bdevs[i];const r=await J('/api/ble/identify',{address:d.address});if(r.ok)toast('Sonando en '+d.name);else toast(r.error||'No se pudo hacer sonar el altavoz.',false);}
-async function bleProvOne(i){const d=bdevs[i],sel=document.querySelector('[data-sel="'+i+'"]'),id=sel?+sel.value:d.suggested_id;
-  const own=!d.new&&d.id===id;
+async function bleProvOne(i){const d=bdevs[i];   // sin número: la Raspberry asigna la casilla por MAC cuando el altavoz se une a la red
   const el=$('b_r'+i);if(el){el.className='res';el.innerHTML='<span class="spin"></span>Configurando…';}
-  const r=await J('/api/ble/provision',{address:d.address,id,force:own});
+  const r=await J('/api/ble/provision',{address:d.address});
   bres[d.address]=r.ok?{ok:true}:{err:r.error||'No se pudo configurar'};
-  if(r.ok){log('Bluetooth: '+d.name+' configurado como #'+id);setTimeout(()=>{sig='';loadNodes();},6000);}else log('Bluetooth: '+d.name+': '+bres[d.address].err);
+  if(r.ok){log('Bluetooth: '+d.name+' configurado (la Raspberry le asignará su número al unirse)');setTimeout(()=>{sig='';loadNodes();},6000);}else log('Bluetooth: '+d.name+': '+bres[d.address].err);
   return !!r.ok;}
 async function bleProv(i){const okk=await bleProvOne(i);if(okk)toast('Enviado a '+bdevs[i].name);else toast('No se pudo configurar el altavoz. El motivo está en la lista.',false);bleBuild();}
-async function bleProvAll(){const todo=[];bdevs.forEach((d,i)=>{if(d.new&&d.status&&d.suggested_id!=null&&!(bres[d.address]||{}).ok)todo.push(i);});
+async function bleProvAll(){const todo=[];bdevs.forEach((d,i)=>{if(d.new&&d.status&&!(bres[d.address]||{}).ok)todo.push(i);});
   if(!todo.length)return;
-  const msg='Se enviará la WiFi «'+bs.ssid+'» a:\n'+todo.map(i=>'  '+bdevs[i].name+' → número '+(document.querySelector('[data-sel="'+i+'"]')||{value:bdevs[i].suggested_id}).value).join('\n')+'\n\n¿Continuar?';
+  const msg='Se enviará la WiFi «'+bs.ssid+'» a:\n'+todo.map(i=>'  '+bdevs[i].name).join('\n')+'\n\n¿Continuar?';
   if(!confirm(msg))return;
   let n=0;for(const i of todo){if(await bleProvOne(i))n++;}toast(n+' de '+todo.length+' enviados',n===todo.length);bleBuild();}
 
@@ -1096,9 +1092,19 @@ const NSEG=12,SEGDB=MDB/NSEG;                  // 12 LED por altavoz, 5 dB cada 
 const segCls=i=>{const top=-MDB+SEGDB*(i+1);return top<=-20?'g':top<=-10?'y':'r';};   // verde hasta −20 dB, amarillo hasta −10 dB, rojo por encima
 const VUSEGS=Array.from({length:NSEG},(_,k)=>'<i class="led '+segCls(k)+'"></i>').join('');
 const vuHtml=ch=>'<span class="vu" aria-hidden="true" data-ch="'+ch+'">'+VUSEGS+'</span>';
-$('mb').innerHTML=CHS.map((c,i)=>'<div class="mc" title="'+CH[i]+' · '+CHN[i]+'"><span class="lab">'+c+'</span><i class="lamp" id="lp'+i+'"></i><span class="lvn" id="nm'+i+'">—</span></div>').join('');
+$('mb').innerHTML=CHS.map((c,i)=>'<div class="mc" title="'+CH[i]+' · '+CHN[i]+'"><span class="lab">'+c+'</span><i class="lamp" id="lp'+i+'" data-st="off"></i><span class="lvn" id="nm'+i+'">—</span></div>').join('');
 const segIdx=db=>db<=-MDB?-1:Math.min(NSEG-1,Math.ceil((db+MDB)/SEGDB)-1);
 const LV=new Array(10).fill(-1),PK=new Array(10).fill(-1);
+/* Estado del indicador de cada canal. Umbrales en dBFS; LAMP_STEP = subida que dispara un destello. */
+const LAMP_CABLE=-70,LAMP_SIG=-40,LAMP_STEP=3,LAMP_FLASH=140;
+const LAMPS=Array.from({length:10},()=>({ref:-90,until:0,tm:0}));
+function lampStep(s,db,now){   // devuelve la zona ('off' | 'cable' | 'sig') y actualiza el destello (s.until) de ese canal
+  if(db<LAMP_CABLE){s.ref=-90;s.until=0;return 'off';}
+  if(db<LAMP_SIG){s.ref=-90;s.until=0;return 'cable';}
+  if(db>=s.ref+LAMP_STEP){s.until=now+LAMP_FLASH;s.ref=db;}   // subió ~3 dB sobre el último valle: destello
+  else if(db<s.ref)s.ref=db;                                  // bajó: el valle se reinicia más abajo
+  return 'sig';
+}
 let VUS=[];
 function collectVus(){VUS=[...document.querySelectorAll('#spks .vu')].map(v=>({ch:+v.dataset.ch,segs:[...v.children]}));applyVu();}
 function applyVu(){   // el vúmetro de cada altavoz sigue el nivel de su canal; el segmento de pico queda 1,2 s
@@ -1111,15 +1117,19 @@ function drawMeters(d){
   const now=performance.now(),on=d.capturing,dt=Math.min(0.5,(now-lastDraw)/1000);
   $('meters').classList.toggle('off',!on);
   for(let i=0;i<10;i++){
-    const db=on?d.db[i]:-90,sig=on&&db>-70;
+    const db=on?d.db[i]:-90,sig=on&&db>=LAMP_CABLE;
     if(db>=holdV[i]){holdV[i]=db;holdT[i]=now;}else if(now-holdT[i]>1200)holdV[i]=Math.max(db,holdV[i]-20*dt);   // el pico se mantiene 1,2 s y baja a 20 dB/s
     LV[i]=segIdx(db);PK[i]=segIdx(holdV[i]);
-    const lp=$('lp'+i);if(lp.classList.contains('on')!==sig)lp.classList.toggle('on',sig);
+    const lp=$('lp'+i),ls=LAMPS[i],z=lampStep(ls,db,now);
+    if(lp.dataset.st!==z)lp.dataset.st=z;
+    const lit=z==='sig'&&now<ls.until;
+    if(lit){lp.classList.add('on');clearTimeout(ls.tm);ls.tm=setTimeout(()=>lp.classList.remove('on'),LAMP_FLASH);}
+    else if(z!=='sig'&&lp.classList.contains('on')){clearTimeout(ls.tm);lp.classList.remove('on');}
     const t=sig?dbTxt(db):'—',nm=$('nm'+i);if(nm.textContent!==t)nm.textContent=t;
   }
   applyVu();lastDraw=now;
   const mx=on?Math.max.apply(null,d.db):-90;
-  $('mtxt').textContent=!on?'Sin captura de la Traktor':mx<-70?'Silencio':'Pico '+mx.toFixed(1).replace('.',',')+' dBFS';
+  $('mtxt').textContent=!on?'Sin captura de la Traktor':mx<-70?'Silencio':mx<-40?'Cable conectado, sin sonido':'Pico '+mx.toFixed(1).replace('.',',')+' dBFS';
 }
 async function pollLevels(){
   if(document.hidden)return;
@@ -1213,7 +1223,7 @@ static const char PAGE_CAL[] = R"HTML(<!DOCTYPE html>
   --on-ac:#04121f; --ac-hi:#9ad0ff; --ac-lo:#2f6fb3; --bad-fg:#ffb0b0; --bad-ln:rgba(255,107,107,.45); --warn-ln:rgba(245,184,74,.4);
   --top-bg:rgba(0,0,0,.88); --top-solid:#000; --tabs-bg:rgba(10,13,19,.94); --scrim:rgba(0,0,0,.55); --code-bg:#05070b; --bar-bg:#000; --cl-off:#3a1512;
   --thumb:#fff; --thumb-ring:rgba(74,163,255,.38); --cap-bg:rgba(0,0,0,.65); --glow:rgba(74,163,255,.09); --orb-glow:rgba(74,163,255,.35);
-  --led-g:#30d158; --led-y:#ffd60a; --led-r:#ff453a;
+  --room-bg:#000; --led-g:#30d158; --led-y:#ffd60a; --led-r:#ff453a;
   color-scheme:dark;
 }
 /* Temas alternativos: data-theme="graphite" (gris grafito, de bajo brillo) y "light" (claro suave, sin blanco puro).
@@ -1225,7 +1235,7 @@ html[data-theme=graphite]{
   --on-ac:#06121f; --ac-hi:#a5d3ff; --ac-lo:#3478b8; --bad-fg:#ffb4ae; --bad-ln:rgba(255,123,114,.5); --warn-ln:rgba(240,182,74,.45);
   --top-bg:rgba(28,28,30,.9); --top-solid:#1c1c1e; --tabs-bg:rgba(43,43,45,.95); --scrim:rgba(0,0,0,.5); --code-bg:#1f1f21; --bar-bg:#18181a; --cl-off:#4a2a28;
   --thumb:#f2f2f4; --thumb-ring:rgba(90,174,255,.4); --cap-bg:rgba(28,28,30,.78); --glow:rgba(90,174,255,.07); --orb-glow:rgba(90,174,255,.35);
-  --led-g:#34c759; --led-y:#ffd60a; --led-r:#ff5a50;
+  --room-bg:#2b2b2d; --led-g:#34c759; --led-y:#ffd60a; --led-r:#ff5a50;
   color-scheme:dark;
 }
 html[data-theme=light]{
@@ -1235,7 +1245,7 @@ html[data-theme=light]{
   --on-ac:#ffffff; --ac-hi:#4aa3ff; --ac-lo:#7fa9d6; --bad-fg:#8f1a16; --bad-ln:rgba(179,42,37,.5); --warn-ln:rgba(138,83,0,.45);
   --top-bg:rgba(213,217,224,.92); --top-solid:#d5d9e0; --tabs-bg:rgba(228,231,236,.95); --scrim:rgba(26,31,39,.35); --code-bg:#cfd4dc; --bar-bg:#0b0e14; --cl-off:#e0c3c1;
   --thumb:#f4f5f8; --thumb-ring:rgba(10,88,172,.35); --cap-bg:rgba(228,231,236,.88); --glow:rgba(10,88,172,.06); --orb-glow:rgba(10,88,172,.3);
-  --led-g:#1fa84a; --led-y:#d9a400; --led-r:#e0342b;
+  --room-bg:#e4e7ec; --led-g:#1fa84a; --led-y:#d9a400; --led-r:#e0342b;
   color-scheme:light;
 }
 *{box-sizing:border-box;margin:0}
@@ -1349,6 +1359,8 @@ label,.lbl{display:block;color:var(--mut);font-size:.74rem;font-weight:600;lette
 html[data-shape=square]{--r-card:0px;--r-sheet:0px}
 html[data-shape=square] :not(#room *),html[data-shape=square] :not(#room *)::before,html[data-shape=square] :not(#room *)::after{border-radius:0!important}
 html[data-shape=square] .zoomctl,html[data-shape=square] .zoomctl *{border-radius:0!important}
+/* el recuadro de selección del altavoz (y sus rótulos) también es recto; el dibujo, el vúmetro y «Escucha» conservan sus formas */
+html[data-shape=square] .spk,html[data-shape=square] .spk .cap,html[data-shape=square] .spk .cal{border-radius:0!important}
 html[data-shape=square] input[type=range]::-webkit-slider-thumb,html[data-shape=square] input[type=range]::-webkit-slider-runnable-track{border-radius:0!important}
 html[data-shape=square] input[type=range]::-moz-range-thumb,html[data-shape=square] input[type=range]::-moz-range-track,html[data-shape=square] input[type=range]::-moz-range-progress{border-radius:0!important}
 main{max-width:760px;margin:0 auto;padding:20px 16px 80px;display:flex;flex-direction:column;gap:16px}
@@ -1720,7 +1732,7 @@ static const char PAGE_BLE[] = R"HTML(<!DOCTYPE html>
   --on-ac:#04121f; --ac-hi:#9ad0ff; --ac-lo:#2f6fb3; --bad-fg:#ffb0b0; --bad-ln:rgba(255,107,107,.45); --warn-ln:rgba(245,184,74,.4);
   --top-bg:rgba(0,0,0,.88); --top-solid:#000; --tabs-bg:rgba(10,13,19,.94); --scrim:rgba(0,0,0,.55); --code-bg:#05070b; --bar-bg:#000; --cl-off:#3a1512;
   --thumb:#fff; --thumb-ring:rgba(74,163,255,.38); --cap-bg:rgba(0,0,0,.65); --glow:rgba(74,163,255,.09); --orb-glow:rgba(74,163,255,.35);
-  --led-g:#30d158; --led-y:#ffd60a; --led-r:#ff453a;
+  --room-bg:#000; --led-g:#30d158; --led-y:#ffd60a; --led-r:#ff453a;
   color-scheme:dark;
 }
 /* Temas alternativos: data-theme="graphite" (gris grafito, de bajo brillo) y "light" (claro suave, sin blanco puro).
@@ -1732,7 +1744,7 @@ html[data-theme=graphite]{
   --on-ac:#06121f; --ac-hi:#a5d3ff; --ac-lo:#3478b8; --bad-fg:#ffb4ae; --bad-ln:rgba(255,123,114,.5); --warn-ln:rgba(240,182,74,.45);
   --top-bg:rgba(28,28,30,.9); --top-solid:#1c1c1e; --tabs-bg:rgba(43,43,45,.95); --scrim:rgba(0,0,0,.5); --code-bg:#1f1f21; --bar-bg:#18181a; --cl-off:#4a2a28;
   --thumb:#f2f2f4; --thumb-ring:rgba(90,174,255,.4); --cap-bg:rgba(28,28,30,.78); --glow:rgba(90,174,255,.07); --orb-glow:rgba(90,174,255,.35);
-  --led-g:#34c759; --led-y:#ffd60a; --led-r:#ff5a50;
+  --room-bg:#2b2b2d; --led-g:#34c759; --led-y:#ffd60a; --led-r:#ff5a50;
   color-scheme:dark;
 }
 html[data-theme=light]{
@@ -1742,7 +1754,7 @@ html[data-theme=light]{
   --on-ac:#ffffff; --ac-hi:#4aa3ff; --ac-lo:#7fa9d6; --bad-fg:#8f1a16; --bad-ln:rgba(179,42,37,.5); --warn-ln:rgba(138,83,0,.45);
   --top-bg:rgba(213,217,224,.92); --top-solid:#d5d9e0; --tabs-bg:rgba(228,231,236,.95); --scrim:rgba(26,31,39,.35); --code-bg:#cfd4dc; --bar-bg:#0b0e14; --cl-off:#e0c3c1;
   --thumb:#f4f5f8; --thumb-ring:rgba(10,88,172,.35); --cap-bg:rgba(228,231,236,.88); --glow:rgba(10,88,172,.06); --orb-glow:rgba(10,88,172,.3);
-  --led-g:#1fa84a; --led-y:#d9a400; --led-r:#e0342b;
+  --room-bg:#e4e7ec; --led-g:#1fa84a; --led-y:#d9a400; --led-r:#e0342b;
   color-scheme:light;
 }
 *{box-sizing:border-box;margin:0}
@@ -1856,6 +1868,8 @@ label,.lbl{display:block;color:var(--mut);font-size:.74rem;font-weight:600;lette
 html[data-shape=square]{--r-card:0px;--r-sheet:0px}
 html[data-shape=square] :not(#room *),html[data-shape=square] :not(#room *)::before,html[data-shape=square] :not(#room *)::after{border-radius:0!important}
 html[data-shape=square] .zoomctl,html[data-shape=square] .zoomctl *{border-radius:0!important}
+/* el recuadro de selección del altavoz (y sus rótulos) también es recto; el dibujo, el vúmetro y «Escucha» conservan sus formas */
+html[data-shape=square] .spk,html[data-shape=square] .spk .cap,html[data-shape=square] .spk .cal{border-radius:0!important}
 html[data-shape=square] input[type=range]::-webkit-slider-thumb,html[data-shape=square] input[type=range]::-webkit-slider-runnable-track{border-radius:0!important}
 html[data-shape=square] input[type=range]::-moz-range-thumb,html[data-shape=square] input[type=range]::-moz-range-track,html[data-shape=square] input[type=range]::-moz-range-progress{border-radius:0!important}
 main{max-width:600px;margin:0 auto;padding:20px 16px 80px;display:flex;flex-direction:column;gap:16px}
@@ -1866,10 +1880,6 @@ main{max-width:600px;margin:0 auto;padding:20px 16px 80px;display:flex;flex-dire
 .step.done .num2{background:var(--ac);border-color:var(--ac);color:var(--on-ac)}
 .step .bd{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
 .step.lock .bd{opacity:.4;pointer-events:none}
-.pills{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
-.pills button{appearance:none;background:var(--raise);border:1px solid var(--line2);border-radius:999px;min-height:46px;font-weight:650;font-size:1.05rem}
-.pills button:hover{border-color:var(--ac-ln)}
-.pills button[aria-pressed=true]{background:var(--ac-bg);border-color:var(--ac);color:var(--ac)}
 .kv{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .kv div{background:var(--raise);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 .kv span{display:block;font-size:.8rem;color:var(--mut)}.kv b{font-weight:600}
@@ -1905,19 +1915,11 @@ details.adv .in2{padding:4px 0 14px;display:flex;flex-direction:column;gap:12px}
     </div>
   </div>
 
-  <div class="panelbox step lock" id="s2">
+  <div class="panelbox step lock" id="s3">
     <div class="num2">2</div>
     <div class="bd">
-      <h2>Elige su número</h2>
-      <p class="mut small">Cada altavoz necesita un número distinto del 0 al 9. Anótalo en el ESP32.</p>
-      <div class="pills" id="pills" role="group" aria-label="Número del altavoz"></div>
-    </div>
-  </div>
-
-  <div class="panelbox step lock" id="s3">
-    <div class="num2">3</div>
-    <div class="bd">
       <h2>Indica la WiFi</h2>
+      <p class="mut small">No hace falta elegir un número: la Raspberry se lo asigna al altavoz por su MAC cuando se une a la red.</p>
       <div><label for="ssid">Nombre de la red (mejor de 5 GHz)</label><input class="txt" id="ssid" maxlength="32" autocapitalize="off" autocomplete="off"></div>
       <div><label for="pass">Contraseña (vacía = mantener la actual)</label>
         <div class="pw"><input class="txt" id="pass" type="password" maxlength="63" autocomplete="new-password"><button class="btn ghost sm" id="eye" type="button">Ver</button></div></div>
@@ -1932,7 +1934,7 @@ details.adv .in2{padding:4px 0 14px;display:flex;flex-direction:column;gap:12px}
       <div><label for="rip">IP de la Raspberry (solo si el router bloquea el broadcast; vacío = automática)</label>
         <input class="txt" id="rip" maxlength="15" inputmode="decimal" autocomplete="off" placeholder="192.168.1.10"></div>
       <div class="row"><button class="btn ghost" id="reboot">Reiniciar</button><button class="btn danger" id="factory">Borrar configuración</button></div>
-      <p class="mut small">Borrar configuración elimina la WiFi y el número guardados en este ESP32.</p>
+      <p class="mut small">Borrar configuración elimina la WiFi guardada en este ESP32.</p>
     </div>
   </details>
 
@@ -1945,14 +1947,12 @@ const SVC=U(1),C_SSID=U(2),C_PASS=U(3),C_ID=U(4),C_ST=U(5),C_CMD=U(6),C_RPI=U(7)
 const $=i=>document.getElementById(i),enc=new TextEncoder(),dec=new TextDecoder();
 const log=m=>{const l=$('log');l.textContent+=new Date().toLocaleTimeString()+'  '+m+'\n';l.scrollTop=l.scrollHeight;};
 function toast(m,ok=true){const d=document.createElement('div');d.className='toast'+(ok?'':' bad');d.textContent=m;$('tb').appendChild(d);setTimeout(()=>d.remove(),2600);}
-let dev=null,ch={},curId=0,connected=false;
+let dev=null,ch={},connected=false;
+const AUTO_ID=255;   // sin número: la Raspberry asigna la casilla por MAC
 if(!navigator.bluetooth)$('nosup').hidden=false;
 if(!window.isSecureContext){$('nohttps').hidden=false;$('httpslink').href='https://'+location.hostname+':8443/ble';}
-$('pills').innerHTML=[0,1,2,3,4,5,6,7,8,9].map(i=>'<button data-i="'+i+'" aria-pressed="'+(i===0)+'">'+i+'</button>').join('');
-function setId(i){curId=i;$('pills').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.i===i));}
-$('pills').onclick=e=>{const b=e.target.closest('button');if(b)setId(+b.dataset.i);};
 function stage(on){connected=on;$('s1').className='panelbox step '+(on?'done':'cur');
-  $('s2').className='panelbox step '+(on?'cur':'lock');$('s3').className='panelbox step '+(on?'cur':'lock');
+  $('s3').className='panelbox step '+(on?'cur':'lock');
   $('adv').style.opacity=on?1:.5;$('adv').style.pointerEvents=on?'auto':'none';
   $('bc').disabled=on;$('bd').disabled=!on;$('kv').hidden=!on;$('s1').querySelector('.num2').textContent=on?'✓':'1';}
 stage(false);
@@ -1973,7 +1973,7 @@ $('bc').onclick=async()=>{
     ch.ssid=await svc.getCharacteristic(C_SSID);ch.pass=await svc.getCharacteristic(C_PASS);
     ch.id=await svc.getCharacteristic(C_ID);ch.st=await svc.getCharacteristic(C_ST);ch.cmd=await svc.getCharacteristic(C_CMD);
     try{ch.rpi=await svc.getCharacteristic(C_RPI);$('rip').value=dec.decode(await ch.rpi.readValue());}catch(e){ch.rpi=null;}
-    try{$('ssid').value=dec.decode(await ch.ssid.readValue());setId((await ch.id.readValue()).getUint8(0));}catch(e){}
+    try{$('ssid').value=dec.decode(await ch.ssid.readValue());}catch(e){}
     await ch.st.startNotifications();ch.st.addEventListener('characteristicvaluechanged',readStatus);await readStatus();
     stage(true);log('Conectado a '+dev.name);
   }catch(e){log('Error: '+e.name+': '+e.message);$('bc').disabled=false;if(e.name!=='NotFoundError')toast('No se pudo conectar',false);}
@@ -1982,7 +1982,7 @@ $('bd').onclick=()=>{if(dev&&dev.gatt.connected)dev.gatt.disconnect();};
 async function cmd(c){try{await wr(ch.cmd,enc.encode(c));log('Comando: '+c);return true;}catch(e){log('Error: '+e.message);toast('El ESP32 no respondió',false);return false;}}
 $('ident').onclick=()=>cmd('identify');
 $('reboot').onclick=()=>cmd('reboot');
-$('factory').onclick=async()=>{if(confirm('¿Borrar WiFi y número guardados en este ESP32?'))if(await cmd('factory'))toast('Configuración borrada');};
+$('factory').onclick=async()=>{if(confirm('¿Borrar la WiFi guardada en este ESP32?'))if(await cmd('factory'))toast('Configuración borrada');};
 $('eye').onclick=()=>{const p=$('pass');const s=p.type==='password';p.type=s?'text':'password';$('eye').textContent=s?'Ocultar':'Ver';};
 $('save').onclick=async()=>{
   const ssid=$('ssid').value,pass=$('pass').value;
@@ -1990,12 +1990,12 @@ $('save').onclick=async()=>{
   if(pass&&(pass.length<8||pass.length>63)){$('res').textContent='La contraseña debe tener entre 8 y 63 caracteres.';return;}
   try{
     $('save').disabled=true;$('res').textContent='Enviando…';
-    await wr(ch.id,new Uint8Array([curId]));
+    await wr(ch.id,new Uint8Array([AUTO_ID]));
     await wr(ch.ssid,enc.encode(ssid));
     if(ch.rpi)await wr(ch.rpi,enc.encode($('rip').value.trim()));
     if(pass)await wr(ch.pass,enc.encode(pass));
     log('Valores enviados. Aplicando…');
-    if(await cmd('apply')){$('res').textContent='Listo. El altavoz #'+curId+' se reinicia y se une a «'+ssid+'». Aparecerá en el panel en unos segundos.';toast('Guardado');}
+    if(await cmd('apply')){$('res').textContent='Listo. El altavoz se reinicia y se une a «'+ssid+'». Aparecerá en el panel en unos segundos.';toast('Guardado');}
   }catch(e){log('Error: '+e.name+': '+e.message);$('res').textContent='No se pudo guardar. Si el móvil pide emparejar, acepta.';}
   $('save').disabled=false;
 };
@@ -2028,8 +2028,8 @@ static const char PWA_MANIFEST[] = R"HTML({
 static const char PWA_SW[] = R"HTML(/* Service worker de SonosWiFi. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * eaeb301ae6 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-eaeb301ae6';
+ * 1cfec40bcc lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-1cfec40bcc';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png', '/fonts/roboto-400.woff2', '/fonts/roboto-500.woff2'];
 
 self.addEventListener('install', e => {

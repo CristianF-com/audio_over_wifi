@@ -83,7 +83,7 @@ static const char* TAG = "RECV";
 #ifndef CONFIG_SONOS_BLE_WINDOW_S
   #define CONFIG_SONOS_BLE_WINDOW_S 300
 #endif
-#define FW_VERSION          6   /* 6: OTA por WiFi, versión/chip en el HELLO y RSSI en el REPORT (protocolo sin cambios: v5) */
+#define FW_VERSION          7   /* 7: ID automático por MAC (HELLO con ESP_ID_AUTO, WELCOME_F_ASSIGNED). 6: OTA por WiFi, versión/chip en el HELLO y RSSI en el REPORT (protocolo sin cambios: v5) */
 #if CONFIG_IDF_TARGET_ESP32C5
 #define FW_CHIP_ID          FW_CHIP_C5
 #else
@@ -108,7 +108,7 @@ static const char* TAG = "RECV";
 /* ─── Estado ───────────────────────────────────────────────────────────────── */
 typedef struct { uint64_t ts; int16_t s[AUDIO_PKT_SAMPLES]; } qitem_t;
 
-static uint8_t  g_receiver_id = CONFIG_RECEIVER_ID;
+static uint8_t  g_receiver_id = CONFIG_RECEIVER_ID;   /* ESP_ID_AUTO (255) = sin número: lo asigna la RPi por MAC (solo en RAM) */
 static char     g_ssid[33], g_pass[65], g_rpi_ip_cfg[16];
 
 static portMUX_TYPE g_mux = portMUX_INITIALIZER_UNLOCKED;
@@ -314,10 +314,13 @@ static void wifi_wait(void)
 static int cfg_save(const char* ssid, const char* pass, uint8_t id, const char* rpi_ip)
 {
     nvs_handle_t nh;
-    if (id >= MAX_NODES || nvs_open("config", NVS_READWRITE, &nh) != ESP_OK) return -1;
+    if ((id >= MAX_NODES && id != ESP_ID_AUTO) || nvs_open("config", NVS_READWRITE, &nh) != ESP_OK) return -1;
     esp_err_t e = nvs_set_str(nh, "wifi_ssid", ssid);
     if (e == ESP_OK && pass) e = nvs_set_str(nh, "wifi_pass", pass);
-    if (e == ESP_OK) e = nvs_set_u8(nh, "receiver_id", id);
+    if (e == ESP_OK) {                                    /* ESP_ID_AUTO: no se guarda número, la RPi lo asigna por MAC */
+        if (id == ESP_ID_AUTO) { e = nvs_erase_key(nh, "receiver_id"); if (e == ESP_ERR_NVS_NOT_FOUND) e = ESP_OK; }
+        else e = nvs_set_u8(nh, "receiver_id", id);
+    }
     if (e == ESP_OK) e = nvs_set_str(nh, "rpi_ip", rpi_ip ? rpi_ip : "");
     if (e == ESP_OK) e = nvs_commit(nh);
     nvs_close(nh);
@@ -423,7 +426,7 @@ static void control_task(void* pv)
     HelloPacket hello;
     memset(&hello, 0, sizeof(hello));
     hello.magic = PROTOCOL_MAGIC; hello.pkt_type = PKT_HELLO;
-    hello.esp_id = g_receiver_id; hello.version = PROTOCOL_VERSION;
+    hello.esp_id = g_receiver_id; hello.version = PROTOCOL_VERSION;   /* se refresca antes de cada envío: puede asignarlo la RPi */
     hello.audio_port = PORT_AUDIO;
     hello.reserved = HELLO_PACK(FW_VERSION, FW_CHIP_ID);   /* la RPi lo muestra en el panel y comprueba el chip antes de una OTA */
     esp_wifi_get_mac(WIFI_IF_STA, hello.mac);
@@ -437,6 +440,7 @@ static void control_task(void* pv)
 
         if (!ota_update_active() && now - last_hello >= 2000000) {   /* durante la OTA se calla: así la RPi sabe que sigue descargando */
             last_hello = now;
+            hello.esp_id = g_receiver_id;
             sendto(g_ctrl_sock, &hello, sizeof(hello), 0, (struct sockaddr*)&bcast, sizeof(bcast));
             if (g_rpi_ip_cfg[0]) {      /* IP fija: sirve aunque el router filtre el broadcast (aislamiento de clientes, etc.) */
                 struct sockaddr_in uni = { .sin_family = AF_INET, .sin_port = htons(PORT_DISCOVERY) };
@@ -473,6 +477,10 @@ static void control_task(void* pv)
         case PKT_WELCOME: {
             if (n < (int)sizeof(WelcomePacket)) break;
             WelcomePacket w; memcpy(&w, buf, sizeof(w));
+            if (g_receiver_id == ESP_ID_AUTO && (w.reserved & WELCOME_F_ASSIGNED) && w.esp_id < MAX_NODES) {
+                g_receiver_id = w.esp_id;                      /* la RPi nos ha dado casilla (por MAC); vale hasta reiniciar y vuelve a darnos la misma */
+                ESP_LOGI(TAG, "ID asignado por la RPi: %d", g_receiver_id);
+            }
             if (w.esp_id != g_receiver_id || w.sample_rate != AUDIO_SAMPLE_RATE) break;
             bool new_rpi = !g_welcomed || src.sin_addr.s_addr != g_rpi_addr.sin_addr.s_addr;
             portENTER_CRITICAL(&g_mux);
@@ -810,9 +818,10 @@ void app_main(void)
     /* Solo informativo hasta el primer WELCOME (la RPi decide el mapa y si es mono o estéreo). */
     static const uint8_t DEF_L[MAX_NODES] = {0, 2, 4, 6, 8, 5, 6, 7, 8, 9};
     static const uint8_t DEF_R[MAX_NODES] = {1, 3, 5, 7, 9, 5, 6, 7, 8, 9};
-    g_ch_left  = DEF_L[g_receiver_id];
-    g_ch_right = DEF_R[g_receiver_id];
-    ESP_LOGI(TAG, "ID=%d ch=%d/%d", g_receiver_id, g_ch_left, g_ch_right);
+    const uint8_t di = g_receiver_id < MAX_NODES ? g_receiver_id : 0;     /* sin ID aún: valores informativos del 0 */
+    g_ch_left  = DEF_L[di];
+    g_ch_right = DEF_R[di];
+    ESP_LOGI(TAG, "ID=%d%s ch=%d/%d", g_receiver_id, g_receiver_id == ESP_ID_AUTO ? " (automático)" : "", g_ch_left, g_ch_right);
 
     g_q = xQueueCreate(RX_QUEUE_PACKETS, sizeof(qitem_t));
     if (!g_q) { ESP_LOGE(TAG, "FATAL: cola"); esp_restart(); }

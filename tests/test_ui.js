@@ -40,14 +40,27 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   // Estado de transmisión y vúmetros (datos reales del arnés: ch0/1 −6 dBFS, ch2 y ch4 −12 dBFS, el resto en silencio)
   ok('estado: «Transmitiendo · 5 altavoces»',await until(async()=>(await p.textContent('#hs')).includes('Transmitiendo · 5 altavoces')),await p.textContent('#hs'));
   ok('estado: punto verde',(await p.getAttribute('#dot','class')).includes('ok'));
-  // Fila superior: un cuadrado por canal (rojo y parpadeando si hay señal, apagado si no) con el nivel debajo
+  // Fila superior: un cuadrado por canal (vacío sin señal, verde = cable conectado, rojo = destello por nivel) con el nivel debajo
   const lamps=await p.evaluate(()=>[...document.querySelectorAll('#mb .mc')].map(m=>({on:m.querySelector('.lamp').classList.contains('on'),num:m.querySelector('.lvn').textContent})));
   ok('vúmetros: 10 cuadrados indicadores, uno por canal',lamps.length===10);
-  ok('vúmetros: encendidos solo FL, FR, C y canal 4 (los que tienen señal); el resto apagado',lamps.map(l=>+l.on).join('')==='1110100000',lamps);
+  const zones=await p.evaluate(()=>[...document.querySelectorAll('#mb .lamp')].map(l=>l.dataset.st));
+  ok('vúmetros: FL, FR, C y canal 5 (≥ −40 dBFS) en zona «con sonido»; el resto sin señal',zones.join()==='sig,sig,sig,off,sig,off,off,off,off,off',zones);
   ok('vúmetros: el número bajo cada cuadrado es el nivel (−6, −6, −12, —, −12)',lamps.slice(0,5).map(l=>l.num).join('|')==='−6|−6|−12|—|−12',lamps);
-  const lp=await p.evaluate(()=>{const on=getComputedStyle(document.getElementById('lp0')),off=getComputedStyle(document.getElementById('lp3'));
-    return {onBg:on.backgroundColor,offBg:off.backgroundColor,anim:on.animationName,animOff:off.animationName,r:on.borderRadius,w:on.width,h:on.height};});
-  ok('vúmetros: cuadrado rojo con parpadeo si hay señal; apagado y quieto si no',lp.onBg==='rgb(255, 69, 58)'&&lp.anim==='lampblink'&&lp.offBg!==lp.onBg&&lp.animOff==='none'&&lp.w===lp.h,lp);
+  const lp=await p.evaluate(()=>{const g=id=>getComputedStyle(document.getElementById(id)),on=g('lp0'),off=g('lp3');
+    document.getElementById('lp3').dataset.st='cable';const cab=g('lp3').backgroundColor,cabAnim=g('lp3').animationName;document.getElementById('lp3').dataset.st='off';
+    document.getElementById('lp0').classList.add('on');const red=g('lp0').backgroundColor;document.getElementById('lp0').classList.remove('on');
+    return {red,offBg:off.backgroundColor,cab,anim:on.animationName,cabAnim,animOff:off.animationName,w:off.width,h:off.height};});
+  ok('vúmetros: sin señal = vacío; cable conectado = verde fijo; destello = rojo; ninguno usa animación continua',lp.red==='rgb(255, 69, 58)'&&lp.cab==='rgb(48, 209, 88)'&&lp.offBg!==lp.cab&&lp.offBg!==lp.red&&lp.anim==='none'&&lp.cabAnim==='none'&&lp.animOff==='none'&&lp.w===lp.h,lp);
+  // Lógica de umbrales: −70..−40 cable fijo; −40..0 destella al subir ~3 dB sobre el último valle; al bajar se apaga y vuelve a destellar
+  const seq=await p.evaluate(()=>{const s={ref:-90,until:0,tm:0},r=[];const st=(db,t)=>{const z=lampStep(s,db,t);r.push([db,z,t<s.until]);};
+    [-95,-60,-45,-39,-39,-37,-36,-30,-33,-36,-31,-90,-39,-60].forEach((db,i)=>st(db,i*1000));return r;});
+  const sq=Object.fromEntries(seq.map(([db,z,f],i)=>[i,[z,f]]));
+  ok('LED: por debajo de −70 apagado; de −70 a −40 «cable» sin destello',sq[0][0]==='off'&&!sq[0][1]&&sq[1][0]==='cable'&&!sq[1][1]&&sq[2][0]==='cable'&&!sq[2][1],seq);
+  ok('LED: al entrar en −40 destella; mantenerse o subir menos de 3 dB no destella',sq[3][1]===true&&sq[4][1]===false&&sq[5][1]===false&&sq[6][1]===true,seq);   // −39 (entra), −39, −37 (+2), −36 (+3 sobre −39)
+  ok('LED: sube 3 dB destella; baja no destella; vuelve a subir 3 dB desde el valle y destella',sq[7][1]===true&&sq[8][1]===false&&sq[9][1]===false&&sq[10][1]===true,seq);   // −30 (+6), −33, −36 (valle), −31 (+5)
+  ok('LED: si cae a «cable» o a silencio se reinicia y al volver a −40 destella otra vez',sq[11][0]==='off'&&sq[12][1]===true&&sq[13][0]==='cable'&&!sq[13][1],seq);
+  const fl=await p.evaluate(async()=>{const l=document.getElementById('lp1');LAMPS[1].ref=-90;LAMPS[1].until=0;const t=performance.now();const z=lampStep(LAMPS[1],-10,t);return z+':'+(t<LAMPS[1].until)+':'+LAMP_FLASH;});
+  ok('LED: el destello dura un instante (140 ms), no es una animación continua',fl==='sig:true:140',fl);
   ok('plano: ya no está la barra de 20 LED por canal en la tarjeta Entrada',(await p.locator('#mb .bar').count())===0);
   // Vúmetro junto a cada altavoz, con la misma altura que el dibujo
   const vu=await p.evaluate(()=>[...document.querySelectorAll('#spks .spk')].map(b=>{const c=b.querySelector('.cab').getBoundingClientRect(),v=b.querySelector('.vu').getBoundingClientRect();
@@ -137,8 +150,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('BLE: «Guardada» tras guardar la WiFi',await until(async()=>(await p.textContent('#b_ss')).includes('Guardada')));
   await p.click('#b_scan');
   ok('BLE: lista 5 dispositivos',await until(async()=>(await p.locator('#bbody .found').count())===5,8000),await p.locator('#bbody .found').count());
-  ok('BLE: 3 nuevos con número sugerido libre (5, 6, 7; el 2 es del que ya está en la red)',await p.evaluate(()=>[...document.querySelectorAll('.found')].filter(f=>f.textContent.includes('Nuevo')).map(f=>f.querySelector('select').value).join())==='5,6,7');
-  ok('BLE: números en uso marcados',(await p.locator('.found select').first().innerHTML()).includes('0 (en uso)'));
+  ok('BLE: 3 nuevos y ya no hay selector de número (lo asigna la Raspberry por MAC)',await p.evaluate(()=>[...document.querySelectorAll('.found')].filter(f=>f.textContent.includes('Nuevo')).length===3&&document.querySelectorAll('.found select').length===0&&!document.getElementById('bbody').textContent.includes('Número')));
   ok('BLE: el que no se pudo leer muestra el error',(await p.textContent('#bbody')).includes('No se pudo conectar: timeout'));
   if(SHOTS)await p.screenshot({path:SHOTS+'/panel_bluetooth.png'});
   fs.writeFileSync('/tmp/sonos_ble_mock.log','');
@@ -151,7 +163,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   await p.click('#b_all');
   ok('BLE: «Configurar los N nuevos» con confirmación: uno falla y se ve el motivo',await until(async()=>(await p.textContent('#bbody')).includes('emparejamiento rechazado')));
   const lines=fs.readFileSync('/tmp/sonos_ble_mock.log','utf8').trim().split('\n').map(l=>JSON.parse(l)).filter(x=>x.cmd==='provision');
-  ok('BLE: se configuraron A101 (5), B202 (6) con la WiFi guardada',lines.some(x=>x.address.endsWith('01')&&x.id===5&&x.ssid==='Casa5G'&&x.pass_len===10)&&lines.some(x=>x.address.endsWith('02')&&x.id===6),lines);
+  ok('BLE: se configuraron A101 y B202 con la WiFi guardada y ID automático (255)',lines.some(x=>x.address.endsWith('01')&&x.id===255&&x.ssid==='Casa5G'&&x.pass_len===10)&&lines.some(x=>x.address.endsWith('02')&&x.id===255),lines);
   await p.keyboard.press('Escape');ok('Esc cierra el panel Bluetooth',await until(async()=>!(await p.$('#bdrawer.on'))));
   ok('panel sin errores de JS',errs.length===0,errs);
   // ── PWA ──
@@ -275,21 +287,27 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
    await p.evaluate(()=>SonosTheme.shape('square'));await sleep(250);
    const r1=await rad();
    ok('forma recta: ningún elemento fuera del plano conserva radio (botones, tarjetas, pestañas, interruptores, deslizadores, cajón)',r1.nOut===0&&await p.evaluate(()=>document.documentElement.getAttribute('data-shape')==='square'),r1);
-   ok('forma recta: los altavoces, vúmetros y «Escucha» del plano conservan sus formas redondeadas',r1.inCount>=r0.inCount&&r1.inCount>5&&r1.inMax>=r0.inMax,[r0.inCount,r1.inCount,r0.inMax,r1.inMax]);
+   ok('forma recta: el dibujo del altavoz, su vúmetro y «Escucha» conservan sus formas redondeadas',r1.inCount>5&&r1.inMax>0&&await p.evaluate(()=>['#spks .cab *','#spks .vu'].every(q=>[...document.querySelectorAll(q)].some(e=>parseFloat(getComputedStyle(e).borderTopLeftRadius)>0))),[r0.inCount,r1.inCount,r0.inMax,r1.inMax]);
    ok('forma recta: el propio plano y los controles de zoom también quedan rectos',await p.evaluate(()=>[document.getElementById('room'),...document.querySelectorAll('.zoomctl,.zoomctl *')].every(e=>parseFloat(getComputedStyle(e).borderTopLeftRadius)===0)));
    if(SHOTS)await p.screenshot({path:SHOTS+'/recta_altavoces.png'});
    await p.click('.tab[data-tab="snd"]');await sleep(300);if(SHOTS)await p.screenshot({path:SHOTS+'/recta_sonido.png',fullPage:true});
    await p.click('.tab[data-tab="lat"]');await sleep(300);if(SHOTS)await p.screenshot({path:SHOTS+'/recta_latencia.png',fullPage:true});
    await p.click('#spks .spk[data-id="3"][data-side="0"]').catch(()=>{});await p.click('.tab[data-tab="spk"]');await p.click('#spks .spk[data-id="3"][data-side="0"]');await p.waitForSelector('#drawer.on');await sleep(400);
    ok('forma recta: el cajón del altavoz también es recto',await p.evaluate(()=>parseFloat(getComputedStyle(document.getElementById('drawer')).borderTopLeftRadius)===0));
+   ok('forma recta: el recuadro de selección del altavoz abierto es cuadrado (también sus rótulos)',await p.evaluate(()=>{const b=document.querySelector('#spks .spk[aria-expanded=true]');if(!b)return false;const g=e=>parseFloat(getComputedStyle(e).borderTopLeftRadius);
+     return g(b)===0&&getComputedStyle(b).outlineStyle==='solid'&&[...b.querySelectorAll('.cap,.cal')].every(e=>g(e)===0);}));
+   ok('plano: fondo sólido (sin degradé) y negro en el tema oscuro',await p.evaluate(()=>{const r=getComputedStyle(document.getElementById('room'));return r.backgroundImage==='none'&&r.backgroundColor==='rgb(0, 0, 0)';}));
    if(SHOTS)await p.screenshot({path:SHOTS+'/recta_cajon.png'});
    await p.keyboard.press('Escape');await until(async()=>!(await p.$('#drawer.on')));
    await p.evaluate(()=>SonosTheme.shape('round'));await sleep(250);
+   ok('forma redonda: el recuadro de selección vuelve a tener esquinas redondeadas',await p.evaluate(()=>{const b=document.querySelector('#spks .spk');return parseFloat(getComputedStyle(b).borderTopLeftRadius)>0;}));
+   ok('forma redonda: el plano sigue sin degradé',await p.evaluate(()=>getComputedStyle(document.getElementById('room')).backgroundImage==='none'));
    ok('forma redonda: al volver, los botones vuelven a ser píldoras (999 px)',await p.evaluate(()=>parseFloat(getComputedStyle(document.querySelector('.btn')).borderTopLeftRadius)>=100));
    await p.goto(BASE+'/?forma=recta');await p.waitForSelector('#spks .spk',{state:'attached'});
    {const fc=await b.newContext({viewport:{width:1280,height:860}});const fp=await fc.newPage();await fp.goto(BASE+'/');await fp.waitForSelector('#spks .spk',{state:'attached'});
     ok('forma: por defecto es recta (sin radios en botones y tarjetas) en el tema oscuro',await fp.evaluate(()=>document.documentElement.getAttribute('data-shape')==='square'&&[...document.querySelectorAll('.btn,.card')].filter(e=>e.offsetParent).every(e=>parseFloat(getComputedStyle(e).borderTopLeftRadius)===0)));
-    for(const t of ['graphite','light']){await fp.evaluate(t=>SonosTheme.set(t),t);await sleep(150);ok('forma: recta por defecto también en el tema '+t,await fp.evaluate(()=>[...document.querySelectorAll('.btn,.card')].filter(e=>e.offsetParent).every(e=>parseFloat(getComputedStyle(e).borderTopLeftRadius)===0)));}
+    for(const t of ['graphite','light']){await fp.evaluate(t=>SonosTheme.set(t),t);await sleep(150);ok('forma: recta por defecto también en el tema '+t,await fp.evaluate(()=>[...document.querySelectorAll('.btn,.card')].filter(e=>e.offsetParent).every(e=>parseFloat(getComputedStyle(e).borderTopLeftRadius)===0)));
+     ok('plano: fondo sólido (color liso, sin degradé) en el tema '+t,await fp.evaluate(()=>{const r=getComputedStyle(document.getElementById('room'));return r.backgroundImage==='none'&&r.backgroundColor===getComputedStyle(document.documentElement).getPropertyValue('--room-bg').trim().replace(/^#(..)(..)(..)$/,(m,x,y,z)=>'rgb('+[x,y,z].map(h=>parseInt(h,16)).join(', ')+')');}));}
     await fc.close();}
    ok('forma: ?forma=recta la activa y se recuerda; ?forma=redonda la quita',await p.evaluate(()=>SonosTheme.getShape()==='square')&&(await p.goto(BASE+'/?forma=redonda'),await p.waitForSelector('#spks .spk',{state:'attached'}),await p.evaluate(()=>SonosTheme.getShape()==='round'&&document.documentElement.getAttribute('data-shape')==='round')));
    await p.click('.tab[data-tab="spk"]');}
@@ -348,16 +366,16 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
     navigator.bluetooth={requestDevice:async()=>({name:'SonosWiFi-A1B2',addEventListener(){},gatt:{connected:true,disconnect(){},connect:async()=>({getPrimaryService:async()=>({getCharacteristic:async(u)=>mk(ch[u.slice(0,8)])})})}})};
   });
   await bp.goto(BASE+'/ble');
-  ok('BLE: pasos 2 y 3 bloqueados antes de conectar',await bp.evaluate(()=>document.getElementById('s2').classList.contains('lock')&&document.getElementById('s3').classList.contains('lock')));
+  ok('BLE móvil: ya no hay paso para elegir número; el paso de la WiFi está bloqueado antes de conectar',await bp.evaluate(()=>!document.getElementById('s2')&&!document.getElementById('pills')&&document.getElementById('s3').classList.contains('lock')&&document.getElementById('s3').querySelector('.num2').textContent==='2'));
   if(SHOTS)await bp.screenshot({path:SHOTS+'/ble_inicio.png',fullPage:true});
   await bp.click('#bc');await bp.waitForSelector('#s3:not(.lock)');
   ok('BLE: estado legible tras conectar',(await bp.textContent('#k_wifi'))==='Conectado a la WiFi'&&(await bp.textContent('#k_rssi')).startsWith('Buena')&&(await bp.textContent('#k_ip'))==='192.168.1.55'&&(await bp.textContent('#k_rpi'))==='Sincronizado');
-  ok('BLE: lee ID y SSID guardados',(await bp.inputValue('#ssid'))==='MiRed5G'&&(await bp.getAttribute('#pills button[data-i="2"]','aria-pressed'))==='true');
-  await bp.click('#pills button[data-i="7"]');await bp.fill('#ssid','Casa5G');await bp.fill('#pass','clave1234');
+  ok('BLE: lee el SSID guardado',(await bp.inputValue('#ssid'))==='MiRed5G');
+  await bp.fill('#ssid','Casa5G');await bp.fill('#pass','clave1234');
   if(SHOTS)await bp.screenshot({path:SHOTS+'/ble_conectado.png',fullPage:true});
   await bp.click('#save');await bp.waitForFunction(()=>window.__w.some(w=>w[0]==='cmd'));
   const w=await bp.evaluate(()=>window.__w);const dec=a=>String.fromCharCode(...a);
-  ok('BLE: escribe ID 7, SSID, contraseña y «apply»',JSON.stringify(w.find(x=>x[0]==='id')[1])==='[7]'&&dec(w.find(x=>x[0]==='ssid')[1])==='Casa5G'&&dec(w.find(x=>x[0]==='pass')[1])==='clave1234'&&dec(w.find(x=>x[0]==='cmd')[1])==='apply',w);
+  ok('BLE: escribe ID automático (255), SSID, contraseña y «apply»',JSON.stringify(w.find(x=>x[0]==='id')[1])==='[255]'&&dec(w.find(x=>x[0]==='ssid')[1])==='Casa5G'&&dec(w.find(x=>x[0]==='pass')[1])==='clave1234'&&dec(w.find(x=>x[0]==='cmd')[1])==='apply',w);
   await bp.fill('#pass','corta');await bp.click('#save');
   ok('BLE: valida la contraseña corta',(await bp.textContent('#res')).includes('8 y 63'));
   ok('BLE sin errores de JS',berr.length===0,berr);

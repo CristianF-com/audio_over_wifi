@@ -20,10 +20,6 @@ main{max-width:600px;margin:0 auto;padding:20px 16px 80px;display:flex;flex-dire
 .step.done .num2{background:var(--ac);border-color:var(--ac);color:var(--on-ac)}
 .step .bd{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
 .step.lock .bd{opacity:.4;pointer-events:none}
-.pills{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
-.pills button{appearance:none;background:var(--raise);border:1px solid var(--line2);border-radius:999px;min-height:46px;font-weight:650;font-size:1.05rem}
-.pills button:hover{border-color:var(--ac-ln)}
-.pills button[aria-pressed=true]{background:var(--ac-bg);border-color:var(--ac);color:var(--ac)}
 .kv{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .kv div{background:var(--raise);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 .kv span{display:block;font-size:.8rem;color:var(--mut)}.kv b{font-weight:600}
@@ -59,19 +55,11 @@ details.adv .in2{padding:4px 0 14px;display:flex;flex-direction:column;gap:12px}
     </div>
   </div>
 
-  <div class="panelbox step lock" id="s2">
+  <div class="panelbox step lock" id="s3">
     <div class="num2">2</div>
     <div class="bd">
-      <h2>Elige su número</h2>
-      <p class="mut small">Cada altavoz necesita un número distinto del 0 al 9. Anótalo en el ESP32.</p>
-      <div class="pills" id="pills" role="group" aria-label="Número del altavoz"></div>
-    </div>
-  </div>
-
-  <div class="panelbox step lock" id="s3">
-    <div class="num2">3</div>
-    <div class="bd">
       <h2>Indica la WiFi</h2>
+      <p class="mut small">No hace falta elegir un número: la Raspberry se lo asigna al altavoz por su MAC cuando se une a la red.</p>
       <div><label for="ssid">Nombre de la red (mejor de 5 GHz)</label><input class="txt" id="ssid" maxlength="32" autocapitalize="off" autocomplete="off"></div>
       <div><label for="pass">Contraseña (vacía = mantener la actual)</label>
         <div class="pw"><input class="txt" id="pass" type="password" maxlength="63" autocomplete="new-password"><button class="btn ghost sm" id="eye" type="button">Ver</button></div></div>
@@ -86,7 +74,7 @@ details.adv .in2{padding:4px 0 14px;display:flex;flex-direction:column;gap:12px}
       <div><label for="rip">IP de la Raspberry (solo si el router bloquea el broadcast; vacío = automática)</label>
         <input class="txt" id="rip" maxlength="15" inputmode="decimal" autocomplete="off" placeholder="192.168.1.10"></div>
       <div class="row"><button class="btn ghost" id="reboot">Reiniciar</button><button class="btn danger" id="factory">Borrar configuración</button></div>
-      <p class="mut small">Borrar configuración elimina la WiFi y el número guardados en este ESP32.</p>
+      <p class="mut small">Borrar configuración elimina la WiFi guardada en este ESP32.</p>
     </div>
   </details>
 
@@ -99,14 +87,12 @@ const SVC=U(1),C_SSID=U(2),C_PASS=U(3),C_ID=U(4),C_ST=U(5),C_CMD=U(6),C_RPI=U(7)
 const $=i=>document.getElementById(i),enc=new TextEncoder(),dec=new TextDecoder();
 const log=m=>{const l=$('log');l.textContent+=new Date().toLocaleTimeString()+'  '+m+'\n';l.scrollTop=l.scrollHeight;};
 function toast(m,ok=true){const d=document.createElement('div');d.className='toast'+(ok?'':' bad');d.textContent=m;$('tb').appendChild(d);setTimeout(()=>d.remove(),2600);}
-let dev=null,ch={},curId=0,connected=false;
+let dev=null,ch={},connected=false;
+const AUTO_ID=255;   // sin número: la Raspberry asigna la casilla por MAC
 if(!navigator.bluetooth)$('nosup').hidden=false;
 if(!window.isSecureContext){$('nohttps').hidden=false;$('httpslink').href='https://'+location.hostname+':8443/ble';}
-$('pills').innerHTML=[0,1,2,3,4,5,6,7,8,9].map(i=>'<button data-i="'+i+'" aria-pressed="'+(i===0)+'">'+i+'</button>').join('');
-function setId(i){curId=i;$('pills').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.i===i));}
-$('pills').onclick=e=>{const b=e.target.closest('button');if(b)setId(+b.dataset.i);};
 function stage(on){connected=on;$('s1').className='panelbox step '+(on?'done':'cur');
-  $('s2').className='panelbox step '+(on?'cur':'lock');$('s3').className='panelbox step '+(on?'cur':'lock');
+  $('s3').className='panelbox step '+(on?'cur':'lock');
   $('adv').style.opacity=on?1:.5;$('adv').style.pointerEvents=on?'auto':'none';
   $('bc').disabled=on;$('bd').disabled=!on;$('kv').hidden=!on;$('s1').querySelector('.num2').textContent=on?'✓':'1';}
 stage(false);
@@ -127,7 +113,7 @@ $('bc').onclick=async()=>{
     ch.ssid=await svc.getCharacteristic(C_SSID);ch.pass=await svc.getCharacteristic(C_PASS);
     ch.id=await svc.getCharacteristic(C_ID);ch.st=await svc.getCharacteristic(C_ST);ch.cmd=await svc.getCharacteristic(C_CMD);
     try{ch.rpi=await svc.getCharacteristic(C_RPI);$('rip').value=dec.decode(await ch.rpi.readValue());}catch(e){ch.rpi=null;}
-    try{$('ssid').value=dec.decode(await ch.ssid.readValue());setId((await ch.id.readValue()).getUint8(0));}catch(e){}
+    try{$('ssid').value=dec.decode(await ch.ssid.readValue());}catch(e){}
     await ch.st.startNotifications();ch.st.addEventListener('characteristicvaluechanged',readStatus);await readStatus();
     stage(true);log('Conectado a '+dev.name);
   }catch(e){log('Error: '+e.name+': '+e.message);$('bc').disabled=false;if(e.name!=='NotFoundError')toast('No se pudo conectar',false);}
@@ -136,7 +122,7 @@ $('bd').onclick=()=>{if(dev&&dev.gatt.connected)dev.gatt.disconnect();};
 async function cmd(c){try{await wr(ch.cmd,enc.encode(c));log('Comando: '+c);return true;}catch(e){log('Error: '+e.message);toast('El ESP32 no respondió',false);return false;}}
 $('ident').onclick=()=>cmd('identify');
 $('reboot').onclick=()=>cmd('reboot');
-$('factory').onclick=async()=>{if(confirm('¿Borrar WiFi y número guardados en este ESP32?'))if(await cmd('factory'))toast('Configuración borrada');};
+$('factory').onclick=async()=>{if(confirm('¿Borrar la WiFi guardada en este ESP32?'))if(await cmd('factory'))toast('Configuración borrada');};
 $('eye').onclick=()=>{const p=$('pass');const s=p.type==='password';p.type=s?'text':'password';$('eye').textContent=s?'Ocultar':'Ver';};
 $('save').onclick=async()=>{
   const ssid=$('ssid').value,pass=$('pass').value;
@@ -144,12 +130,12 @@ $('save').onclick=async()=>{
   if(pass&&(pass.length<8||pass.length>63)){$('res').textContent='La contraseña debe tener entre 8 y 63 caracteres.';return;}
   try{
     $('save').disabled=true;$('res').textContent='Enviando…';
-    await wr(ch.id,new Uint8Array([curId]));
+    await wr(ch.id,new Uint8Array([AUTO_ID]));
     await wr(ch.ssid,enc.encode(ssid));
     if(ch.rpi)await wr(ch.rpi,enc.encode($('rip').value.trim()));
     if(pass)await wr(ch.pass,enc.encode(pass));
     log('Valores enviados. Aplicando…');
-    if(await cmd('apply')){$('res').textContent='Listo. El altavoz #'+curId+' se reinicia y se une a «'+ssid+'». Aparecerá en el panel en unos segundos.';toast('Guardado');}
+    if(await cmd('apply')){$('res').textContent='Listo. El altavoz se reinicia y se une a «'+ssid+'». Aparecerá en el panel en unos segundos.';toast('Guardado');}
   }catch(e){log('Error: '+e.name+': '+e.message);$('res').textContent='No se pudo guardar. Si el móvil pide emparejar, acepta.';}
   $('save').disabled=false;
 };

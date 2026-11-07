@@ -29,6 +29,7 @@ struct ESPNode {
     bool               mono      = false;   // «1 ESP por canal»: ch_right = ch_left, vol_r = vol_l, paquetes PKT_AUDIO_MONO
     bool               enabled   = true;
     uint8_t            role      = ROLE_FULL;
+    uint64_t           mac       = 0;       // MAC (48 bits) del ESP que ocupa esta casilla; 0 = libre. Se persiste: asignación automática del ID
     bool               known     = false;   // este ESP ya se conectó alguna vez: aparece en el panel aunque esté apagado (se persiste)
     float              pos_x     = -1;      // posición en el plano de la sala, % del ancho (0..100); <0 = automática (según el canal)
     float              pos_y     = -1;      // % del alto (0..100)

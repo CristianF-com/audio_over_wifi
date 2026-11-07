@@ -445,10 +445,12 @@ std::string WebServer::bleProvision(const std::string& b) {
     std::string addr = jsonGet(b, "address");
     long id;
     if (!BleManager::validAddress(addr)) return "{\"error\":\"dirección Bluetooth no válida\"}";
-    if (!parseInt(jsonGet(b, "id"), 0, MAX_NODES - 1, id)) return "{\"error\":\"id fuera de rango (0-9)\"}";
+    const std::string ids = jsonGet(b, "id");
+    if (ids.empty() || ids == "auto" || ids == "255") id = ESP_ID_AUTO;      // por defecto el ESP recibe su casilla de la RPi por MAC
+    else if (!parseInt(ids, 0, MAX_NODES - 1, id)) return "{\"error\":\"id fuera de rango (0-9)\"}";
     auto st = ble_.settings();
     if (st.ssid.empty()) return "{\"error\":\"Primero guarda el nombre y la contraseña de la WiFi\"}";
-    if (jsonGet(b, "force") != "true")
+    if (id != ESP_ID_AUTO && jsonGet(b, "force") != "true")
         for (const auto& n : streamer_.getNodes())
             if (n.id == (int)id && n.online)
                 return "{\"error\":\"El ID " + std::to_string(id) + " ya lo usa un altavoz en línea. Elige otro número.\"}";
@@ -497,6 +499,12 @@ std::string WebServer::getStatus() {
       << jnum("master_volume", streamer_.masterVolume()) << "}";
     return o.str();
 }
+static std::string macStr(uint64_t m) {                   // 0 = casilla libre -> ""
+    if (!m) return "";
+    char b[18]; snprintf(b, sizeof(b), "%02X:%02X:%02X:%02X:%02X:%02X", (unsigned)(m >> 40) & 255, (unsigned)(m >> 32) & 255,
+                         (unsigned)(m >> 24) & 255, (unsigned)(m >> 16) & 255, (unsigned)(m >> 8) & 255, (unsigned)m & 255);
+    return b;
+}
 std::string WebServer::getNodes() {
     auto nodes = streamer_.getNodes();
     std::ostringstream o;
@@ -517,6 +525,7 @@ std::string WebServer::getNodes() {
           << jbool("mono",    n.mono)     << ","
           << jnum("role",     n.role)     << ","
           << jbool("known",   n.known)    << ","
+          << jstr("mac",     macStr(n.mac)) << ","
           << jnum("pos_x",    std::round(n.pos_x * 100.0) / 100.0) << "," << jnum("pos_y", std::round(n.pos_y * 100.0) / 100.0) << ","
           << jnum("pos2_x", std::round(n.pos2_x * 100.0) / 100.0) << "," << jnum("pos2_y", std::round(n.pos2_y * 100.0) / 100.0) << ","
           << "\"eq\":[" ;

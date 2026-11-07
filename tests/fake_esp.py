@@ -468,8 +468,13 @@ c, b = http("POST", "/api/ble/provision", {"address": "AA:BB:CC:00:00:01", "id":
 check("BLE: provisionar con ID libre -> ok y el ayudante recibe SSID, longitud de contraseña e ID", c == 200 and '"ok":true' in b.replace(" ", "") and lg == [{"cmd": "provision", "address": "AA:BB:CC:00:00:01", "id": 7, "ssid": "Casa5G", "pass_len": 10, "rpi_ip": ""}], (b, lg))
 c, b = http("POST", "/api/ble/provision", {"address": "AA:BB:CC:00:00:05", "id": 8}); check("BLE: el error del dispositivo llega a la UI", c == 400 and "emparejamiento rechazado" in b, (c, b))
 c, b = http("POST", "/api/ble/provision", {"address": "AA:BB:CC:00:00:03", "id": min(online), "force": True}); check("BLE: force=true permite reconfigurar el ID de un altavoz en línea", c == 200, (c, b))
-for bad in ({"address": "no-es-mac!", "id": 3}, {"address": "AA:BB:CC:00:00:01", "id": 10}, {"address": "AA:BB:CC:00:00:01"}, {"address": "AA:BB:CC:00:00:01; rm -rf /", "id": 3}):
+for bad in ({"address": "no-es-mac!", "id": 3}, {"address": "AA:BB:CC:00:00:01", "id": 10}, {"address": "AA:BB:CC:00:00:01", "id": "99"}, {"address": "AA:BB:CC:00:00:01; rm -rf /", "id": 3}):
     c, b = http("POST", "/api/ble/provision", bad); check(f"BLE: provision inválido {bad} -> 400", c == 400, (c, b))
+open(mlog, "w").close()
+c, b = http("POST", "/api/ble/provision", {"address": "AA:BB:CC:00:00:01"}); lg = [json.loads(l) for l in open(mlog)]
+check("BLE: sin número en la petición -> ID automático (255): el ayudante recibe 255 y la WiFi", c == 200 and len(lg) == 1 and lg[0]["id"] == 255 and lg[0]["ssid"] == "Casa5G", (c, b, lg))
+c, b = http("POST", "/api/ble/provision", {"address": "AA:BB:CC:00:00:01", "id": "auto"}); check("BLE: id=\"auto\" también -> ok", c == 200, (c, b))
+c, b = http("POST", "/api/ble/provision", {"address": "AA:BB:CC:00:00:01", "id": min(online)}); check("BLE: un número fijo de un altavoz en línea sigue rechazándose sin force (compatibilidad)", c == 400 and "ya lo usa" in b, (c, b))
 c, b = http("POST", "/api/ble/identify", {"address": "AA:BB:CC:00:00:02"}); lg = [json.loads(l) for l in open(mlog)]
 check("BLE: identify -> ok y llega al ayudante", c == 200 and lg[-1] == {"cmd": "identify", "address": "AA:BB:CC:00:00:02"}, (b, lg[-1:]))
 c, b = http("POST", "/api/ble/identify", {"address": "zz"}); check("BLE: identify con dirección inválida -> 400", c == 400, (c, b))
@@ -639,6 +644,43 @@ c, b = http_bin("GET", "/?forma=recta"); check("la página acepta una consulta (
 c, b = http_bin("GET", "/api/status?x=1"); check("una consulta en la API no rompe la ruta", c == 200 and b"running" in b, c)
 c, b = http_bin("GET", "/fonts/roboto-900.woff2"); check("fuente inexistente -> 404", c == 404, c)
 c, b = http_bin("GET", "/"); check("las páginas no piden fuentes externas (sin Google Fonts ni CDN)", b"fonts.googleapis" not in b and b"fonts.gstatic" not in b and b"/fonts/roboto-400.woff2" in b, c)
+
+# 13) ID automático por MAC (HELLO con esp_id 255 -> la RPi asigna la casilla y la recuerda)
+print("\n== ID automático por MAC ==")
+def drain():
+    ctrl.settimeout(0.15)
+    try:
+        while True: ctrl.recvfrom(256)
+    except (socket.timeout, BlockingIOError): pass
+    ctrl.settimeout(2)
+def hello_auto(mac, esp_id=255):
+    drain()
+    ctrl.sendto(struct.pack("<IBBBBH6s", MAGIC, 1, esp_id, 5, 7 | (1 << 6), 5006, mac), (RPI_IP, 5005))
+    t0 = time.time()
+    while time.time() - t0 < 1.5:
+        try: d, _ = ctrl.recvfrom(256)
+        except (socket.timeout, BlockingIOError): return None
+        if len(d) == 20 and d[4] == 2: return struct.unpack("<IBBBBBBBBII", d)
+    return None
+nds = json.loads(http("GET", "/api/nodes")[1])
+free = [n["id"] for n in nds if not n["known"] and not n["mac"] and not n["online"]]
+check("auto-ID: hay casillas libres para probar", len(free) >= 3, free)
+M1, M2 = b"\x02\x11\x22\x33\x44\x55", b"\x02\x11\x22\x33\x44\x66"
+w1 = hello_auto(M1)
+check("auto-ID: HELLO con esp_id 255 -> WELCOME con la primera casilla libre y WELCOME_F_ASSIGNED", w1 is not None and w1[2] == free[0] and (w1[8] & 1) == 1 and w1[9] == 48000, w1)
+w1b = hello_auto(M1)
+check("auto-ID: el mismo ESP (misma MAC) vuelve a recibir la misma casilla", w1b is not None and w1b[2] == free[0], w1b)
+w2 = hello_auto(M2)
+check("auto-ID: otro ESP recibe la siguiente casilla libre", w2 is not None and w2[2] == free[1], (w2, free))
+nds = {n["id"]: n for n in json.loads(http("GET", "/api/nodes")[1])}
+check("auto-ID: /api/nodes muestra la MAC de cada casilla y que ya es un ESP conocido", nds[free[0]]["mac"] == "02:11:22:33:44:55" and nds[free[1]]["mac"] == "02:11:22:33:44:66" and nds[free[0]]["known"], (nds[free[0]]["mac"], nds[free[1]]["mac"]))
+check("auto-ID: el WELCOME trae el mapa de canales de esa casilla", w1[3:5] == (nds[free[0]]["ch_left"], nds[free[0]]["ch_right"]), (w1[3:5], nds[free[0]]["ch_left"]))
+check("auto-ID: sin MAC (todo ceros) no se asigna nada", hello_auto(b"\x00" * 6) is None)
+w3 = hello_auto(M1, esp_id=free[2])
+check("auto-ID: el mismo ESP pasa a un número fijo -> la casilla antigua se libera", w3 is not None and w3[2] == free[2] and (w3[8] & 1) == 0, w3)
+nds = {n["id"]: n for n in json.loads(http("GET", "/api/nodes")[1])}
+check("auto-ID: …y la MAC queda en la casilla nueva, no en la vieja", nds[free[2]]["mac"] == "02:11:22:33:44:55" and nds[free[0]]["mac"] == "", (nds[free[2]]["mac"], nds[free[0]]["mac"]))
+c, _ = http("POST", "/api/node", {"id": 0, "ch_left": 0, "ch_right": 1}); check("auto-ID: las casillas automáticas no afectan al resto", c == 200, c)
 
 print("\nRESULTADO:", "TODO OK" if ok else "HAY FALLOS")
 sys.exit(0 if ok else 1)
