@@ -344,6 +344,8 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
       zin:document.getElementById('zin').disabled,zout:document.getElementById('zout').disabled,zoomed:document.getElementById('room').classList.contains('zoomed')};});
   const vec=g=>[g.fr[0]-g.me[0],g.fr[1]-g.me[1]];
   const same=(a,b)=>Math.abs(a.fr[2]-b.fr[2])<0.6&&Math.abs(a.fr[3]-b.fr[3])<0.6&&Math.abs(a.me[2]-b.me[2])<0.6&&Math.abs(a.me[3]-b.me[3])<0.6;
+  const vuIn=async()=>p.evaluate(()=>[...document.querySelectorAll('#spks .spk')].every(b=>{const r=b.getBoundingClientRect(),v=b.querySelector('.vu').getBoundingClientRect(),c=b.querySelector('.cab').getBoundingClientRect();return v.left>=r.left-0.5&&v.right<=r.right+0.5&&v.top>=r.top-0.5&&v.bottom<=r.bottom+0.5&&c.left>=r.left-0.5&&c.right<=r.right+0.5;}));
+  ok('zoom 100 %: el vúmetro y el dibujo quedan dentro del recuadro de cada altavoz',await vuIn());
   const g0=await geo();
   const zsz=await p.evaluate(()=>['zin','zout','zval'].map(i=>{const b=document.getElementById(i).getBoundingClientRect();return [b.width,b.height];}));
   ok('zoom: controles − / % / + con objetivos ≥ 44 px y marca «100%»',g0.z==='100%'&&zsz.every(x=>x[0]>=44&&x[1]>=44)&&!g0.zoomed,[g0.z,zsz]);
@@ -352,6 +354,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('zoom: los altavoces y «Escucha» conservan su tamaño y «Escucha» no se mueve',same(g0,g1)&&Math.abs(g1.me[0]-g0.me[0])<0.6&&Math.abs(g1.me[1]-g0.me[1])<0.6,[g0.fr,g1.fr,g0.me,g1.me]);
   for(let i=0;i<6;i++)if(!(await geo()).zin)await p.click('#zin');
   const g3=await geo();
+  ok('zoom 300 %: el vúmetro queda dentro del recuadro del altavoz',await vuIn());
   ok('zoom: máximo 300 % (el botón + se desactiva) y sigue sin cambiar el tamaño de los altavoces',g3.z==='300%'&&g3.zin&&g3.zoomed&&same(g0,g3),[g3.z,g3.zin]);
   const bgPt=async()=>p.evaluate(()=>{const R=document.getElementById('room').getBoundingClientRect();for(let fy=0.55;fy<0.95;fy+=0.05)for(let fx=0.1;fx<0.95;fx+=0.05){const x=R.left+R.width*fx,y=R.top+R.height*fy;if(document.elementFromPoint(x,y)===document.getElementById('room'))return [x,y];}return null;});
   const bp0=await bgPt();await p.mouse.move(bp0[0],bp0[1]);await p.mouse.down();await p.mouse.move(bp0[0]-80,bp0[1]-60,{steps:6});await p.mouse.up();await sleep(100);const g4=await geo();
@@ -360,6 +363,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   const gm=await geo();
   ok('zoom: mínimo 50 % (el botón − se desactiva): «Escucha» no se mueve, el plano se encoge y los altavoces se achican (≈ 55 %) para despejar',gm.z==='50%'&&gm.zout&&Math.abs(gm.me[0]-g0.me[0])<1&&Math.abs(gm.me[1]-g0.me[1])<1&&Math.hypot(...vec(gm))<Math.hypot(...vec(g0))&&gm.fr[2]<g0.fr[2]*0.6&&gm.me[2]<g0.me[2]*0.6,[gm.z,gm.fr[2],g0.fr[2]]);
   ok('zoom: alejado se ocultan el estado y el volumen/retardo (queda canal y vúmetro); a 100 % o más están visibles',await p.evaluate(()=>[...document.querySelectorAll('#spks .spk .cap,#spks .spk .cal')].every(e=>getComputedStyle(e).display==='none'&&true))&&await p.evaluate(()=>getComputedStyle(document.querySelector('#spks .spk .ch')).display!=='none'&&getComputedStyle(document.querySelector('#spks .spk .vu')).display!=='none'));
+  ok('zoom 50 % (sin etiquetas): el vúmetro queda dentro del recuadro del altavoz',await vuIn());
   await p.click('#zval');await sleep(100);const gr=await geo();
   ok('zoom: pulsar el porcentaje vuelve a 100 % y todo al sitio de antes',gr.z==='100%'&&!gr.zoomed&&Math.abs(gr.fr[0]-g0.fr[0])<1&&Math.abs(gr.fr[1]-g0.fr[1])<1&&Math.abs(gr.step-g0.step)<0.5,[gr.fr,g0.fr]);
   await p.evaluate(()=>{const r=document.getElementById('room'),b=r.getBoundingClientRect();r.dispatchEvent(new WheelEvent('wheel',{deltaY:-60,ctrlKey:true,clientX:b.left+300,clientY:b.top+300,bubbles:true,cancelable:true}));});
@@ -413,7 +417,8 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('Móvil: tocar «+» dos veces acerca a 156 % sin cambiar el tamaño de altavoces ni de «Escucha»; el fondo deja de deslizar la página',zm1.z==='156%'&&Math.abs(zm1.w-zm0.w)<0.6&&Math.abs(zm1.h-zm0.h)<0.6&&zm1.mw===zm0.mw&&zm1.ta==='none'&&zm0.ta==='pan-y',[zm0,zm1]);
   if(SHOTS){await mp.screenshot({path:SHOTS+'/movil_zoom_mas.png'});}
   await mp.tap('#zval');await mp.tap('#zout');await mp.tap('#zout');await sleep(150);const zm2=await mg();
-  ok('Móvil: alejar a 64 % achica los altavoces (≈ 64 %), oculta las etiquetas y se solapan bastantes menos (5 → ≤ 1)',zm2.z==='64%'&&zm2.w<zm0.w*0.75&&zm2.ov<zm0.ov&&zm2.ov<=1&&zm2.cap==='none',[zm0,zm2]);
+  ok('Móvil: alejar a 64 % achica los altavoces (≈ 64 %), oculta las etiquetas y se solapan bastantes menos (5 → ≤ 2)',zm2.z==='64%'&&zm2.w<zm0.w*0.75&&zm2.ov<zm0.ov&&zm2.ov<=2&&zm2.cap==='none',[zm0,zm2]);
+  ok('Móvil 64 %: el vúmetro queda dentro del recuadro del altavoz',await mp.evaluate(()=>[...document.querySelectorAll('#spks .spk')].every(b=>{const r=b.getBoundingClientRect(),v=b.querySelector('.vu').getBoundingClientRect();return v.left>=r.left-0.5&&v.right<=r.right+0.5;})));
   if(SHOTS){await mp.screenshot({path:SHOTS+'/movil_zoom_menos.png'});}
   await mp.tap('#zval');await sleep(100);
   ok('Móvil: el control de zoom no tapa el plano ni se sale de la pantalla (≥ 44 px)',await mp.evaluate(()=>{const z=document.querySelector('.zoomctl').getBoundingClientRect(),r=document.getElementById('room').getBoundingClientRect();return z.right<=r.right&&z.top>=r.top&&z.height>=44&&innerWidth>=z.right;}));

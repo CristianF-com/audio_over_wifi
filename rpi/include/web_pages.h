@@ -230,7 +230,7 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 .me svg{width:32px;height:32px;color:var(--ac)}
 .me small{position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);font-size:.8rem;font-weight:600;color:var(--mut);white-space:nowrap}
 .screen{position:absolute;left:30%;right:30%;top:1.5%;height:18px;border-radius:5px;background:var(--ctl);display:grid;place-items:center;font-size:.68rem;font-weight:600;color:var(--bg);letter-spacing:.03em}
-.spk{--s:1;position:absolute;transform:translate(-50%,-50%) scale(var(--s));display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:0;padding:4px 6px;color:var(--fg);z-index:2;border-radius:12px}
+.spk{--s:1;min-width:98px;position:absolute;transform:translate(-50%,-50%) scale(var(--s));display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:0;padding:4px 6px;color:var(--fg);z-index:2;border-radius:12px}
 .cab{position:relative;display:block;width:46px;height:62px;transition:transform .12s}
 .spk.sub .cab{width:56px;height:56px}
 .cab svg{width:100%;height:100%;display:block;overflow:visible}
@@ -364,7 +364,7 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   .mv{order:5;flex:1 1 100%;margin-left:0}
   .links{margin-left:auto}
   .room{aspect-ratio:9/16;min-height:640px;--hw:60px;--ht:78px;--hb:70px}
-  .cab{width:40px;height:54px}.spk.sub .cab{width:48px;height:48px}.spk .ch{font-size:.92rem}.spk .cap{font-size:.66rem;padding:1px 4px}.spk .cal{font-size:.7rem;padding:1px 5px}
+  .spk{min-width:90px}.cab{width:40px;height:54px}.spk.sub .cab{width:48px;height:48px}.spk .ch{font-size:.92rem}.spk .cap{font-size:.66rem;padding:1px 4px}.spk .cal{font-size:.7rem;padding:1px 5px}
   .tiles,.cards{grid-template-columns:1fr}
   .drawer{top:auto;left:0;right:0;bottom:0;width:100%;max-height:88vh;border-bottom:0;box-shadow:0 -20px 50px -24px rgba(0,0,0,.6);border-top:1px solid var(--line2);border-radius:var(--r-sheet) var(--r-sheet) 0 0;transform:translateY(calc(100% + 40px))}
   .drawer.on{transform:none}
@@ -1818,8 +1818,8 @@ static const char PWA_MANIFEST[] = R"HTML({
 static const char PWA_SW[] = R"HTML(/* Service worker de SonosWiFi. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * 4d5cbfe19f lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-4d5cbfe19f';
+ * 3bcc0399ff lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-3bcc0399ff';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png'];
 
 self.addEventListener('install', e => {
