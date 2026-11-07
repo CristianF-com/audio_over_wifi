@@ -106,7 +106,7 @@ static int chr_access(uint16_t conn, uint16_t attr, struct ble_gatt_access_ctxt*
             memcpy(s_rpi, buf, len); s_rpi[len] = 0;
             return 0;
         case CH_ID:
-            if (len != 1 || buf[0] >= MAX_NODES) return BLE_ATT_ERR_VALUE_NOT_ALLOWED;
+            if (len != 1 || (buf[0] >= MAX_NODES && buf[0] != ESP_ID_AUTO)) return BLE_ATT_ERR_VALUE_NOT_ALLOWED;   /* 255 = ID automático (la RPi lo asigna por MAC) */
             s_id = buf[0];
             return 0;
         case CH_CMD:

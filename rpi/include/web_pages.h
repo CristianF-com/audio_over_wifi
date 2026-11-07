@@ -116,7 +116,9 @@ h2{font-size:1.02rem;font-weight:650}
 
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;line-height:1.2;font-family:inherit;appearance:none;border:0;background:var(--ac);color:var(--on-ac);font-weight:650;padding:10px 22px;border-radius:999px;min-height:44px;box-shadow:0 8px 22px -10px var(--orb-glow);
   transition:filter .12s,transform .06s,background .12s}
-.btn:hover{filter:brightness(1.1);text-decoration:none}.btn:active{transform:translateY(1px)}
+.btn:hover{filter:brightness(1.1);text-decoration:none}
+/* Claro: el acento es blanco por decisión de diseño; el botón principal lleva texto oscuro y borde para leerse y distinguirse del fondo */
+html[data-theme=light] .btn:not(.ghost):not(.danger){color:#1a1f27;border:1px solid var(--line2)}.btn:active{transform:translateY(1px)}
 .btn.ghost{background:var(--raise);color:var(--fg);border:1px solid var(--line2);font-weight:600;box-shadow:none}
 .btn.ghost:hover{background:var(--line);filter:none}
 .btn.danger{background:transparent;color:var(--bad);border:1px solid var(--bad-ln);font-weight:600;box-shadow:none}
@@ -1396,7 +1398,9 @@ h2{font-size:1.02rem;font-weight:650}
 
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;line-height:1.2;font-family:inherit;appearance:none;border:0;background:var(--ac);color:var(--on-ac);font-weight:650;padding:10px 22px;border-radius:999px;min-height:44px;box-shadow:0 8px 22px -10px var(--orb-glow);
   transition:filter .12s,transform .06s,background .12s}
-.btn:hover{filter:brightness(1.1);text-decoration:none}.btn:active{transform:translateY(1px)}
+.btn:hover{filter:brightness(1.1);text-decoration:none}
+/* Claro: el acento es blanco por decisión de diseño; el botón principal lleva texto oscuro y borde para leerse y distinguirse del fondo */
+html[data-theme=light] .btn:not(.ghost):not(.danger){color:#1a1f27;border:1px solid var(--line2)}.btn:active{transform:translateY(1px)}
 .btn.ghost{background:var(--raise);color:var(--fg);border:1px solid var(--line2);font-weight:600;box-shadow:none}
 .btn.ghost:hover{background:var(--line);filter:none}
 .btn.danger{background:transparent;color:var(--bad);border:1px solid var(--bad-ln);font-weight:600;box-shadow:none}
@@ -1906,7 +1910,9 @@ h2{font-size:1.02rem;font-weight:650}
 
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;line-height:1.2;font-family:inherit;appearance:none;border:0;background:var(--ac);color:var(--on-ac);font-weight:650;padding:10px 22px;border-radius:999px;min-height:44px;box-shadow:0 8px 22px -10px var(--orb-glow);
   transition:filter .12s,transform .06s,background .12s}
-.btn:hover{filter:brightness(1.1);text-decoration:none}.btn:active{transform:translateY(1px)}
+.btn:hover{filter:brightness(1.1);text-decoration:none}
+/* Claro: el acento es blanco por decisión de diseño; el botón principal lleva texto oscuro y borde para leerse y distinguirse del fondo */
+html[data-theme=light] .btn:not(.ghost):not(.danger){color:#1a1f27;border:1px solid var(--line2)}.btn:active{transform:translateY(1px)}
 .btn.ghost{background:var(--raise);color:var(--fg);border:1px solid var(--line2);font-weight:600;box-shadow:none}
 .btn.ghost:hover{background:var(--line);filter:none}
 .btn.danger{background:transparent;color:var(--bad);border:1px solid var(--bad-ln);font-weight:600;box-shadow:none}
@@ -2161,8 +2167,8 @@ static const char PWA_MANIFEST[] = R"HTML({
 static const char PWA_SW[] = R"HTML(/* Service worker de AStream. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * 8efdd09a16 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-8efdd09a16';
+ * 3814150371 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-3814150371';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png', '/fonts/roboto-400.woff2', '/fonts/roboto-500.woff2'];
 
 self.addEventListener('install', e => {

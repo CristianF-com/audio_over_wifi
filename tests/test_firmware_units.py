@@ -49,6 +49,7 @@ sd = open(f"{w}/sdkconfig.defaults").read()
 check("wroom: target esp32 (clásico) y tabla de particiones OTA", 'CONFIG_IDF_TARGET="esp32"' in sd and "CONFIG_PARTITION_TABLE_CUSTOM=y" in sd and "esp32c5" not in sd.replace("# ", ""))
 wk = open(f"{w}/main/Kconfig.projbuild").read()
 pins = {n: int(_re.search(r"config I2S_%s_GPIO\n\s+int .*\n\s+default (\d+)" % n, wk).group(1)) for n in ("BCK", "WS", "DOUT")}
+check("BLE: la característica ID acepta 255 (ID automático) además de 0..MAX_NODES-1 (si no, el móvil/RPi recibe ATT 0x13)", "buf[0] >= MAX_NODES && buf[0] != ESP_ID_AUTO" in c)
 check("wroom: pines I2S por defecto 26/25/22", pins == {"BCK": 26, "WS": 25, "DOUT": 22}, pins)
 check("wroom: sin selección de banda 5 GHz (solo 2.4)", "SONOS_WIFI_BAND" not in wk and 'default "AR"' in wk)
 wc = open(f"{w}/main/CMakeLists.txt").read()
