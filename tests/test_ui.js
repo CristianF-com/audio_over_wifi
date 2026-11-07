@@ -9,6 +9,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
 (async()=>{
   const b=await chromium.launch();
   const ctx=await b.newContext({viewport:{width:1280,height:860}});
+  await ctx.addInitScript(()=>{try{if(localStorage.getItem('sonos_shape')===null)localStorage.setItem('sonos_shape','round');}catch(e){}});
   const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(String(e)));p.on('console',m=>{if(m.type()==='error'&&!m.text().includes('status of 400'))errs.push(m.text());});
   await J('/api/dsp').catch(()=>0);
   await fetch(BASE+'/api/dsp',{method:'POST',body:JSON.stringify({xover:false,eq:false})});
@@ -191,9 +192,14 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('pestañas enlazadas con sus paneles (aria-controls / aria-labelledby)',await p.evaluate(()=>[...document.querySelectorAll('.tab')].every(t=>{const pane=document.getElementById(t.getAttribute('aria-controls'));return pane&&pane.getAttribute('aria-labelledby')===t.id;})));
   ok('los avisos se anuncian al lector de pantalla (región en vivo) y los errores como alerta',await p.evaluate(()=>{const tb=document.getElementById('tb');toast('prueba',false);const a=tb.querySelector('.toast.bad');const r=tb.getAttribute('role')==='status'&&tb.getAttribute('aria-live')==='polite'&&a&&a.getAttribute('role')==='alert';if(a)a.remove();return r;}));
   ok('volumen maestro con texto para lector de pantalla (aria-valuetext)',await p.evaluate(()=>/\d+ %/.test(document.getElementById('mvs').getAttribute('aria-valuetext')||'')));
+  // Tipografía: Roboto autoalojada en toda la app
+  ok('tipografía: Roboto 300/400/500/700 cargadas desde la RPi (sin internet)',await p.evaluate(async()=>{await document.fonts.ready;return [300,400,500,700].every(w=>document.fonts.check(w+' 16px Roboto'))&&[...document.fonts].filter(f=>f.family.replace(/"/g,'')==='Roboto'&&f.status==='loaded').length>=2;}));
+  ok('tipografía: texto, botones, campos y números usan Roboto (ninguna fuente monoespaciada)',await p.evaluate(()=>{const sel=['body','.btn','input','.big','.lvn','.cal','.log','.cmd','h2','.tab'];return sel.every(q=>{const e=document.querySelector(q);return !e||/^"?Roboto"?/.test(getComputedStyle(e).fontFamily);});}));
   // ── Funciones nuevas: probar altavoz, distancias, modo noche, LFE, perfiles, salud ──
   await p.click('[data-tab=spk]');await p.click('#spks .spk[data-id="3"][data-side="0"]');await p.waitForSelector('#drawer.on');await sleep(300);
   ok('cajón: ESP estéreo ofrece Izquierdo, Derecho y Ambos para probar',await p.locator('#d_tone button').count()===3);
+  ok('EQ: las perillas de las 6 bandas miden 18 px, no se pisan (≥4 px libres entre filas) y los demás deslizadores conservan los 26 px',await p.evaluate(()=>{const r=[...document.querySelectorAll('#dbody .eqrow input')];const th=parseFloat(getComputedStyle(r[0]).getPropertyValue('--th'));const vis=th+6;let min=1e9;for(let i=1;i<r.length;i++){const a=r[i-1].getBoundingClientRect(),b=r[i].getBoundingClientRect();min=Math.min(min,(b.top+b.height/2)-(a.top+a.height/2)-vis);}const vol=document.querySelector('#dbody input.rng:not(.mid)');return r.length===6&&th===18&&min>=4&&parseFloat(getComputedStyle(vol).getPropertyValue('--th'))===26;}));
+  await p.evaluate(()=>document.getElementById('d_eq0').scrollIntoView({block:'center'}));await sleep(250);if(SHOTS)await p.screenshot({path:SHOTS+'/panel_eq.png'});
   await p.click('#d_tone button[data-side="2"]');
   ok('probar: «Ambos» inicia el tono en el servidor y el botón queda pulsado',await until(async()=>{const t=await J('/api/tone');return t.active&&t.id===3;})&&await until(async()=>(await p.getAttribute('#d_tone button[data-side="2"]','aria-pressed'))==='true'),[await J('/api/tone'),await p.textContent('#d_toneh'),await J('/api/cal/status')]);
   await p.click('#d_tone button[data-side="2"]');
@@ -261,8 +267,35 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
    if(SHOTS)await p.screenshot({path:SHOTS+'/panel_firmware.png',fullPage:true});}
   ok('nuevas funciones: sin errores de JS',errs.length===0,errs);
   await p.click('.tab[data-tab="spk"]');
+  // Forma recta: todos los radios a 0 salvo el plano de la sala (altavoces, vúmetros, «Escucha»)
+  {const rad=()=>p.evaluate(()=>{const out=[],inn=[];for(const e of document.querySelectorAll('body *')){if(e.closest('svg')&&!e.matches('svg'))continue;const r=parseFloat(getComputedStyle(e).borderTopLeftRadius)||0;const rb=parseFloat(getComputedStyle(e,'::before').borderTopLeftRadius)||0;const ra=parseFloat(getComputedStyle(e,'::after').borderTopLeftRadius)||0;
+      if(e.closest('#room')&&e.id!=='room'&&!e.closest('.zoomctl'))inn.push(Math.max(r,rb,ra));else if(Math.max(r,rb,ra)>0)out.push((e.id||e.className||e.tagName)+':'+Math.max(r,rb,ra));}
+    return {out:out.slice(0,8),nOut:out.length,inMax:Math.max(0,...inn),inCount:inn.filter(x=>x>0).length};});
+   const r0=await rad();ok('forma: redonda (?forma=redonda) hay esquinas redondeadas fuera del plano',r0.nOut>20,r0);
+   await p.evaluate(()=>SonosTheme.shape('square'));await sleep(250);
+   const r1=await rad();
+   ok('forma recta: ningún elemento fuera del plano conserva radio (botones, tarjetas, pestañas, interruptores, deslizadores, cajón)',r1.nOut===0&&await p.evaluate(()=>document.documentElement.getAttribute('data-shape')==='square'),r1);
+   ok('forma recta: los altavoces, vúmetros y «Escucha» del plano conservan sus formas redondeadas',r1.inCount>=r0.inCount&&r1.inCount>5&&r1.inMax>=r0.inMax,[r0.inCount,r1.inCount,r0.inMax,r1.inMax]);
+   ok('forma recta: el propio plano y los controles de zoom también quedan rectos',await p.evaluate(()=>[document.getElementById('room'),...document.querySelectorAll('.zoomctl,.zoomctl *')].every(e=>parseFloat(getComputedStyle(e).borderTopLeftRadius)===0)));
+   if(SHOTS)await p.screenshot({path:SHOTS+'/recta_altavoces.png'});
+   await p.click('.tab[data-tab="snd"]');await sleep(300);if(SHOTS)await p.screenshot({path:SHOTS+'/recta_sonido.png',fullPage:true});
+   await p.click('.tab[data-tab="lat"]');await sleep(300);if(SHOTS)await p.screenshot({path:SHOTS+'/recta_latencia.png',fullPage:true});
+   await p.click('#spks .spk[data-id="3"][data-side="0"]').catch(()=>{});await p.click('.tab[data-tab="spk"]');await p.click('#spks .spk[data-id="3"][data-side="0"]');await p.waitForSelector('#drawer.on');await sleep(400);
+   ok('forma recta: el cajón del altavoz también es recto',await p.evaluate(()=>parseFloat(getComputedStyle(document.getElementById('drawer')).borderTopLeftRadius)===0));
+   if(SHOTS)await p.screenshot({path:SHOTS+'/recta_cajon.png'});
+   await p.keyboard.press('Escape');await until(async()=>!(await p.$('#drawer.on')));
+   await p.evaluate(()=>SonosTheme.shape('round'));await sleep(250);
+   ok('forma redonda: al volver, los botones vuelven a ser píldoras (999 px)',await p.evaluate(()=>parseFloat(getComputedStyle(document.querySelector('.btn')).borderTopLeftRadius)>=100));
+   await p.goto(BASE+'/?forma=recta');await p.waitForSelector('#spks .spk',{state:'attached'});
+   {const fc=await b.newContext({viewport:{width:1280,height:860}});const fp=await fc.newPage();await fp.goto(BASE+'/');await fp.waitForSelector('#spks .spk',{state:'attached'});
+    ok('forma: por defecto es recta (sin radios en botones y tarjetas) en el tema oscuro',await fp.evaluate(()=>document.documentElement.getAttribute('data-shape')==='square'&&[...document.querySelectorAll('.btn,.card')].filter(e=>e.offsetParent).every(e=>parseFloat(getComputedStyle(e).borderTopLeftRadius)===0)));
+    for(const t of ['graphite','light']){await fp.evaluate(t=>SonosTheme.set(t),t);await sleep(150);ok('forma: recta por defecto también en el tema '+t,await fp.evaluate(()=>[...document.querySelectorAll('.btn,.card')].filter(e=>e.offsetParent).every(e=>parseFloat(getComputedStyle(e).borderTopLeftRadius)===0)));}
+    await fc.close();}
+   ok('forma: ?forma=recta la activa y se recuerda; ?forma=redonda la quita',await p.evaluate(()=>SonosTheme.getShape()==='square')&&(await p.goto(BASE+'/?forma=redonda'),await p.waitForSelector('#spks .spk',{state:'attached'}),await p.evaluate(()=>SonosTheme.getShape()==='round'&&document.documentElement.getAttribute('data-shape')==='round')));
+   await p.click('.tab[data-tab="spk"]');}
   // Móvil
   const m=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
+  await m.addInitScript(()=>{try{if(localStorage.getItem('sonos_shape')===null)localStorage.setItem('sonos_shape','round');}catch(e){}});
   const q=await m.newPage();await q.goto(BASE+'/');await q.waitForSelector('#spks .spk');await sleep(800);
   ok('móvil: sin scroll horizontal',await q.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
   if(SHOTS){await q.screenshot({path:SHOTS+'/movil_altavoces.png'});await q.locator('#meters').screenshot({path:SHOTS+'/movil_entrada_leds.png'});await q.locator('#room').scrollIntoViewIfNeeded();await q.locator('#room').screenshot({path:SHOTS+'/movil_plano_vumetros.png'});}
@@ -285,11 +318,22 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('móvil: Sonido sin scroll horizontal',await q.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
   if(SHOTS)await q.screenshot({path:SHOTS+'/movil_sonido.png'});
   await q.click('.tab[data-tab="snd"]');await q.evaluate(()=>window.scrollTo(0,document.getElementById('c_nt').getBoundingClientRect().top+scrollY-70));await sleep(300);
+  const segFit=()=>q.evaluate(()=>[...document.querySelectorAll('.seg.block button')].filter(b=>b.offsetParent).map(b=>{const r=document.createRange();r.selectNodeContents(b);const t=r.getBoundingClientRect(),c=b.getBoundingClientRect();return (t.left>=c.left-0.5&&t.right<=c.right+0.5&&t.top>=c.top-0.5&&t.bottom<=c.bottom+0.5)?null:(b.textContent+' '+Math.round(t.left-c.left)+'/'+Math.round(c.right-t.right));}).filter(Boolean));
+  for(const w of [390,360,320]){await q.setViewportSize({width:w,height:844});await sleep(250);const bad=await segFit();ok('móvil '+w+' px: el texto de «Apagado/Suave/Medio/Fuerte» queda dentro de su botón (sin punto que lo empuje)',bad.length===0,bad);}
+  await q.setViewportSize({width:390,height:844});await sleep(250);
+  ok('móvil: el botón activo de ancho completo no muestra el punto (display none)',await q.evaluate(()=>getComputedStyle(document.querySelector('#ntseg button[aria-pressed=true]'),'::before').display==='none'));
   ok('móvil: modo noche, LFE y perfiles sin scroll horizontal',await q.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
   ok('móvil: los segmentos de modo noche miden 44 px',await q.evaluate(()=>[...document.querySelectorAll('#ntseg button')].every(b=>b.getBoundingClientRect().height>=43.5)));
   if(SHOTS)await q.screenshot({path:SHOTS+'/movil_sonido_nuevo.png'});
+  await q.evaluate(()=>SonosTheme.shape('square'));await sleep(250);
+  ok('móvil forma recta: sin radios fuera del plano y el texto de los segmentos sigue dentro',await q.evaluate(()=>[...document.querySelectorAll('.btn,.card,.seg,.seg button,.tab,.switch,.chip')].filter(e=>e.offsetParent).every(e=>parseFloat(getComputedStyle(e).borderTopLeftRadius)===0))&&(await segFit()).length===0);
+  if(SHOTS)await q.screenshot({path:SHOTS+'/movil_recta_sonido.png'});
+  await q.tap('.tab[data-tab="spk"]');await q.evaluate(()=>window.scrollTo(0,0));await sleep(300);if(SHOTS)await q.screenshot({path:SHOTS+'/movil_recta_altavoces.png'});
+  await q.evaluate(()=>SonosTheme.shape('round'));await sleep(250);
   await q.tap('.tab[data-tab="spk"]');await q.tap('#spks .spk[data-id="0"]');await q.waitForSelector('#drawer.on');await sleep(400);
   ok('móvil: los botones de prueba miden 36 px o más y caben sin scroll horizontal',await q.evaluate(()=>[...document.querySelectorAll('#d_tone button')].every(b=>b.getBoundingClientRect().height>=35.5)&&document.documentElement.scrollWidth<=window.innerWidth+1));
+  ok('EQ: las perillas de las 6 bandas miden 18 px, no se pisan (≥4 px libres entre filas) y los demás deslizadores conservan los 26 px',await q.evaluate(()=>{const r=[...document.querySelectorAll('#dbody .eqrow input')];const th=parseFloat(getComputedStyle(r[0]).getPropertyValue('--th'));const vis=th+6;let min=1e9;for(let i=1;i<r.length;i++){const a=r[i-1].getBoundingClientRect(),b=r[i].getBoundingClientRect();min=Math.min(min,(b.top+b.height/2)-(a.top+a.height/2)-vis);}const vol=document.querySelector('#dbody input.rng:not(.mid)');return r.length===6&&th===18&&min>=4&&parseFloat(getComputedStyle(vol).getPropertyValue('--th'))===26;}));
+  await q.evaluate(()=>document.getElementById('d_eq0').scrollIntoView({block:'center'}));await sleep(250);if(SHOTS)await q.screenshot({path:SHOTS+'/movil_eq.png'});
   await q.evaluate(()=>document.getElementById('d_tone').scrollIntoView({block:'center'}));await sleep(200);
   if(SHOTS)await q.screenshot({path:SHOTS+'/movil_cajon_probar.png'});
   await q.tap('#dclose');
@@ -469,6 +513,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('Plano: «Listo» sale del modo mover',await p.getAttribute('#medit','aria-pressed')==='false'&&!(await p.isVisible('#mreset')));
   // móvil: arrastre táctil, temas sin desbordes y botones alineados
   const ctx2=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
+  await ctx2.addInitScript(()=>{try{if(localStorage.getItem('sonos_shape')===null)localStorage.setItem('sonos_shape','round');}catch(e){}});
   const mp=await ctx2.newPage();await mp.goto(BASE+'/');await mp.waitForSelector('.spk');
   for(const t of ['graphite','light']){await mp.evaluate(t=>localStorage.setItem('sonos_theme',t),t);await mp.reload();await mp.waitForSelector('.spk');
     ok('Móvil: tema '+t+' sin desbordamiento horizontal',await mp.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));}

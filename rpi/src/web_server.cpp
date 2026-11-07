@@ -293,7 +293,8 @@ void WebServer::handleClient(int cfd, bool tls) {
         ::close(cfd); return;
     }
     std::string resp, ct = "application/json", extra;
-    int code = 200;
+    int code = 200; const char* cache = "no-store";
+    if (m == "GET" && p.rfind("/fw/ota.bin", 0) != 0) { const size_t qm = p.find('?'); if (qm != std::string::npos) p.resize(qm); }   // las páginas aceptan ?forma=recta (lo lee theme.js); solo el token de la OTA usa la consulta
     // Recursos de la PWA (manifiesto, service worker, iconos): públicos, sin datos; el navegador los pide sin credenciales.
     const char* pwaTxt = nullptr; const char* pwaCt = nullptr;
     const unsigned char* pwaBin = nullptr; size_t pwaBinLen = 0;
@@ -304,6 +305,10 @@ void WebServer::handleClient(int cfd, bool tls) {
         else if (p == "/icons/icon-180.png" || p == "/apple-touch-icon.png") { pwaBin = PWA_ICON_180; pwaBinLen = sizeof(PWA_ICON_180); }
         else if (p == "/icons/icon-192.png")   { pwaBin = PWA_ICON_192;  pwaBinLen = sizeof(PWA_ICON_192); }
         else if (p == "/icons/icon-512.png")   { pwaBin = PWA_ICON_512;  pwaBinLen = sizeof(PWA_ICON_512); }
+        else if (p == "/fonts/roboto-300.woff2") { pwaBin = PWA_FONT_ROBOTO_300; pwaBinLen = sizeof(PWA_FONT_ROBOTO_300); }
+        else if (p == "/fonts/roboto-400.woff2") { pwaBin = PWA_FONT_ROBOTO_400; pwaBinLen = sizeof(PWA_FONT_ROBOTO_400); }
+        else if (p == "/fonts/roboto-500.woff2") { pwaBin = PWA_FONT_ROBOTO_500; pwaBinLen = sizeof(PWA_FONT_ROBOTO_500); }
+        else if (p == "/fonts/roboto-700.woff2") { pwaBin = PWA_FONT_ROBOTO_700; pwaBinLen = sizeof(PWA_FONT_ROBOTO_700); }
         else if (p == "/icons/icon-maskable-512.png") { pwaBin = PWA_ICON_MASKABLE_512; pwaBinLen = sizeof(PWA_ICON_MASKABLE_512); }
     }
     bool fwget = false;                                     // GET /fw/ota.bin?t=<token>: lo pide el ESP, que no puede enviar contraseña; lo protege un token de un solo uso por orden
@@ -321,7 +326,7 @@ void WebServer::handleClient(int cfd, bool tls) {
     }
     else if (fwget) { resp = serveFirmware(p, code); ct = code == 200 ? "application/octet-stream" : "application/json"; }
     else if (pwaTxt) { resp = pwaTxt; ct = pwaCt; }
-    else if (pwaBin) { resp.assign(reinterpret_cast<const char*>(pwaBin), pwaBinLen); ct = "image/png"; }
+    else if (pwaBin) { resp.assign(reinterpret_cast<const char*>(pwaBin), pwaBinLen); ct = p.rfind("/fonts/", 0) == 0 ? "font/woff2" : "image/png"; if (p.rfind("/fonts/", 0) == 0) cache = "public, max-age=31536000, immutable"; }
     else if ((p == "/" || p == "/index.html") && m == "GET") { resp = loadPage("panel.html", PAGE_PANEL); ct = "text/html; charset=utf-8"; }
     else if (p == "/calibrate" && m == "GET") { resp = loadPage("calibrate.html", PAGE_CAL); ct = "text/html; charset=utf-8"; }
     else if (p == "/ble"       && m == "GET") { resp = loadPage("ble.html", PAGE_BLE); ct = "text/html; charset=utf-8"; }
@@ -332,7 +337,7 @@ void WebServer::handleClient(int cfd, bool tls) {
                      code == 403 ? "Forbidden" : code == 404 ? "Not Found" : code == 409 ? "Conflict" : "Error";
     std::ostringstream r;
     r << "HTTP/1.1 " << code << " " << st << "\r\nContent-Type: " << ct << "\r\n"
-      << extra << "Cache-Control: no-store\r\n"
+      << extra << "Cache-Control: " << cache << "\r\n"
       << "Content-Length: " << resp.size() << "\r\nConnection: close\r\n\r\n" << resp;
     std::string rs = r.str();
     size_t off = 0;

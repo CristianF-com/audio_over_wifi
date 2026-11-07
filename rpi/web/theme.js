@@ -1,7 +1,7 @@
 /* Tema de la interfaz: «dark» (por defecto), «graphite», «light» o «auto» (sigue al sistema; resuelve a dark o light). Se guarda en localStorage (por navegador).
    Se ejecuta en el <head> (antes de pintar) para que no haya destello; los botones [data-theme-btn] rotan Oscuro → Grafito → Claro → Automático. */
 (function () {
-  var KEY = 'sonos_theme', ORDER = ['dark', 'graphite', 'light', 'auto'], NAME = { dark: 'Oscuro', graphite: 'Grafito', light: 'Claro', auto: 'Automático' };
+  var KEY = 'sonos_theme', SKEY = 'sonos_shape', ORDER = ['dark', 'graphite', 'light', 'auto'], NAME = { dark: 'Oscuro', graphite: 'Grafito', light: 'Claro', auto: 'Automático' };
   var META = { dark: '#000000', graphite: '#1c1c1e', light: '#d5d9e0' };
   var ICON = {
     dark: '<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>',
@@ -11,7 +11,12 @@
   };
   var mq = window.matchMedia ? matchMedia('(prefers-color-scheme: light)') : null;
   function pref() { var p = 'dark'; try { p = localStorage.getItem(KEY) || 'dark'; } catch (e) {} return ORDER.indexOf(p) < 0 ? 'dark' : p; }
+  // Forma: «square» (por defecto: todos los radios a 0 salvo los altavoces del radar) o «round» (píldoras). ?forma=recta / ?forma=redonda la fija y se guarda.
+  function shape() { var v = 'square'; try { v = localStorage.getItem(SKEY) || 'square'; } catch (e) {} return v === 'round' ? 'round' : 'square'; }
+  function setShape(v) { try { localStorage.setItem(SKEY, v === 'square' ? 'square' : 'round'); } catch (e) {} apply(); }
+  try { var q = /[?&]forma=(recta|redonda)/.exec(location.search); if (q) setShape(q[1] === 'recta' ? 'square' : 'round'); } catch (e) {}
   function apply() {
+    document.documentElement.setAttribute('data-shape', shape());
     var p = pref(), t = p === 'auto' ? (mq && mq.matches ? 'light' : 'dark') : p;
     document.documentElement.setAttribute('data-theme', t);
     var m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', META[t]);
@@ -25,7 +30,7 @@
   }
   function set(p) { try { localStorage.setItem(KEY, p); } catch (e) {} apply(); }
   function next() { set(ORDER[(ORDER.indexOf(pref()) + 1) % ORDER.length]); }
-  window.SonosTheme = { get: pref, set: set, next: next, apply: apply };
+  window.SonosTheme = { get: pref, set: set, next: next, apply: apply, shape: setShape, getShape: shape };
   apply();
   if (mq && mq.addEventListener) mq.addEventListener('change', apply);
   addEventListener('storage', function (e) { if (e.key === KEY) apply(); });

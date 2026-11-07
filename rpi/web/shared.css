@@ -1,5 +1,10 @@
 /* Sistema de diseño compartido por las tres páginas (panel, /calibrate, /ble). Negro puro + azul señal. */
+@font-face{font-family:'Roboto';font-style:normal;font-weight:300;font-display:swap;src:url(/fonts/roboto-300.woff2) format('woff2')}
+@font-face{font-family:'Roboto';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/roboto-400.woff2) format('woff2')}
+@font-face{font-family:'Roboto';font-style:normal;font-weight:500;font-display:swap;src:url(/fonts/roboto-500.woff2) format('woff2')}
+@font-face{font-family:'Roboto';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/roboto-700.woff2) format('woff2')}
 :root{
+  --font:'Roboto',system-ui,-apple-system,'Segoe UI',sans-serif;
   --r-card:24px; --r-sheet:28px;
   --bg:#000; --panel:#0a0d13; --raise:#121722; --line:#1f2735; --line2:#2b3548;
   --fg:#e9edf5; --mut:#8a93a6; --ac:#4aa3ff; --ac-bg:rgba(74,163,255,.13); --ac-ln:rgba(74,163,255,.5);
@@ -62,7 +67,8 @@ h2{font-size:1.02rem;font-weight:650}
 .seg button:hover{color:var(--fg)}
 .seg button[aria-pressed=true]{background:var(--ac-bg);color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac-ln)}
 .seg button[aria-pressed=true]::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
-.seg.block{display:flex}.seg.block button{flex:1;min-width:0;white-space:normal;line-height:1.2;padding-left:8px;padding-right:8px}   /* con texto grande o pantalla estrecha, las etiquetas bajan de línea en vez de salirse */
+.seg.block{display:flex}.seg.block button{flex:1;min-width:0;white-space:normal;line-height:1.2;padding-left:8px;padding-right:8px}
+.seg.block button[aria-pressed=true]::before{display:none}   /* en segmentos de ancho completo el punto no cabe: el estado ya lo marcan el color, el fondo y el borde */   /* con texto grande o pantalla estrecha, las etiquetas bajan de línea en vez de salirse */
 
 .switch{appearance:none;position:relative;width:52px;height:32px;border-radius:16px;border:1px solid var(--ctl);background:var(--raise);flex:none;
   transition:background .15s,border-color .15s}
@@ -71,14 +77,14 @@ h2{font-size:1.02rem;font-weight:650}
 .switch[aria-checked=true]::after{transform:translateX(20px);background:var(--on-ac)}
 
 input[type=range].rng{-webkit-appearance:none;appearance:none;width:100%;height:28px;background:transparent;border-radius:0;cursor:pointer;
-  --f:.5;--rh:28px;height:var(--rh);
-  background:linear-gradient(to right,var(--ac) calc(var(--f)*(100% - 38px) + 19px),var(--line2) 0) no-repeat center/100% 10px}
+  --f:.5;--rh:28px;--tw:38px;--th:26px;height:var(--rh);
+  background:linear-gradient(to right,var(--ac) calc(var(--f)*(100% - var(--tw)) + var(--tw)/2),var(--line2) 0) no-repeat center/100% 10px}
 input[type=range].rng.mid{--lo:.5;--hi:.5;
-  background:linear-gradient(to right,var(--line2) calc(var(--lo)*(100% - 38px) + 19px),var(--ac) 0,var(--ac) calc(var(--hi)*(100% - 38px) + 19px),var(--line2) 0) no-repeat center/100% 10px}
+  background:linear-gradient(to right,var(--line2) calc(var(--lo)*(100% - var(--tw)) + var(--tw)/2),var(--ac) 0,var(--ac) calc(var(--hi)*(100% - var(--tw)) + var(--tw)/2),var(--line2) 0) no-repeat center/100% 10px}
 .rng::-webkit-slider-runnable-track{height:var(--rh);background:transparent}
 .rng::-moz-range-track{height:var(--rh);background:transparent}
-.rng::-webkit-slider-thumb{-webkit-appearance:none;width:38px;height:26px;border-radius:13px;background:var(--thumb);border:0;margin-top:calc((var(--rh) - 26px)/2);box-shadow:0 2px 8px rgba(0,0,0,.35),0 0 0 3px var(--thumb-ring)}
-.rng::-moz-range-thumb{width:38px;height:26px;border-radius:13px;background:var(--thumb);border:0;box-shadow:0 2px 8px rgba(0,0,0,.35),0 0 0 3px var(--thumb-ring)}
+.rng::-webkit-slider-thumb{-webkit-appearance:none;width:var(--tw);height:var(--th);border-radius:calc(var(--th)/2);background:var(--thumb);border:0;margin-top:calc((var(--rh) - var(--th))/2);box-shadow:0 2px 8px rgba(0,0,0,.35),0 0 0 3px var(--thumb-ring)}
+.rng::-moz-range-thumb{width:var(--tw);height:var(--th);border-radius:calc(var(--th)/2);background:var(--thumb);border:0;box-shadow:0 2px 8px rgba(0,0,0,.35),0 0 0 3px var(--thumb-ring)}
 .rng:focus-visible{outline-offset:0}
 
 .num,.txt,.sel{background:var(--raise);border:1px solid var(--ctl);border-radius:14px;padding:9px 14px;min-height:44px;width:100%;color:var(--fg)}
@@ -115,10 +121,14 @@ label,.lbl{display:block;color:var(--mut);font-size:.74rem;font-weight:600;lette
 .procbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 14px;padding:10px 18px;border-radius:999px;background:var(--ac-bg);border:1px solid var(--ac-ln);color:var(--ac);font-size:.92rem}
 .procbar[hidden]{display:none}
 
+/* Ecualizador: perilla más pequeña y filas más separadas para que no se pisen (el área de toque sigue siendo la fila entera) */
+.eqrow input[type=range].rng{--tw:30px;--th:18px;--rh:32px}
+.eqrow+.eqrow{margin-top:6px}
+
 /* Objetivos táctiles: 44 × 44 (mínimo cómodo de iOS) cuando el puntero es el dedo */
 @media (pointer:coarse){
   .btn,.btn.sm,.seg button,.tab,.num,.txt,.sel{min-height:44px}
-  input[type=range].rng{--rh:44px}
+  input[type=range].rng,.eqrow input[type=range].rng{--rh:44px}
   .switch::before{content:"";position:absolute;inset:-9px -6px}   /* zona de toque ampliada; el aspecto no cambia */
 }
 .themebtn{display:inline-flex;align-items:center;gap:6px}
@@ -133,3 +143,11 @@ label,.lbl{display:block;color:var(--mut);font-size:.74rem;font-weight:600;lette
 @media (prefers-reduced-transparency:reduce){
   .top{background:var(--top-solid);backdrop-filter:none;-webkit-backdrop-filter:none}
 }
+
+/* Forma recta (opcional, ?forma=recta o SonosTheme.shape('square')): todos los radios a 0 salvo el plano de la sala,
+   donde los altavoces, los vúmetros y «Escucha» conservan sus formas. Los pseudo-elementos y el deslizador se tratan aparte. */
+html[data-shape=square]{--r-card:0px;--r-sheet:0px}
+html[data-shape=square] :not(#room *),html[data-shape=square] :not(#room *)::before,html[data-shape=square] :not(#room *)::after{border-radius:0!important}
+html[data-shape=square] .zoomctl,html[data-shape=square] .zoomctl *{border-radius:0!important}
+html[data-shape=square] input[type=range]::-webkit-slider-thumb,html[data-shape=square] input[type=range]::-webkit-slider-runnable-track{border-radius:0!important}
+html[data-shape=square] input[type=range]::-moz-range-thumb,html[data-shape=square] input[type=range]::-moz-range-track,html[data-shape=square] input[type=range]::-moz-range-progress{border-radius:0!important}

@@ -630,5 +630,15 @@ grab(0.3); pk = grab(0.6); check("OTA: el audio se reanuda", len(pk) > 100, len(
 c, b = http("POST", "/api/ota", {"id": 0}); http("POST", "/api/ota/cancel", {"id": 0})
 n0 = json.loads(http("GET", "/api/nodes")[1])[0]; check("OTA: cancelar libera al altavoz", c == 200 and n0["ota_busy"] is False, (c, n0["ota_busy"]))
 
+# 12) Tipografía Roboto servida por la RPi
+print("\n== Fuentes Roboto ==")
+for w in (300, 400, 500, 700):
+    r = urllib.request.urlopen(B + f"/fonts/roboto-{w}.woff2", timeout=3); d = r.read()
+    check(f"fuente Roboto {w}: woff2 válido, tipo font/woff2 y caché larga", r.status == 200 and d[:4] == b"wOF2" and 15000 < len(d) < 40000 and r.headers["Content-Type"] == "font/woff2" and "max-age=31536000" in r.headers["Cache-Control"], (len(d), r.headers["Content-Type"]))
+c, b = http_bin("GET", "/?forma=recta"); check("la página acepta una consulta (?forma=recta) -> 200 con HTML", c == 200 and b"<html" in b, c)
+c, b = http_bin("GET", "/api/status?x=1"); check("una consulta en la API no rompe la ruta", c == 200 and b"running" in b, c)
+c, b = http_bin("GET", "/fonts/roboto-900.woff2"); check("fuente inexistente -> 404", c == 404, c)
+c, b = http_bin("GET", "/"); check("las páginas no piden fuentes externas (sin Google Fonts ni CDN)", b"fonts.googleapis" not in b and b"fonts.gstatic" not in b and b"/fonts/roboto-400.woff2" in b, c)
+
 print("\nRESULTADO:", "TODO OK" if ok else "HAY FALLOS")
 sys.exit(0 if ok else 1)

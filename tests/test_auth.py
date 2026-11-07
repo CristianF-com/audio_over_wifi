@@ -24,6 +24,7 @@ for path, ct in (("/manifest.webmanifest", "application/manifest+json"), ("/sw.j
     c, h = get(path); check(f"PWA {path} sin contraseña -> 200 ({ct})", c == 200 and h.get("Content-Type", "").startswith(ct), (c, h.get("Content-Type")))
 c, h = get("/sw.js"); check("sw.js con Service-Worker-Allowed: /", h.get("Service-Worker-Allowed") == "/", h.get("Service-Worker-Allowed"))
 c, _ = get("/api/nodes"); check("con los recursos PWA públicos, /api/nodes sigue exigiendo contraseña", c == 401, c)
+c, _ = get("/fonts/roboto-400.woff2"); check("fuentes: públicas sin contraseña (las pide el CSS sin credenciales)", c == 200, c)
 # OTA: solo el binario con token es público (lo pide el ESP); subir firmware y dar la orden exigen contraseña
 c, _ = get("/fw/ota.bin?t=1");  check("OTA: /fw/ota.bin sin contraseña llega a la comprobación del token -> 403 (no 401)", c == 403, c)
 for path in ("/api/firmware", "/api/tone", "/api/profiles"):

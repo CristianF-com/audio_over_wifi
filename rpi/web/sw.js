@@ -3,7 +3,7 @@
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
  * @BUILD@ lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
 const CACHE = 'sonoswifi-@BUILD@';
-const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png'];
+const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png', '/fonts/roboto-400.woff2', '/fonts/roboto-500.woff2'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE)

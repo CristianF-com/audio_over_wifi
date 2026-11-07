@@ -32,6 +32,9 @@ for f in ("icon-180", "icon-192", "icon-512", "icon-maskable-512"):
     data = (web / "icons" / (f + ".png")).read_bytes()
     body = ",".join(str(b) for b in data)
     parts.append(f'\nstatic const unsigned char PWA_{f.upper().replace("-", "_")}[] = {{{body}}};\n')
+for w in (300, 400, 500, 700):    # Roboto autoalojada (sin internet en la RPi)
+    data = (web / "fonts" / f"roboto-{w}.woff2").read_bytes()
+    parts.append(f'\nstatic const unsigned char PWA_FONT_ROBOTO_{w}[] = {{{",".join(str(b) for b in data)}}};\n')
 text = "".join(parts)
 if "--check" in sys.argv:
     cur = out.read_text(encoding="utf-8") if out.exists() else ""
