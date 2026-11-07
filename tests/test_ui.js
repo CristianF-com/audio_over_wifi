@@ -379,6 +379,24 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   await bp.fill('#pass','corta');await bp.click('#save');
   ok('BLE: valida la contraseña corta',(await bp.textContent('#res')).includes('8 y 63'));
   ok('BLE sin errores de JS',berr.length===0,berr);
+  // ── Nombres de las 10 entradas ──
+  await p.click('#tab_snd');await sleep(200);
+  ok('Nombres: tarjeta con 10 campos, con los nombres de siempre por defecto',await p.evaluate(()=>{const v=[...document.querySelectorAll('#nmgrid input')].map(i=>i.value).join();return v==='FL,FR,C,LFE,SL,SR,SBL,SBR,AUX-L,AUX-R';}));
+  ok('Nombres: cada campo tiene etiqueta visible con su número y su función (≥ 44 px de alto)',await p.evaluate(()=>[...document.querySelectorAll('#nmgrid input')].every((i,k)=>{const l=document.querySelector('label[for="'+i.id+'"]');return l&&l.textContent.startsWith('Entrada '+(k+1))&&i.getBoundingClientRect().height>=44&&i.maxLength===12;})));
+  await p.fill('#chn_0','Sala TV');await p.fill('#chn_3','Sub');await p.fill('#chn_9','');
+  await p.click('#nmsave');await sleep(500);
+  const nmApi=await J('/api/names');
+  ok('Nombres: Guardar los envía a la Raspberry (el vacío vuelve al de fábrica)',nmApi.names[0]==='Sala TV'&&nmApi.names[3]==='Sub'&&nmApi.names[9]==='AUX-R',nmApi);
+  await p.click('#tab_spk');await sleep(300);
+  ok('Nombres: los indicadores de entrada, el plano y las fichas usan el nombre nuevo',await p.evaluate(()=>{const labs=[...document.querySelectorAll('#mb .lab')].map(e=>e.textContent);const chips=document.body.innerText;return labs[0]==='Sala TV'&&labs[3]==='Sub'&&labs[9]==='AUX-R'&&[...document.querySelectorAll('#spks .spk')].some(b=>b.textContent.includes('Sala TV'))&&chips.includes('Sala TV');}));
+  await p.click('#tab_snd');await sleep(200);
+  await p.fill('#chn_1','<b>x');await p.click('#nmsave');await sleep(400);
+  ok('Nombres: un nombre con < se rechaza con aviso y no cambia nada',(await J('/api/names')).names[1]==='FR'&&await p.evaluate(()=>[...document.querySelectorAll('.toast')].some(t=>t.textContent.includes('<'))));
+  if(SHOTS)await p.screenshot({path:SHOTS+'/panel_nombres.png'});
+  await p.fill('#chn_1','');await p.click('#nmreset');await sleep(500);
+  ok('Nombres: Restablecer devuelve los 10 nombres de fábrica en la interfaz y en la Raspberry',await p.evaluate(()=>[...document.querySelectorAll('#nmgrid input')].map(i=>i.value).join()==='FL,FR,C,LFE,SL,SR,SBL,SBR,AUX-L,AUX-R'&&document.querySelector('#mb .lab').textContent==='FL')&&(await J('/api/names')).names.join()==='FL,FR,C,LFE,SL,SR,SBL,SBR,AUX-L,AUX-R');
+  await p.click('#tab_spk');await sleep(200);
+
   // ── Temas: Oscuro, Grafito, Claro (suave) y Automático ──
   const lum=h=>{const m=h.match(/\d+/g).map(Number),f=v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4);};return .2126*f(m[0])+.7152*f(m[1])+.0722*f(m[2]);};
   const cr=(a,b)=>{const x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
@@ -556,12 +574,35 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
     return {cap:getComputedStyle(document.querySelector('#spks .spk .cap')).display,w:bs[0].width,h:bs[0].height,mw:m.width,ov,z:document.getElementById('zval').textContent,ta:getComputedStyle(document.getElementById('room')).touchAction};});
   const zm0=await mg();await mp.locator('#room').scrollIntoViewIfNeeded();await sleep(600);   // sin esta pausa el primer toque puede caer mientras la página aún se desplaza
   await mp.tap('#zin');await sleep(250);await mp.tap('#zin');await sleep(250);const zm1=await mg();
-  ok('Móvil: tocar «+» dos veces acerca a 156 % sin cambiar el tamaño de altavoces ni de «Escucha»; el fondo deja de deslizar la página',zm1.z==='156%'&&Math.abs(zm1.w-zm0.w)<0.6&&Math.abs(zm1.h-zm0.h)<0.6&&zm1.mw===zm0.mw&&zm1.ta==='none'&&zm0.ta==='pan-y',[zm0,zm1]);
+  ok('Móvil: tocar «+» dos veces acerca a 156 % sin cambiar el tamaño de altavoces ni de «Escucha»; el plano ya no bloquea el scroll de la página (touch-action pan-y)',zm1.z==='156%'&&Math.abs(zm1.w-zm0.w)<0.6&&Math.abs(zm1.h-zm0.h)<0.6&&zm1.mw===zm0.mw&&zm1.ta==='pan-y'&&zm0.ta==='pan-y',[zm0,zm1]);
   if(SHOTS){await mp.screenshot({path:SHOTS+'/movil_zoom_mas.png'});}
+  // Gestos reales (CDP): con zoom un dedo mueve el plano mientras pueda; en el borde, el mismo gesto desliza la página
+  {const cdp=await ctx2.newCDPSession(mp);
+   const free=async()=>mp.evaluate(()=>{const r=document.getElementById('room').getBoundingClientRect();for(let y=Math.max(r.top+20,20);y<Math.min(r.bottom-20,innerHeight-120);y+=14)for(let x=r.left+8;x<r.right-8;x+=14){const e=document.elementFromPoint(x,y);if(e&&e.closest('#room')&&!e.closest('.spk,.zoomctl'))return {x,y};}return null;});
+   const swipe=async(x,y0,dy)=>{await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y:y0}]});for(let i=1;i<=8;i++){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:y0+dy*i/8}]});await sleep(20);}await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await sleep(450);};
+   const st=()=>mp.evaluate(()=>({sy:scrollY,py:panY,max:ly_max()}));
+   await mp.evaluate(()=>{window.ly_max=()=>{const {W,H}=vw(),[lx,ly]=LXY(W,H);return [(H-ly)*(1-zoom),ly*(zoom-1)];};});
+   const fp0=await free();ok('Móvil gestos: hay un punto libre del plano para arrastrar',!!fp0,fp0);
+   if(fp0){
+    const a0=await st();await swipe(fp0.x,fp0.y,60);const a1=await st();
+    ok('Móvil gestos (zoom 156 %): un dedo hacia abajo mueve el plano y NO desliza la página',a1.py>a0.py+20&&a1.sy===a0.sy,[a0,a1]);
+    for(let i=0;i<14&&(await st()).py<(await st()).max[1]-1;i++){const f=(await free())||fp0;await swipe(f.x,f.y,80);}   // el punto se recalcula cada vez: al mover el plano un altavoz podría quedar bajo el dedo y arrastrarse
+    const b0=await st();
+    ok('Móvil gestos: con el plano ya en su borde superior (y la página desplazada)',b0.py>=b0.max[1]-1&&b0.sy>0,b0);
+    const fb=(await free())||fp0;await swipe(fb.x,fb.y,80);const b1=await st();   // el punto se recalcula: la página se movió y uno viejo podría caer sobre un altavoz
+    ok('Móvil gestos: en el borde, el mismo gesto desliza la página hacia arriba (el scroll ya no queda atrapado)',b1.sy<b0.sy-20&&Math.abs(b1.py-b0.py)<1,[b0,b1]);
+    await sleep(1200);await mp.evaluate(()=>window.scrollTo(0,scrollY));await sleep(300);   // que termine el desliz inercial de la página: durante él el navegador no deja cancelar el gesto
+    const fc=(await free())||fp0;const c0=await st();await swipe(fc.x,fc.y,-60);const c1=await st();
+    ok('Móvil gestos: arrastrar en sentido contrario vuelve a mover el plano (aún puede moverse hacia ese lado)',c1.py<c0.py-20&&Math.abs(c1.sy-c0.sy)<2,[c0,c1]);
+   }}
   await mp.tap('#zval');await mp.tap('#zout');await mp.tap('#zout');await sleep(150);const zm2=await mg();
   ok('Móvil: alejar a 64 % achica los altavoces (≈ 64 %), oculta las etiquetas y se solapan bastantes menos (5 → ≤ 2)',zm2.z==='64%'&&zm2.w<zm0.w*0.75&&zm2.ov<zm0.ov&&zm2.ov<=2&&zm2.cap==='none',[zm0,zm2]);
   ok('Móvil 64 %: el vúmetro queda dentro del recuadro del altavoz',await mp.evaluate(()=>[...document.querySelectorAll('#spks .spk')].every(b=>{const r=b.getBoundingClientRect(),v=b.querySelector('.vu').getBoundingClientRect();return v.left>=r.left-0.5&&v.right<=r.right+0.5;})));
   if(SHOTS){await mp.screenshot({path:SHOTS+'/movil_zoom_menos.png'});}
+  {const cdp=await ctx2.newCDPSession(mp);const fp=await mp.evaluate(()=>{const r=document.getElementById('room').getBoundingClientRect();for(let y=Math.max(r.top+20,20);y<Math.min(r.bottom-20,innerHeight-160);y+=14)for(let x=r.left+8;x<r.right-8;x+=14){const e=document.elementFromPoint(x,y);if(e&&e.closest('#room')&&!e.closest('.spk,.zoomctl'))return {x,y};}return null;});
+   if(fp){await mp.evaluate(()=>window.scrollTo(0,0));await sleep(200);const s0=await mp.evaluate(()=>scrollY);
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:fp.x,y:fp.y}]});for(let i=1;i<=8;i++){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:fp.x,y:fp.y-12*i}]});await sleep(20);}await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await sleep(450);
+    ok('Móvil gestos (zoom 64 %): arrastrar sobre el plano desliza la página',(await mp.evaluate(()=>scrollY))>s0+20,[s0]);}}
   await mp.tap('#zval');await sleep(100);
   ok('Móvil: el control de zoom no tapa el plano ni se sale de la pantalla (≥ 44 px)',await mp.evaluate(()=>{const z=document.querySelector('.zoomctl').getBoundingClientRect(),r=document.getElementById('room').getBoundingClientRect();return z.right<=r.right&&z.top>=r.top&&z.height>=44&&innerWidth>=z.right;}));
   await fetch(BASE+'/api/node',{method:'POST',body:JSON.stringify({id:2,pos_auto:true})});

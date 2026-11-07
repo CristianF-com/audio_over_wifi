@@ -64,6 +64,28 @@ int main() {
         CHECK("known persiste tras guardar y recargar (3 quitado, 4 conservado); enabled=0 se conserva", !k2.getNodes()[3].known && k2.getNodes()[4].known && !k2.getNodes()[3].enabled);
         remove(kp);
     }
+    {   // Nombres de las entradas: se guardan en <config>.chnames; vacío o igual al de fábrica no se guarda
+        const char* np = "/tmp/sonos_cfg_names.txt";
+        remove(np); remove("/tmp/sonos_cfg_names.txt.chnames");
+        UdpStreamer a; a.setConfigPath(np); a.loadConfig();
+        CHECK("nombres por defecto", a.channelNames()[0] == "FL" && a.channelNames()[8] == "AUX-L" && a.channelNames().size() == 10);
+        std::string err;
+        std::vector<std::string> v = {"TV I", "FR", "", "Sub", "SL", "SR", "SBL", "SBR", "AUX-L", "Ñandú"};
+        CHECK("setChannelNames acepta", a.setChannelNames(v, err));
+        CHECK("vacío -> por defecto, iguales a fábrica sin cambio", a.channelNames()[0] == "TV I" && a.channelNames()[2] == "C" && a.channelNames()[1] == "FR" && a.channelNames()[9] == "Ñandú");
+        UdpStreamer b2; b2.setConfigPath(np); b2.loadConfig();
+        CHECK("persisten tras recargar", b2.channelNames()[0] == "TV I" && b2.channelNames()[3] == "Sub" && b2.channelNames()[9] == "Ñandú" && b2.channelNames()[2] == "C");
+        std::vector<std::string> bad = v; bad[4] = "<x>";
+        CHECK("se rechaza < > sin tocar nada", !a.setChannelNames(bad, err) && a.channelNames()[4] == "SL");
+        bad = v; bad[4] = "abcdefghijklm";
+        CHECK("se rechazan más de 12 caracteres", !a.setChannelNames(bad, err));
+        bad.pop_back();
+        CHECK("se rechaza una lista que no tiene 10", !a.setChannelNames(bad, err));
+        FILE* f = fopen("/tmp/sonos_cfg_names.txt.chnames", "w"); fputs("ch0=OK\nch99=x\nbasura\nch1=<b>\nch2=" "1234567890123\nch3=\n", f); fclose(f);
+        UdpStreamer c3; c3.setConfigPath(np); c3.loadConfig();
+        CHECK("fichero con líneas inválidas: solo vale la correcta", c3.channelNames()[0] == "OK" && c3.channelNames()[1] == "FR" && c3.channelNames()[2] == "C" && c3.channelNames()[3] == "LFE");
+        remove(np); remove("/tmp/sonos_cfg_names.txt.chnames");
+    }
     {   // MAC por casilla (ID automático): se persiste, forgetNode la libera, valores fuera de rango se ignoran
         const char* mp = "/tmp/sonos_cfg_mac.txt";
         FILE* f = fopen(mp, "w"); fputs("node1.known=1\nnode1.mac=2345912259942\nnode2.mac=-5\nnode3.mac=999999999999999999\nnode4.mac=abc\n", f); fclose(f);

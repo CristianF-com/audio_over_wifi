@@ -388,6 +388,7 @@ std::string WebServer::handleGET(const std::string& p, int& code) {
     if (p == "/api/tone")     return toneStatus();
     if (p == "/api/firmware") return firmwareInfo();
     if (p == "/api/profiles") return profilesList();
+    if (p == "/api/names") return namesList();
     code = 404; return "{\"error\":\"not found\"}";
 }
 std::string WebServer::handlePOST(const std::string& p, const std::string& b, int& code) {
@@ -404,6 +405,7 @@ std::string WebServer::handlePOST(const std::string& p, const std::string& b, in
     else if (p == "/api/tone")      r = toneStart(b);
     else if (p == "/api/tone/stop") { streamer_.toneStop(); r = "{\"ok\":true}"; }
     else if (p == "/api/profiles")  r = profilesPost(b);
+    else if (p == "/api/names")     r = namesPost(b);
     else if (p == "/api/firmware")  r = firmwareUpload(b);
     else if (p == "/api/ota")       r = otaStart(b);
     else if (p == "/api/ota/cancel") r = otaCancel(b);
@@ -485,6 +487,7 @@ std::string WebServer::getStatus() {
     std::ostringstream o;
     o << "{" << jstr("device", c.device) << ","
       << jnum("sample_rate", c.sample_rate) << ","
+      << "\"ch_names\":" << [&] { std::string r = "["; auto v = streamer_.channelNames(); for (size_t i = 0; i < v.size(); i++) r += (i ? ",\"" : "\"") + jesc(v[i]) + "\""; return r + "]"; }() << ","
       << jnum("channels", c.channels) << ","
       << jnum("period_frames", c.period_size) << ","
       << jnum("playout_ms", streamer_.playoutUs() / 1000.0) << ","
@@ -716,6 +719,51 @@ std::string WebServer::serveFirmware(const std::string& path, int& code) {
     std::lock_guard<std::mutex> lk(fw_mtx_);
     if (!tok || !end || *end || tok != fw_token_ || nowUs() > fw_token_until_us_ || fw_data_.empty()) { code = 403; return "{\"error\":\"token no válido\"}"; }
     return fw_data_;
+}
+// Nombres de las 10 entradas: GET {"names":[10 nombres]}; POST {"names":[...10]} o {"reset":true}
+std::string WebServer::namesList() {
+    auto v = streamer_.channelNames();
+    std::ostringstream o;
+    o << "{\"names\":[";
+    for (size_t i = 0; i < v.size(); i++) o << (i ? "," : "") << "\"" << jesc(v[i]) << "\"";
+    o << "]}";
+    return o.str();
+}
+std::string WebServer::namesPost(const std::string& b) {
+    std::string err;
+    std::vector<std::string> v;
+    if (jsonGet(b, "reset") == "true") { for (int i = 0; i < 10; i++) v.push_back(UdpStreamer::defaultChannelName(i)); }
+    else {
+        const size_t k = b.find("\"names\"");
+        const size_t lb = k == std::string::npos ? k : b.find('[', k), rb = lb == std::string::npos ? lb : b.find(']', lb);
+        if (rb == std::string::npos) return "{\"error\":\"falta names (lista de 10 nombres)\"}";
+        size_t pos = lb + 1;
+        while (pos < rb) {                                             // cadenas JSON con \" y \\ escapados
+            size_t q = b.find('"', pos); if (q == std::string::npos || q >= rb) break;
+            std::string s; size_t i = q + 1;
+            for (; i < b.size() && b[i] != '"'; i++) {
+                if (b[i] == '\\' && i + 1 < b.size()) {
+                    i++; char c = b[i];
+                    if (c == 'u' && i + 4 < b.size()) {                  // \uXXXX (algunos clientes escapan los acentos) -> UTF-8
+                        auto hex4 = [&](size_t at) { return (unsigned)strtoul(b.substr(at, 4).c_str(), nullptr, 16); };
+                        unsigned cp = hex4(i + 1); i += 4;
+                        if (cp >= 0xD800 && cp < 0xDC00 && i + 6 < b.size() && b[i + 1] == '\\' && b[i + 2] == 'u') {
+                            const unsigned lo = hex4(i + 3);
+                            if (lo >= 0xDC00 && lo < 0xE000) { cp = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00); i += 6; }
+                        }
+                        if (cp < 0x80) s += (char)cp;
+                        else if (cp < 0x800) { s += (char)(0xC0 | (cp >> 6)); s += (char)(0x80 | (cp & 63)); }
+                        else if (cp < 0x10000) { s += (char)(0xE0 | (cp >> 12)); s += (char)(0x80 | ((cp >> 6) & 63)); s += (char)(0x80 | (cp & 63)); }
+                        else { s += (char)(0xF0 | (cp >> 18)); s += (char)(0x80 | ((cp >> 12) & 63)); s += (char)(0x80 | ((cp >> 6) & 63)); s += (char)(0x80 | (cp & 63)); }
+                    } else s += c == 'n' ? ' ' : c == 't' ? ' ' : c;
+                }
+                else s += b[i];
+            }
+            v.push_back(s); pos = i + 1;
+        }
+    }
+    if (!streamer_.setChannelNames(v, err)) return "{\"error\":\"" + jesc(err) + "\"}";
+    return namesList();
 }
 // Perfiles guardados: GET lista; POST {"save":"nombre"} | {"load":idx} | {"delete":idx}
 std::string WebServer::profilesList() {

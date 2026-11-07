@@ -682,5 +682,25 @@ nds = {n["id"]: n for n in json.loads(http("GET", "/api/nodes")[1])}
 check("auto-ID: …y la MAC queda en la casilla nueva, no en la vieja", nds[free[2]]["mac"] == "02:11:22:33:44:55" and nds[free[0]]["mac"] == "", (nds[free[2]]["mac"], nds[free[0]]["mac"]))
 c, _ = http("POST", "/api/node", {"id": 0, "ch_left": 0, "ch_right": 1}); check("auto-ID: las casillas automáticas no afectan al resto", c == 200, c)
 
+# 14) Nombres de las 10 entradas (editables, persistidos en <config>.chnames)
+print("\n== Nombres de las entradas ==")
+DEF = ["FL", "FR", "C", "LFE", "SL", "SR", "SBL", "SBR", "AUX-L", "AUX-R"]
+c, b = http("GET", "/api/names"); check("nombres: por defecto son los de siempre (FL, FR, C, LFE, SL, SR, SBL, SBR, AUX-L, AUX-R)", c == 200 and json.loads(b)["names"] == DEF, (c, b))
+mine = ["Frontal I", "Frontal D", "Centro", "Sub", "Lat. izq", "Lat. der", "Fondo I", "Fondo D", "Extra 1", "Extra 2"]
+c, b = http("POST", "/api/names", {"names": mine}); check("nombres: se guardan los 10 y la respuesta los devuelve", c == 200 and json.loads(b)["names"] == mine, (c, b))
+c, b = http("GET", "/api/status"); check("nombres: /api/status incluye ch_names", c == 200 and json.loads(b)["ch_names"] == mine, (c, b))
+try: pf = open("/tmp/sonos_harness_config.txt.chnames").read()
+except OSError: pf = ""
+check("nombres: persisten en <config>.chnames", "ch0=Frontal I" in pf and "ch9=Extra 2" in pf, pf)
+c, b = http("POST", "/api/names", {"names": ["  Sala TV  "] + DEF[1:]}); n = json.loads(b).get("names", []) if c == 200 else []
+check("nombres: se recortan espacios y un nombre igual al de fábrica no se guarda como personalizado", c == 200 and n[0] == "Sala TV" and n[1:] == DEF[1:], (c, b))
+c, b = http("POST", "/api/names", {"names": ["", "", "", "", "", "", "", "", "", ""]}); check("nombres: vacío = nombre de fábrica", c == 200 and json.loads(b)["names"] == DEF, (c, b))
+for bad, why in (({"names": DEF[:9]}, "9 nombres"), ({"names": ["<b>x"] + DEF[1:]}, "con <"), ({"names": ['a"b'] + DEF[1:]}, 'con "'), ({"names": ["a&b"] + DEF[1:]}, "con &"), ({"names": ["1234567890123"] + DEF[1:]}, "13 caracteres"), ({}, "sin names")):
+    c, b = http("POST", "/api/names", bad); check("nombres: se rechaza " + why, c == 400 and "error" in b, (c, b))
+c, b = http("POST", "/api/names", {"names": ["Ñandú ñoño"] + DEF[1:]}); check("nombres: acepta acentos y ñ (12 caracteres, más bytes)", c == 200 and json.loads(b)["names"][0] == "Ñandú ñoño", (c, b))
+c, b = http("POST", "/api/names", {"names": mine}); c2, b2 = http("POST", "/api/names", {"reset": True})
+check("nombres: «reset» vuelve a los de fábrica", c2 == 200 and json.loads(b2)["names"] == DEF, (c2, b2))
+c, b = http("POST", "/api/names", {"names": mine})   # se deja personalizado: la interfaz lo comprueba después
+
 print("\nRESULTADO:", "TODO OK" if ok else "HAY FALLOS")
 sys.exit(0 if ok else 1)

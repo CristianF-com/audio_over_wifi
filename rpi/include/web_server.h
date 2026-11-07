@@ -44,6 +44,8 @@ private:
     std::string serveFirmware(const std::string& path, int& code);
     std::string toneStart(const std::string& body);
     std::string toneStatus();
+    std::string namesList();
+    std::string namesPost(const std::string& body);
     std::string profilesList();
     std::string profilesPost(const std::string& body);
     std::string bleStatus();

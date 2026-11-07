@@ -179,6 +179,12 @@ public:
     int  profileActive() const { return profile_active_.load(); }// último cargado en esta sesión; -1 si ninguno
     bool loadProfiles();
 
+    // ── Nombres de las 10 entradas de audio (FL, FR, C…), editables; fichero aparte <config>.chnames ──
+    static const char* defaultChannelName(int ch);
+    std::vector<std::string> channelNames() const;
+    bool setChannelNames(const std::vector<std::string>& names, std::string& err);   // vacío = nombre por defecto
+    bool loadChannelNames();
+
     // ── Actualización de firmware por WiFi (OTA): envía la orden al ESP y deja de mandarle audio ──
     bool sendOta(uint8_t id, uint16_t http_port, uint32_t size, uint64_t token);
     void cancelOta(uint8_t id);
@@ -235,6 +241,9 @@ private:
         int   night = 0;
         struct N { uint8_t vl = 255, vr = 255, role = ROLE_FULL; int32_t lat = 0; float eq[EQ_BANDS] = {0, 0, 0, 0, 0, 0}; } n[MAX_NODES];
     };
+    mutable std::mutex    names_mtx_;
+    std::string           ch_names_[MAX_NODES];            // nombre elegido por el usuario; vacío = el de fábrica
+    bool saveChannelNames();
     mutable std::mutex    prof_mtx_;
     std::vector<Profile>  profiles_;
     bool saveProfiles();

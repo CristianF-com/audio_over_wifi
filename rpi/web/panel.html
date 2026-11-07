@@ -34,7 +34,7 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 .room{--hw:64px;--ht:80px;--hb:72px;user-select:none;-webkit-user-select:none;position:relative;width:100%;aspect-ratio:16/9;min-height:360px;border:1px solid var(--line);border-radius:var(--r-sheet);overflow:hidden;background:var(--room-bg)}
 .room>*{z-index:1}
 .room{touch-action:pan-y}                       /* la página sigue deslizándose; el pellizco lo gestiona el plano */
-.room.zoomed{touch-action:none;cursor:grab}
+.room.zoomed{cursor:grab}   /* sigue en pan-y: el arrastre vertical del plano lo decide el JS (touchmove) para no atrapar el scroll de la página */
 .room.lod .spk .cap,.room.lod .spk .cal{display:none}   /* alejado: solo el altavoz, su canal y su vúmetro */
 .room.zoomed.panning{cursor:grabbing}
 .room>.radar{position:absolute;left:0;top:0;width:100%;height:100%;z-index:0;pointer-events:none}
@@ -91,7 +91,11 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 .mh{display:flex;align-items:baseline;gap:10px;margin-bottom:8px}.mh b{font-weight:650}.mh .hint{margin-left:auto}
 .mb{display:grid;grid-template-columns:repeat(10,1fr);gap:8px}
 .mc{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
-.mc .lab{font-size:.72rem;font-weight:600;color:var(--mut);line-height:1}
+.mc .lab{font-size:.72rem;font-weight:600;color:var(--mut);line-height:1;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nmgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.nmgrid label{display:block;font-size:.78rem;color:var(--mut);margin-bottom:4px}
+.nmgrid .txt{width:100%}
+.nmbtns{display:flex;gap:10px;flex-wrap:wrap}
 /* Indicador de entrada por canal: apagado (< −70 dBFS), verde fijo = cable conectado sin sonido (−70 a −40) y, con sonido (−40 a 0),
    verde que destella en rojo cada vez que el nivel sube ~3 dB; al bajar se apaga y vuelve a destellar en la siguiente subida */
 .lamp{display:block;width:22px;height:22px;border-radius:5px;background:var(--bar-bg);border:1.5px solid var(--ctl)}
@@ -296,6 +300,11 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
       <div class="fld"><label for="pfname">Guardar el ajuste actual como</label>
         <div class="pfnew"><input class="txt" id="pfname" type="text" maxlength="24" placeholder="Cine, Música, Noche…" autocomplete="off"><button class="btn sm" id="pfsave" type="button">Guardar perfil</button></div></div>
     </div>
+    <div class="card" id="c_names">
+      <div><b>Nombres de las entradas</b><span class="hint">Los 10 canales de audio que llegan por la entrada. El nombre se ve en el plano, en los indicadores y al elegir qué canal toma cada altavoz (hasta 12 caracteres)</span></div>
+      <div class="nmgrid" id="nmgrid"></div>
+      <div class="nmbtns"><button class="btn sm" id="nmsave" type="button">Guardar nombres</button><button class="btn sm" id="nmreset" type="button">Restablecer</button></div>
+    </div>
   </div>
 </section>
 
@@ -360,6 +369,7 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
 
 <script>
 const CH=['FL','FR','C','LFE','SL','SR','SBL','SBR','AUX-L','AUX-R'];
+const CH_DEF=CH.slice();   // nombres de fábrica; los de la Raspberry (ch_names de /api/status) sustituyen a CH en el sitio
 const CHN=['Frontal izq.','Frontal der.','Central','Graves (LFE)','Lateral izq.','Lateral der.','Trasero izq.','Trasero der.','Extra izq.','Extra der.'];
 const POS=[[15,20],[85,20],[50,17],[50,37],[10,60],[90,60],[18,88],[82,88],[20,42],[80,42]];
 const EQF=['354 Hz','707 Hz','1,4 kHz','2,8 kHz','5,7 kHz','9,8 kHz'];
@@ -411,6 +421,7 @@ function sheetDrag(el,close){const hs=[el.querySelector('.grab'),el.querySelecto
 /* Datos */
 async function loadStatus(){
   try{const d=await (await fetch('/api/status')).json();st=d;
+    if(d.ch_names)setChNames(d.ch_names);
     if(!lvOK){$('hs').textContent=(d.running?'Capturando':'Detenido')+' · '+d.sample_rate/1000+' kHz';$('dot').className='dot '+(d.running?'ok':'bad');}
     if(document.activeElement!==$('xos')){$('xos').value=d.xover_hz||80;$('xod').textContent=Math.round(d.xover_hz||80)+' Hz';fillRng($('xos'));}
     if(document.activeElement!==$('lex')&&d.lipsync_extra_ms!==undefined)$('lex').value=d.lipsync_extra_ms;
@@ -513,6 +524,18 @@ $('room').addEventListener('pointermove',e=>{
     if(zoom>1){panX+=cur.x-prev.x;panY+=cur.y-prev.y;placeAll();}
   }
 });
+/* Con zoom > 100 % un dedo mueve el plano; pero si el plano ya no puede moverse hacia donde arrastras (está en el borde), el gesto
+   se deja al navegador y desliza la página: así nunca queda atrapado el scroll. Un gesto no cambia de decisión a mitad de camino. */
+let tg=null;
+const canPanY=dy=>{const {W,H}=vw(),[lx,ly]=LXY(W,H);return zoom>1&&(dy>0?panY<ly*(zoom-1)-0.5:panY>(H-ly)*(1-zoom)+0.5);};
+$('room').addEventListener('touchstart',e=>{tg=e.touches.length===1&&!e.target.closest('.spk,.zoomctl')?{x:e.touches[0].clientX,y:e.touches[0].clientY,d:0}:null;},{passive:true});
+$('room').addEventListener('touchmove',e=>{
+  if(!tg||e.touches.length!==1)return;
+  const t=e.touches[0],dx=t.clientX-tg.x,dy=t.clientY-tg.y;
+  if(!tg.d){if(Math.hypot(dx,dy)<4)return;tg.d=(Math.abs(dx)>Math.abs(dy)||canPanY(dy))?1:2;}   // 1 = mueve el plano, 2 = desliza la página
+  if(tg.d===1&&e.cancelable)e.preventDefault();
+},{passive:false});
+$('room').addEventListener('touchend',()=>{tg=null;},{passive:true});$('room').addEventListener('touchcancel',()=>{tg=null;},{passive:true});
 const endPan=e=>{pts.delete(e.pointerId);if(!pts.size)$('room').classList.remove('panning');};
 $('room').addEventListener('pointerup',endPan);$('room').addEventListener('pointercancel',endPan);
 const spkSvg=sub=>sub
@@ -883,14 +906,30 @@ async function bleProvAll(){const todo=[];bdevs.forEach((d,i)=>{if(d.new&&d.stat
   let n=0;for(const i of todo){if(await bleProvOne(i))n++;}toast(n+' de '+todo.length+' enviados',n===todo.length);bleBuild();}
 
 /* Estado de la transmisión y vúmetros (consulta ligera /api/levels) */
-const CHS=['FL','FR','C','LFE','SL','SR','SBL','SBR','AXL','AXR'];
 const MDB=60;                                   // la escala va de −60 a 0 dBFS
 let lvOK=false,lastDraw=0,lvTxt='',holdV=new Array(10).fill(-90),holdT=new Array(10).fill(0);
 const NSEG=12,SEGDB=MDB/NSEG;                  // 12 LED por altavoz, 5 dB cada uno
 const segCls=i=>{const top=-MDB+SEGDB*(i+1);return top<=-20?'g':top<=-10?'y':'r';};   // verde hasta −20 dB, amarillo hasta −10 dB, rojo por encima
 const VUSEGS=Array.from({length:NSEG},(_,k)=>'<i class="led '+segCls(k)+'"></i>').join('');
 const vuHtml=ch=>'<span class="vu" aria-hidden="true" data-ch="'+ch+'">'+VUSEGS+'</span>';
-$('mb').innerHTML=CHS.map((c,i)=>'<div class="mc" title="'+CH[i]+' · '+CHN[i]+'"><span class="lab">'+c+'</span><i class="lamp" id="lp'+i+'" data-st="off"></i><span class="lvn" id="nm'+i+'">—</span></div>').join('');
+$('mb').innerHTML=CH.map((c,i)=>'<div class="mc" title="'+CH[i]+' · '+CHN[i]+'"><span class="lab">'+c+'</span><i class="lamp" id="lp'+i+'" data-st="off"></i><span class="lvn" id="nm'+i+'">—</span></div>').join('');
+function drawChLabels(){document.querySelectorAll('#mb .mc').forEach((m,i)=>{m.title=CH[i]+' · '+CHN[i];m.querySelector('.lab').textContent=CH[i];});}
+function drawNamesForm(force){
+  const g=$('nmgrid');if(!g||(!force&&g.contains(document.activeElement)))return;      // no pisar lo que se está escribiendo
+  g.innerHTML=CH.map((c,i)=>'<div><label for="chn_'+i+'">Entrada '+(i+1)+' · '+CHN[i]+'</label><input class="txt" id="chn_'+i+'" type="text" maxlength="12" value="'+c+'" placeholder="'+CH_DEF[i]+'" autocomplete="off"></div>').join('');
+}
+function setChNames(a){   // aplica los nombres que llegan de la Raspberry; devuelve true si cambió alguno
+  if(!Array.isArray(a)||a.length!==10||a.every((x,i)=>x===CH[i]))return false;
+  a.forEach((x,i)=>{CH[i]=x;});drawChLabels();drawNamesForm();sig='';return true;
+}
+$('nmsave').onclick=async()=>{
+  const r=await J('/api/names',{names:CH.map((_,i)=>$('chn_'+i).value)});
+  if(r.names){setChNames(r.names);drawNamesForm(true);toast('Nombres guardados');log('Nombres de las entradas guardados');loadNodes();}else toast(r.error||'No se pudieron guardar los nombres.',false);
+};
+$('nmreset').onclick=async()=>{
+  const r=await J('/api/names',{reset:true});
+  if(r.names){setChNames(r.names);drawNamesForm(true);toast('Nombres restablecidos');loadNodes();}else toast(r.error||'No se pudo restablecer.',false);
+};
 const segIdx=db=>db<=-MDB?-1:Math.min(NSEG-1,Math.ceil((db+MDB)/SEGDB)-1);
 const LV=new Array(10).fill(-1),PK=new Array(10).fill(-1);
 /* Estado del indicador de cada canal. Umbrales en dBFS; LAMP_STEP = subida que dispara un destello. */
@@ -947,7 +986,7 @@ $('logclr').onclick=()=>{$('lb').innerHTML='';};
   $('lcal').href=b+'/calibrate';$('lcal2').href=b+'/calibrate';window._bleHref=b+'/ble';})();
 document.querySelectorAll('.rng').forEach(fillRng);
 const h0=(location.hash||'').slice(1);if(['spk','snd','lat','log'].includes(h0))showTab(h0);
-loadStatus().then(loadNodes);updLat();loadProfiles();loadFw();lvLoop();
+drawNamesForm(true);loadStatus().then(loadNodes);updLat();loadProfiles();loadFw();lvLoop();
 setInterval(loadStatus,5000);setInterval(loadNodes,2500);
 </script>
 </body></html>

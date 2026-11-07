@@ -796,7 +796,7 @@ bool UdpStreamer::saveConfig() {
 bool UdpStreamer::loadConfig() {
     if (cfg_path_.empty()) return false;
     FILE* f = fopen(cfg_path_.c_str(), "r");
-    if (!f) return false;                                          // primera ejecución: normal
+    if (!f) { loadChannelNames(); return false; }                   // primera ejecución: normal (los nombres de las entradas van aparte)
     char line[160]; int applied = 0;
     std::lock_guard<std::mutex> lk(nodes_mtx_);
     while (fgets(line, sizeof(line), f)) {
@@ -841,6 +841,7 @@ bool UdpStreamer::loadConfig() {
     fclose(f);
     fprintf(stderr, "[Config] %s cargado (%d valores)\n", cfg_path_.c_str(), applied);
     loadProfiles();
+    loadChannelNames();
     return true;
 }
 
@@ -922,6 +923,73 @@ bool UdpStreamer::profileDelete(int idx) {
     const int a = profile_active_.load();
     if (a == idx) profile_active_.store(-1); else if (a > idx) profile_active_.store(a - 1);
     saveProfiles();
+    return true;
+}
+// ── Nombres de entradas: «chN=nombre», una línea por entrada (solo las personalizadas) ──
+const char* UdpStreamer::defaultChannelName(int ch) {
+    static const char* N[10] = {"FL", "FR", "C", "LFE", "SL", "SR", "SBL", "SBR", "AUX-L", "AUX-R"};
+    return (ch >= 0 && ch < 10) ? N[ch] : "";
+}
+std::vector<std::string> UdpStreamer::channelNames() const {
+    std::lock_guard<std::mutex> lk(names_mtx_);
+    std::vector<std::string> v;
+    for (int i = 0; i < 10; i++) v.push_back(ch_names_[i].empty() ? defaultChannelName(i) : ch_names_[i]);
+    return v;
+}
+// Limpia un nombre: sin espacios sobrantes ni caracteres de control, ni < > " & (se muestran en HTML); máximo 12 caracteres.
+static bool cleanChannelName(const std::string& in, std::string& out, std::string& err) {
+    out.clear();
+    for (unsigned char c : in) { if (c < 0x20 || c == 0x7f) continue; out += (char)c; }
+    size_t a = out.find_first_not_of(' '), b = out.find_last_not_of(' ');
+    out = (a == std::string::npos) ? "" : out.substr(a, b - a + 1);
+    if (out.find_first_of("<>\"&") != std::string::npos) { err = "el nombre no puede llevar < > \" ni &"; return false; }
+    size_t cp = 0; for (unsigned char c : out) if ((c & 0xC0) != 0x80) cp++;
+    if (cp > 12) { err = "el nombre admite como máximo 12 caracteres"; return false; }
+    return true;
+}
+bool UdpStreamer::setChannelNames(const std::vector<std::string>& names, std::string& err) {
+    if (names.size() != 10) { err = "hacen falta los 10 nombres"; return false; }
+    std::string clean[10];
+    for (int i = 0; i < 10; i++) {
+        if (!cleanChannelName(names[i], clean[i], err)) { err = "entrada " + std::to_string(i + 1) + ": " + err; return false; }
+        if (clean[i] == defaultChannelName(i)) clean[i].clear();
+    }
+    {
+        std::lock_guard<std::mutex> lk(names_mtx_);
+        for (int i = 0; i < 10; i++) ch_names_[i] = clean[i];
+    }
+    if (!saveChannelNames()) { err = "no se pudo guardar en la Raspberry"; return false; }
+    return true;
+}
+bool UdpStreamer::saveChannelNames() {
+    if (cfg_path_.empty()) return true;
+    const std::string path = cfg_path_ + ".chnames", tmp = path + ".tmp";
+    FILE* f = fopen(tmp.c_str(), "w");
+    if (!f) return false;
+    {
+        std::lock_guard<std::mutex> lk(names_mtx_);
+        for (int i = 0; i < 10; i++) if (!ch_names_[i].empty()) fprintf(f, "ch%d=%s\n", i, ch_names_[i].c_str());
+    }
+    const bool ok = (fflush(f) == 0) & (ferror(f) == 0);
+    fclose(f);
+    return ok && rename(tmp.c_str(), path.c_str()) == 0;
+}
+bool UdpStreamer::loadChannelNames() {
+    if (cfg_path_.empty()) return false;
+    FILE* f = fopen((cfg_path_ + ".chnames").c_str(), "r");
+    if (!f) return false;
+    std::string v[10];
+    char line[128];
+    while (fgets(line, sizeof(line), f)) {
+        unsigned i = 0; int n = 0;
+        if (sscanf(line, "ch%u=%n", &i, &n) < 1 || n == 0 || i >= 10) continue;
+        std::string val = line + n, clean, err;
+        while (!val.empty() && (val.back() == '\n' || val.back() == '\r')) val.pop_back();
+        if (cleanChannelName(val, clean, err) && clean != defaultChannelName((int)i)) v[i] = clean;
+    }
+    fclose(f);
+    std::lock_guard<std::mutex> lk(names_mtx_);
+    for (int i = 0; i < 10; i++) ch_names_[i] = v[i];
     return true;
 }
 bool UdpStreamer::saveProfiles() {
