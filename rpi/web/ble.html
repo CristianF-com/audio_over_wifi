@@ -21,14 +21,14 @@ main{max-width:600px;margin:0 auto;padding:20px 16px 80px;display:flex;flex-dire
 .step .bd{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
 .step.lock .bd{opacity:.4;pointer-events:none}
 .pills{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
-.pills button{appearance:none;background:var(--raise);border:1px solid var(--line2);border-radius:12px;min-height:46px;font-weight:650;font-size:1.05rem}
+.pills button{appearance:none;background:var(--raise);border:1px solid var(--line2);border-radius:999px;min-height:46px;font-weight:650;font-size:1.05rem}
 .pills button:hover{border-color:var(--ac-ln)}
 .pills button[aria-pressed=true]{background:var(--ac-bg);border-color:var(--ac);color:var(--ac)}
 .kv{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .kv div{background:var(--raise);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 .kv span{display:block;font-size:.8rem;color:var(--mut)}.kv b{font-weight:600}
 .pw{position:relative}.pw button{position:absolute;right:6px;top:5px}
-details.adv{border:1px solid var(--line);border-radius:14px;padding:4px 14px;background:var(--panel)}
+details.adv{border:1px solid var(--line);border-radius:var(--r-card);padding:4px 14px;background:var(--panel)}
 details.adv summary{cursor:pointer;padding:10px 0;font-weight:600;color:var(--mut)}
 details.adv[open] summary{color:var(--fg)}
 details.adv .in2{padding:4px 0 14px;display:flex;flex-direction:column;gap:12px}

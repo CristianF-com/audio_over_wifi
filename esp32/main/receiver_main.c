@@ -1,5 +1,7 @@
 /**
- * receiver_main.c — SonosWiFi receptor para XIAO ESP32-C5 (ESP-IDF >= 5.5, C)
+ * receiver_main.c — SonosWiFi receptor para XIAO ESP32-C5 (ESP-IDF >= 5.5, C).
+ * También lo compila ../esp32_wroom para el ESP32-WROOM-32D (ESP32 clásico, solo 2.4 GHz): los únicos
+ * puntos que dependen del chip son apply_band_mode() y los pines/valores de Kconfig de cada carpeta.
  * ===========================================================================
  * Diferencias clave frente a la versión para ESP32 clásico:
  *  - ESP32-C5 = UN solo núcleo RISC-V  -> xTaskCreate (sin pin a core 1).
@@ -192,6 +194,7 @@ static void wifi_retry_cb(void* arg) { esp_wifi_connect(); }
 
 /* Banda del C5 (no puede usar 2.4 y 5 GHz a la vez). Por defecto SOLO 5 GHz: con un SSID compartido
  * entre bandas, el escaneo "por señal" suele elegir 2.4 GHz (más señal a distancia) y perderías la ventaja. */
+#if CONFIG_IDF_TARGET_ESP32C5
 static void apply_band_mode(void)
 {
 #if defined(CONFIG_SONOS_WIFI_BAND_2G)
@@ -205,6 +208,9 @@ static void apply_band_mode(void)
     if (e != ESP_OK) ESP_LOGW(TAG, "set_band_mode(%s) falló: %d", n, (int)e);
     else ESP_LOGI(TAG, "Banda WiFi: solo %s", n);
 }
+#else   /* ESP32 clásico (WROOM-32D, ver ../esp32_wroom): solo 2.4 GHz, no hay banda que elegir */
+static void apply_band_mode(void) { ESP_LOGI(TAG, "Banda WiFi: 2.4 GHz (única del chip)"); }
+#endif
 
 /* País regulatorio del WiFi (por defecto Argentina, "AR"): fija canales y potencia permitidos.
  * ieee80211d=false: no lo cambia el país que anuncie el router. */

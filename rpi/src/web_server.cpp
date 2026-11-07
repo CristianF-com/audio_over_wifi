@@ -472,6 +472,7 @@ std::string WebServer::getNodes() {
           << jbool("enabled", n.enabled)  << ","
           << jbool("mono",    n.mono)     << ","
           << jnum("role",     n.role)     << ","
+          << jbool("known",   n.known)    << ","
           << jnum("pos_x",    std::round(n.pos_x * 100.0) / 100.0) << "," << jnum("pos_y", std::round(n.pos_y * 100.0) / 100.0) << ","
           << jnum("pos2_x", std::round(n.pos2_x * 100.0) / 100.0) << "," << jnum("pos2_y", std::round(n.pos2_y * 100.0) / 100.0) << ","
           << "\"eq\":[" ;
@@ -510,6 +511,13 @@ std::string WebServer::setNode(const std::string& b) {
     if (!(s = jsonGet(b, "volume_r")).empty() && !parseInt(s, 0, 255, vr)) return BAD;
     if (!(s = jsonGet(b, "enabled")).empty()) enabled = (s != "false" && s != "0");
     if (!(s = jsonGet(b, "mono")).empty())    mono    = (s != "false" && s != "0");
+    {   // «forget»: quitar del panel un ESP apagado (su configuración se conserva por si vuelve)
+        std::string fg = jsonGet(b, "forget");
+        if (fg == "true" || fg == "1") {
+            if (!streamer_.forgetNode((uint8_t)id)) return "{\"error\":\"ese ESP está en línea: apágalo antes de quitarlo\"}";
+            return "{\"ok\":true}";
+        }
+    }
     long role = cur.role;
     if (!(s = jsonGet(b, "role")).empty() && !parseInt(s, 0, 2, role)) return BAD;
     if (!streamer_.setNodeConfig((uint8_t)id, (uint8_t)chl, (uint8_t)chr,

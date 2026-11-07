@@ -29,6 +29,7 @@ struct ESPNode {
     bool               mono      = false;   // «1 ESP por canal»: ch_right = ch_left, vol_r = vol_l, paquetes PKT_AUDIO_MONO
     bool               enabled   = true;
     uint8_t            role      = ROLE_FULL;
+    bool               known     = false;   // este ESP ya se conectó alguna vez: aparece en el panel aunque esté apagado (se persiste)
     float              pos_x     = -1;      // posición en el plano de la sala, % del ancho (0..100); <0 = automática (según el canal)
     float              pos_y     = -1;      // % del alto (0..100)
     float              pos2_x    = -1;      // idem para el canal derecho (los nodos estéreo son dos altavoces en el plano)
@@ -94,6 +95,7 @@ public:
     bool setLayout(int layout);
     int  layout() const { return layout_.load(); }
     bool setLatencyOffset(uint8_t id, int32_t us);   // ±500000 µs
+    bool forgetNode(uint8_t id);                                     // quita un ESP apagado del panel (false si está en línea); su configuración se conserva
     bool setNodeRole(uint8_t id, uint8_t role);                      // NodeRole
     bool setNodePos(uint8_t id, float x, float y, int side = 0);  // side 0 = canal izquierdo, 1 = derecho;                   // plano de la sala: x,y en 0..100 (% del plano); x<0 e y<0 = automática
     bool setNodeEq(uint8_t id, const float gains_db[EQ_BANDS]);      // ±EQ_MAX_DB por banda

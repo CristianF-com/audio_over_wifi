@@ -294,6 +294,13 @@ c, _ = http("POST", "/api/node", {"id": 0, "pos_auto": True}); check("pos_auto -
 c, b2 = http("GET", "/api/nodes"); n0 = json.loads(b2)[0]
 check("pos_auto devuelve la posición automática (ambos canales)", n0["pos_x"] == -1 and n0["pos_y"] == -1 and n0["pos2_x"] == -1 and n0["pos2_y"] == -1, (n0["pos_x"], n0["pos_y"]))
 
+print("\n-- ESP conocidos (aparecen en el panel) --")
+c, b2 = http("GET", "/api/nodes"); ns = json.loads(b2)
+check("el ESP que se conectó (0) es «known»; los que nunca se vieron, no", ns[0]["known"] is True and all(n["known"] is False for n in ns[1:]), [n["known"] for n in ns])
+c, b2 = http("POST", "/api/node", {"id": 0, "forget": True}); check("quitar un ESP en línea -> 400", c == 400 and "en línea" in b2.decode() if isinstance(b2, bytes) else c == 400, (c, b2))
+c, _ = http("POST", "/api/node", {"id": 5, "forget": True}); check("quitar un ESP apagado -> 200", c == 200, c)
+c, b2 = http("GET", "/api/nodes"); check("ESP en línea sigue «known» tras intentar quitarlo", json.loads(b2)[0]["known"] is True)
+
 # 11) REENVÍO (NACK) y límites
 print("\n-- reenvío de paquetes (NACK) --")
 pk = pkts_after_switch()

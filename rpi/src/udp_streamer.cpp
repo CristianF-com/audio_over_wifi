@@ -158,6 +158,7 @@ void UdpStreamer::handleHello(const uint8_t* b, int n, const sockaddr_in& src) {
             fprintf(stderr, "[Control] AVISO: dos placas con ID %u (%s y %s)\n",
                     h.esp_id, node.ip.c_str(), ip);
         bool was_offline = !node.online;
+        if (!node.known) { node.known = true; node.enabled = true; dirty_.store(true); }   // primera vez: aparece en el panel y suena
         node.ip         = ip;
         node.audio_port = h.audio_port ? h.audio_port : PORT_AUDIO;
         node.online     = true;
@@ -522,6 +523,14 @@ bool UdpStreamer::setLatencyOffset(uint8_t id, int32_t us) {
     return true;
 }
 
+bool UdpStreamer::forgetNode(uint8_t id) {
+    if (id >= MAX_NODES) return false;
+    std::lock_guard<std::mutex> lk(nodes_mtx_);
+    if (nodes_[id].online) return false;
+    nodes_[id].known = false;
+    dirty_.store(true);
+    return true;
+}
 bool UdpStreamer::setNodeRole(uint8_t id, uint8_t role) {
     if (id >= MAX_NODES || role > ROLE_SUB) return false;
     std::lock_guard<std::mutex> lk(nodes_mtx_);
@@ -598,7 +607,7 @@ bool UdpStreamer::saveConfig() {
                 n.id, n.ch_left, n.id, n.ch_right, n.id, n.volume_l, n.id, n.volume_r,
                 n.id, n.enabled ? 1 : 0, n.id, n.mono ? 1 : 0, n.id, n.latency_offset_us);
     for (const auto& n : nodes) {
-        fprintf(f, "node%d.role=%d\nnode%d.pos_x=%.2f\nnode%d.pos_y=%.2f\nnode%d.pos2_x=%.2f\nnode%d.pos2_y=%.2f\n", n.id, n.role, n.id, n.pos_x, n.id, n.pos_y, n.id, n.pos2_x, n.id, n.pos2_y);
+        fprintf(f, "node%d.role=%d\nnode%d.known=%d\nnode%d.pos_x=%.2f\nnode%d.pos_y=%.2f\nnode%d.pos2_x=%.2f\nnode%d.pos2_y=%.2f\n", n.id, n.role, n.id, n.known ? 1 : 0, n.id, n.pos_x, n.id, n.pos_y, n.id, n.pos2_x, n.id, n.pos2_y);
         for (int b = 0; b < EQ_BANDS; b++) fprintf(f, "node%d.eq%d=%.2f\n", n.id, b, n.eq_db[b]);
     }
     bool ok = (fflush(f) == 0) & (ferror(f) == 0);
@@ -637,6 +646,7 @@ bool UdpStreamer::loadConfig() {
         else if (!strcmp(field, "ch_right") && v >= 0 && v < AUDIO_CHANNELS) { n.ch_right = (uint8_t)v; applied++; }
         else if (!strcmp(field, "volume_l") && v >= 0 && v <= 255) { n.volume_l = (uint8_t)v; applied++; }
         else if (!strcmp(field, "volume_r") && v >= 0 && v <= 255) { n.volume_r = (uint8_t)v; applied++; }
+        else if (!strcmp(field, "known"))    { n.known = (v != 0); applied++; }
         else if (!strcmp(field, "pos_x") && dv >= -1 && dv <= 100) { n.pos_x = (float)dv; applied++; }
         else if (!strcmp(field, "pos_y") && dv >= -1 && dv <= 100) { n.pos_y = (float)dv; applied++; }
         else if (!strcmp(field, "pos2_x") && dv >= -1 && dv <= 100) { n.pos2_x = (float)dv; applied++; }

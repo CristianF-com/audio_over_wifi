@@ -53,6 +53,17 @@ int main() {
         CHECK("crossover persistido (110 Hz) y extra lip-sync (−7 ms)", b.xoverHz() == 110.0f && b.lipsyncExtraMs() == -7);
         CHECK("por defecto nodos 5..9 deshabilitados", !n[5].enabled && !n[9].enabled);
     }
+    {   // ESP «conocidos»: se persisten, y forgetNode solo vale para los apagados
+        const char* kp = "/tmp/sonos_cfg_known.txt";
+        FILE* f = fopen(kp, "w"); fputs("node3.known=1\nnode4.known=1\nnode3.enabled=0\n", f); fclose(f);
+        UdpStreamer k; k.setConfigPath(kp);
+        CHECK("known=1 cargado desde el fichero", k.loadConfig() && k.getNodes()[3].known && k.getNodes()[4].known && !k.getNodes()[0].known);
+        CHECK("forgetNode(3) quita un ESP apagado; forgetNode(10) rechazado", k.forgetNode(3) && !k.getNodes()[3].known && !k.forgetNode(10));
+        CHECK("saveConfig con known", k.saveConfig());
+        UdpStreamer k2; k2.setConfigPath(kp); k2.loadConfig();
+        CHECK("known persiste tras guardar y recargar (3 quitado, 4 conservado); enabled=0 se conserva", !k2.getNodes()[3].known && k2.getNodes()[4].known && !k2.getNodes()[3].enabled);
+        remove(kp);
+    }
     {   // fichero con basura, valores fuera de rango y claves desconocidas
         FILE* f = fopen(path, "w");
         fputs("version=1\nmaster_volume=99\nplayout_us=5\nnode9.ch_left=1\nnode1.ch_left=77\nnode1.volume_l=abc\n"

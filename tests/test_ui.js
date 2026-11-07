@@ -17,6 +17,25 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   const n=await p.locator('#spks .spk').count();ok('plano: un altavoz dibujado por canal (5 ESP estéreo = 10)',n===10,n);
   ok('plano: nodos en línea (punto verde)',await p.locator('#spks .st.on').count()===10);
   ok('estado: «5 de 5 en línea»',(await p.textContent('#onl')).includes('5 de 5'));
+  ok('sin selector «5 estéreo / 10 mono» (cada ESP elige estéreo o mono en su cajón)',await p.locator('#lyseg').count()===0&&!(await p.textContent('body')).includes('10 mono'));
+  // solo existen en el plano los ESP que se conectaron alguna vez (known), aunque haya otros «habilitados»
+  await fetch(BASE+'/api/node',{method:'POST',body:JSON.stringify({id:8,enabled:true})});await sleep(1500);
+  ok('plano: un ESP habilitado que nunca se conectó (8) no aparece ni en el plano ni en la lista',await p.locator('#spks .spk[data-id="8"]').count()===0&&await p.locator('#chips button[data-id="8"]').count()===0&&(await J('/api/nodes'))[8].known===false);
+  await fetch(BASE+'/api/node',{method:'POST',body:JSON.stringify({id:8,enabled:false})});
+  // mezcla: 1 ESP estéreo y 2 ESP mono (antes solo había «5 estéreo» o «10 mono»)
+  await fetch(BASE+'/api/node',{method:'POST',body:JSON.stringify({id:1,mono:true,ch_left:2,volume_l:255})});
+  await fetch(BASE+'/api/node',{method:'POST',body:JSON.stringify({id:2,mono:true,ch_left:4,volume_l:255})});
+  await p.reload();await p.waitForSelector('#spks .spk');await sleep(1200);
+  const mix=await p.evaluate(()=>[...document.querySelectorAll('#spks .spk')].reduce((a,e)=>{a[e.dataset.id]=(a[e.dataset.id]||0)+1;return a;},{}));
+  ok('plano: ESP 0 estéreo = 2 altavoces; ESP 1 y 2 mono = 1 cada uno',mix[0]===2&&mix[1]===1&&mix[2]===1&&mix[3]===2&&mix[4]===2,mix);
+  await fetch(BASE+'/api/node',{method:'POST',body:JSON.stringify({id:1,mono:false,ch_left:2,ch_right:3})});
+  await fetch(BASE+'/api/node',{method:'POST',body:JSON.stringify({id:2,mono:false,ch_left:4,ch_right:5})});
+  await fetch(BASE+'/api/layout',{method:'POST',body:JSON.stringify({layout:'stereo5'})});
+  await p.reload();await p.waitForSelector('#spks .spk');await sleep(800);
+  // quitar un ESP del panel: no se puede con uno en línea
+  await p.click('#spks .spk[data-id="3"][data-side="0"]');
+  ok('cajón: «Quitar este ESP del panel» está desactivado mientras el ESP está en línea',await p.isDisabled('#d_fg'));
+  await p.click('#drawer .x');
   // Estado de transmisión y vúmetros (datos reales del arnés: ch0/1 −6 dBFS, ch2 y ch4 −12 dBFS, el resto en silencio)
   ok('estado: «Transmitiendo · 5 altavoces»',await until(async()=>(await p.textContent('#hs')).includes('Transmitiendo · 5 altavoces')),await p.textContent('#hs'));
   ok('estado: punto verde',(await p.getAttribute('#dot','class')).includes('ok'));
@@ -144,7 +163,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
     if(![...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim()))continue;const fs=parseFloat(getComputedStyle(e).fontSize);if(fs<11)out.push(e.className+':'+e.textContent.trim().slice(0,20)+':'+fs);}return out;});
   ok('ningún texto por debajo de 11 px (mínimo de iOS)',small.length===0,small);
   ok('el texto base es 17 px y sigue el tamaño de letra del navegador (rem)',await p.evaluate(()=>getComputedStyle(document.body).fontSize==='17px'&&getComputedStyle(document.documentElement).fontSize==='17px'));
-  const sb=await p.locator('#lyseg button').first().boundingBox();
+  await p.click('#tab_lat');const sb=await p.locator('#plseg button').first().boundingBox();await p.click('#tab_spk');
   ok('controles segmentados visibles (no se pisan con los LED del vúmetro)',sb&&sb.height>=30&&sb.width>=60,sb);
   ok('el cajón cerrado es inerte y está oculto (el teclado no entra en él)',await p.evaluate(()=>document.getElementById('drawer').inert===true&&document.getElementById('bdrawer').inert===true&&document.getElementById('drawer').getAttribute('aria-hidden')==='true'));
   ok('los cajones son diálogos modales con título',await p.evaluate(()=>['drawer','bdrawer'].every(i=>{const d=document.getElementById(i);return d.getAttribute('role')==='dialog'&&d.getAttribute('aria-modal')==='true'&&document.getElementById(d.getAttribute('aria-labelledby'))!==null;})));
@@ -164,9 +183,9 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   const q=await m.newPage();await q.goto(BASE+'/');await q.waitForSelector('#spks .spk');await sleep(800);
   ok('móvil: sin scroll horizontal',await q.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
   if(SHOTS)await q.screenshot({path:SHOTS+'/movil_altavoces.png'});
-  ok('móvil: la navegación es una barra inferior fija con icono y una sola palabra por pestaña',await q.evaluate(()=>{const t=document.querySelector('.tabs'),r=t.getBoundingClientRect(),cs=getComputedStyle(t);
-    return cs.position==='fixed'&&Math.abs(r.bottom-innerHeight)<2&&[...t.querySelectorAll('.tab')].every(b=>b.querySelector('svg')&&getComputedStyle(b.querySelector('svg')).display!=='none'&&b.textContent.trim().split(/\s+/).length===1);}));
-  ok('móvil: objetivos táctiles de 44 px como mínimo (botones, segmentos, pestañas, selector, campo)',await q.evaluate(()=>['#lble','#lcal','#lyseg button','.tab','#spks .spk','#mvs'].every(s=>{const e=document.querySelector(s);const r=e.getBoundingClientRect();return r.height>=44-.5;})));
+  ok('móvil: la navegación es una píldora flotante abajo (separada de los bordes) con icono y una sola palabra por pestaña',await q.evaluate(()=>{const t=document.querySelector('.tabs'),r=t.getBoundingClientRect(),cs=getComputedStyle(t);
+    return cs.position==='fixed'&&r.bottom<=innerHeight-8&&r.left>=8&&r.right<=innerWidth-8&&parseFloat(cs.borderTopLeftRadius)>=24&&[...t.querySelectorAll('.tab')].every(b=>b.querySelector('svg')&&getComputedStyle(b.querySelector('svg')).display!=='none'&&b.textContent.trim().split(/\s+/).length===1);}));
+  ok('móvil: objetivos táctiles de 44 px como mínimo (botones, segmentos, pestañas, selector, campo)',await q.evaluate(()=>['#lble','#lcal','.tab','#spks .spk','#mvs'].every(s=>{const e=document.querySelector(s);const r=e.getBoundingClientRect();return r.height>=44-.5;})));
   ok('móvil: la cabecera ya no es fija (la navegación va abajo)',await q.evaluate(()=>getComputedStyle(document.querySelector('.top')).position==='static'));
   ok('móvil: ningún texto por debajo de 11 px',await q.evaluate(()=>{for(const e of document.querySelectorAll('body *')){if(!e.offsetParent&&getComputedStyle(e).position!=='fixed')continue;if(![...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim()))continue;if(parseFloat(getComputedStyle(e).fontSize)<11)return false;}return true;}));
   await q.tap('#spks .spk[data-id="0"]');await q.waitForSelector('#drawer.on');await sleep(400);

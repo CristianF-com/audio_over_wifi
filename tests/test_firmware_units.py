@@ -40,4 +40,30 @@ check("sdkconfig.defaults: partición de aplicación grande (el binario supera 1
       "CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y" in sd)
 check("ble_store_config_init() declarada antes de usarla (ESP-IDF no la expone)",
       "void ble_store_config_init(void);" in c and c.index("void ble_store_config_init(void);") < c.index("    ble_store_config_init();"))
+
+
+# ── ESP32-WROOM-32D (esp32_wroom): mismo código, otro chip ──
+import re as _re
+w = f"{here}/../esp32_wroom"
+sd = open(f"{w}/sdkconfig.defaults").read()
+check("wroom: target esp32 (clásico) y partición grande", 'CONFIG_IDF_TARGET="esp32"' in sd and "SINGLE_APP_LARGE=y" in sd and "esp32c5" not in sd.replace("# ", ""))
+wk = open(f"{w}/main/Kconfig.projbuild").read()
+pins = {n: int(_re.search(r"config I2S_%s_GPIO\n\s+int .*\n\s+default (\d+)" % n, wk).group(1)) for n in ("BCK", "WS", "DOUT")}
+check("wroom: pines I2S por defecto 26/25/22", pins == {"BCK": 26, "WS": 25, "DOUT": 22}, pins)
+check("wroom: sin selección de banda 5 GHz (solo 2.4)", "SONOS_WIFI_BAND" not in wk and 'default "AR"' in wk)
+wc = open(f"{w}/main/CMakeLists.txt").read()
+check("wroom: compila los mismos fuentes que el C5", "../../esp32/main/receiver_main.c" in wc and "../../esp32/main/ble_prov.c" in wc and "../../common" in wc)
+check("wroom: README con pines y aviso de no probado", "GPIO26" in open(f"{w}/README.md").read() and "No probado" in open(f"{w}/README.md").read())
+src = open(f"{here}/../esp32/main/receiver_main.c").read()
+check("C5 y WROOM: apply_band_mode protegido por el chip (C5 igual que antes)", "#if CONFIG_IDF_TARGET_ESP32C5" in src and src.count("static void apply_band_mode") == 2 and src.count("esp_wifi_set_band_mode") == 1)
+def _balanced(t):
+    d = 0
+    for l in t.splitlines():
+        l = l.strip()
+        if _re.match(r"#\s*if(def|ndef)?\b", l): d += 1
+        elif _re.match(r"#\s*endif\b", l): d -= 1
+        if d < 0: return False
+    return d == 0
+check("receiver_main.c: #if/#endif balanceados", _balanced(src))
+
 sys.exit(0 if ok else 1)
