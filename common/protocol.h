@@ -18,6 +18,10 @@
  * v5: recuperación de pérdidas. El ESP detecta huecos en seq y pide el reenvío con PKT_NACK (hasta 8 seq);
  *     la RPi guarda los últimos TX_HISTORY_PACKETS paquetes por nodo y reenvía el mismo paquete (mismo seq/ts).
  *     REPORT incluye recovered_packets. Con la red limpia no cuesta ni un byte extra.
+ * v5 (compatible hacia atrás, SIN cambiar PROTOCOL_VERSION; los ESP antiguos lo ignoran):
+ *   - HELLO.reserved = versión de firmware (bits 0..5) | chip (bits 6..7: 1 = ESP32-C5, 2 = ESP32 clásico); 0 = firmware antiguo.
+ *   - REPORT.reserved[0] = RSSI WiFi en dBm (int8; 0 = desconocido).
+ *   - PKT_OTA (RPi -> ESP:5005): orden de actualizar el firmware por WiFi (el ESP la ignora si no la entiende).
  * Volumen, crossover y ecualización: se aplican SOLO en la RPi. El ESP no toca las muestras.
  * (antes:) Volumen: se aplica SOLO en la RPi. El ESP no escala muestras.
  * Todo en little-endian (RPi y ESP32-C5 lo son). Structs empaquetados.
@@ -59,6 +63,14 @@
 #define PKT_SYNC_RESP   0x07   /* RPi -> ESP:5005                       */
 #define PKT_AUDIO_MONO  0x08   /* RPi -> ESP:5006 (240 frames mono; num_samples = 240) */
 #define PKT_NACK        0x09   /* ESP -> RPi:5005 (pide reenvío de paquetes de audio)  */
+#define PKT_OTA         0x0A   /* RPi -> ESP:5005 (actualizar firmware por HTTP desde la RPi) */
+
+#define FW_CHIP_UNKNOWN 0
+#define FW_CHIP_C5      1
+#define FW_CHIP_ESP32   2
+#define HELLO_FW_VERSION(r)  ((r) & 0x3F)
+#define HELLO_FW_CHIP(r)     (((r) >> 6) & 0x03)
+#define HELLO_PACK(ver, chip) ((uint8_t)(((ver) & 0x3F) | (((chip) & 0x03) << 6)))
 
 #define NACK_MAX_SEQS       8
 #define TX_HISTORY_PACKETS  128   /* RPi: paquetes recordados por nodo (potencia de 2; 128 = 0.6 s mono / 0.3 s estéreo) */
@@ -70,7 +82,7 @@ typedef struct {
     uint8_t  pkt_type;     /* PKT_HELLO */
     uint8_t  esp_id;       /* 0..9 */
     uint8_t  version;      /* PROTOCOL_VERSION */
-    uint8_t  reserved;
+    uint8_t  reserved;     /* HELLO_PACK(fw_version, chip); 0 = firmware sin esta información */
     uint16_t audio_port;   /* host order */
     uint8_t  mac[6];
 } HelloPacket;             /* 16 */
@@ -116,7 +128,8 @@ typedef struct {
     uint32_t magic;
     uint8_t  pkt_type;     /* PKT_REPORT */
     uint8_t  esp_id;
-    uint8_t  reserved[2];
+    int8_t   rssi_dbm;         /* RSSI WiFi (0 = desconocido; firmware antiguo) */
+    uint8_t  reserved;
     int64_t  clock_offset_us;  /* maestro - local */
     int32_t  rtt_us;           /* mejor RTT de sync */
     int32_t  jitter_us;        /* estilo RFC3550 */
@@ -137,6 +150,17 @@ typedef struct {
     uint8_t  reserved;
     uint32_t seq[NACK_MAX_SEQS];
 } NackPacket;              /* 40 */
+
+typedef struct {
+    uint32_t magic;
+    uint8_t  pkt_type;     /* PKT_OTA */
+    uint8_t  esp_id;
+    uint8_t  reserved[2];
+    uint16_t http_port;    /* puerto HTTP de la RPi (host order) */
+    uint16_t reserved2;
+    uint32_t size;         /* bytes de la imagen */
+    uint64_t token;        /* permiso de un solo uso: GET /fw/ota.bin?t=<token en hex de 16 dígitos> */
+} OtaPacket;               /* 24 */
 
 typedef struct {
     uint32_t magic;
@@ -164,5 +188,6 @@ PROTO_ASSERT(sizeof(ConfigPacket)   == 16, "ConfigPacket");
 PROTO_ASSERT(sizeof(AudioPacket)    == 500, "AudioPacket");
 PROTO_ASSERT(sizeof(ReportPacket)   == 52, "ReportPacket");
 PROTO_ASSERT(sizeof(NackPacket)     == 40, "NackPacket");
+PROTO_ASSERT(sizeof(OtaPacket)      == 24, "OtaPacket");
 PROTO_ASSERT(sizeof(SyncReqPacket)  == 16, "SyncReqPacket");
 PROTO_ASSERT(sizeof(SyncRespPacket) == 32, "SyncRespPacket");

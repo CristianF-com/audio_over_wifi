@@ -55,6 +55,13 @@ struct ESPNode {
 
     // Ajuste de alineación (distancia/latencia acústica) en µs. + = retrasa este nodo.
     int32_t  latency_offset_us = 0;
+
+    float    dist_m          = -1;       // distancia del altavoz a quien escucha (m); <0 = sin definir. Solo informativa: sirve para calcular retardo y nivel
+    uint8_t  fw_version      = 0;        // versión de firmware que anuncia el ESP en el HELLO (0 = firmware antiguo)
+    uint8_t  chip            = FW_CHIP_UNKNOWN;
+    int8_t   rssi_dbm        = 0;        // señal WiFi del último REPORT (0 = desconocida)
+    bool     ota_busy        = false;    // actualizando firmware: no se le envía audio
+    uint64_t ota_until_us    = 0;        // mono_us() hasta el que se espera a que termine
 };
 
 // ── Calibración acústica ────────────────────────────────────────────────────
@@ -138,6 +145,43 @@ public:
     int64_t  captureAgeMs() const;                // ms desde el último bloque de audio recibido de la tarjeta; -1 si nunca
     uint32_t packetsPerSec() const { return pps_.load(std::memory_order_relaxed); }   // paquetes de audio enviados por segundo (todos los nodos)
 
+    // ── Tono de prueba por altavoz (diagnóstico) ────────────────────────────────
+    // Un tono de 1 kHz a pulsos suena SOLO en ese altavoz (side 0 = izquierdo, 1 = derecho, 2 = ambos).
+    // solo = true silencia el resto de altavoces mientras dura. Respeta el volumen del altavoz y el maestro.
+    bool toneStart(uint8_t id, int side, int ms, bool solo, float level_db);   // 1000..10000 ms, -40..-6 dBFS
+    void toneStop();
+    bool toneActive() const { return tone_active_.load(); }
+    int  toneNode() const { return tone_id_.load(); }
+    int  toneSide() const { return tone_side_.load(); }
+    int64_t toneRemainingMs() const;
+
+    // ── Opciones de procesado nuevas (desactivadas por defecto: pass-through intacto) ──
+    // Graves (LFE) a los frontales: si NINGÚN altavoz activo reproduce el canal LFE (3), su contenido (pasa-bajos 120 Hz)
+    // se suma a los canales 0 y 1 de los altavoces de rango completo. Con un subwoofer sonando el LFE no tiene efecto.
+    bool  lfeFront() const { return lfe_front_.load(); }
+    void  setLfeFront(bool on) { lfe_front_.store(on); dirty_.store(true); }
+    float lfeDb() const { return lfe_db_.load(); }
+    bool  setLfeDb(float db);                                    // -12..+10 dB
+    bool  lfeActive() const { return lfe_active_.load(); }       // ahora mismo se está mezclando el LFE en los frontales
+    // Modo noche: compresor de rango dinámico sobre la salida (0 = desactivado, 1 suave, 2 medio, 3 fuerte).
+    int   nightLevel() const { return night_.load(); }
+    bool  setNightLevel(int lv);
+
+    bool  setNodeDist(uint8_t id, float m);                      // 0.2..30 m, o <0 para borrarla
+
+    // ── Perfiles guardados (volúmenes, retardos, EQ, roles y opciones de procesado de todos los altavoces) ──
+    static constexpr int MAX_PROFILES = 12;
+    std::vector<std::string> profileNames() const;
+    bool profileSave(const std::string& name, std::string& err); // mismo nombre = sobrescribe
+    bool profileLoad(int idx);
+    bool profileDelete(int idx);
+    int  profileActive() const { return profile_active_.load(); }// último cargado en esta sesión; -1 si ninguno
+    bool loadProfiles();
+
+    // ── Actualización de firmware por WiFi (OTA): envía la orden al ESP y deja de mandarle audio ──
+    bool sendOta(uint8_t id, uint16_t http_port, uint32_t size, uint64_t token);
+    void cancelOta(uint8_t id);
+
 private:
     void controlLoop();                       // HELLO / REPORT / SYNC_REQ
     void markOffline();
@@ -165,6 +209,34 @@ private:
     std::atomic<float>    xover_hz_{(float)XOVER_DEFAULT_HZ};
     std::atomic<bool>     xover_on_{false}, eq_on_{false};
     std::atomic<int>      lipsync_extra_ms_{0};
+    std::atomic<bool>     lfe_front_{false}, lfe_active_{false};
+    std::atomic<float>    lfe_db_{0.0f};
+    std::atomic<int>      night_{0};
+    std::atomic<int>      profile_active_{-1};
+
+    // Tono de prueba: petición (hilo web) -> estado (hilo de captura)
+    std::atomic<bool>     tone_active_{false}, tone_req_{false}, tone_stop_req_{false}, tone_solo_{false};
+    std::atomic<int>      tone_id_{-1}, tone_side_{2}, tone_dur_ms_{3000};
+    std::atomic<float>    tone_level_db_{-20.0f};
+    std::atomic<uint64_t> tone_end_wall_us_{0};
+    bool                  tone_run_ = false;                       // --- solo hilo de captura ---
+    double                tone_t0_ = 0, tone_end_ts_ = 0;
+    float                 tone_amp_ = 0;
+    int                   tone_run_id_ = -1, tone_run_side_ = 2;
+    bool                  tone_run_solo_ = false;
+    std::vector<float>    tone_wave_;
+
+    // Perfiles
+    struct Profile {
+        std::string name;
+        float master = 1.0f, xover_hz = (float)XOVER_DEFAULT_HZ, lfe_db = 0;
+        bool  xover_on = false, eq_on = false, lfe_front = false;
+        int   night = 0;
+        struct N { uint8_t vl = 255, vr = 255, role = ROLE_FULL; int32_t lat = 0; float eq[EQ_BANDS] = {0, 0, 0, 0, 0, 0}; } n[MAX_NODES];
+    };
+    mutable std::mutex    prof_mtx_;
+    std::vector<Profile>  profiles_;
+    bool saveProfiles();
 
     // Historial de los últimos TX_HISTORY_PACKETS paquetes por nodo, para atender los NACK
     struct HistSlot { uint32_t seq = 0; bool used = false; AudioPacket pkt; };
@@ -180,8 +252,11 @@ private:
         Lr4      hp[AUDIO_CHANNELS], lp[AUDIO_CHANNELS];
         EqChain  eq[MAX_NODES][2];
         uint32_t prev_hp = 0, prev_lp = 0;
+        Lr4      lfe_lp;                     // pasa-bajos de 120 Hz del canal LFE (graves a los frontales)
+        bool     lfe_prev = false;
+        double   night_env_db = 0;           // reducción de ganancia del compresor (dB, suavizada)
     } dsp_;
-    std::vector<float> dsp_hp_, dsp_lp_, dsp_bass_;
+    std::vector<float> dsp_hp_, dsp_lp_, dsp_bass_, dsp_lfe_, dsp_night_;
     uint64_t              last_save_us_ = 0;
     void sendConfig(const ESPNode& n);
     std::atomic<uint64_t> send_errors_{0};

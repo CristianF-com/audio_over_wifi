@@ -24,4 +24,15 @@ for path, ct in (("/manifest.webmanifest", "application/manifest+json"), ("/sw.j
     c, h = get(path); check(f"PWA {path} sin contraseña -> 200 ({ct})", c == 200 and h.get("Content-Type", "").startswith(ct), (c, h.get("Content-Type")))
 c, h = get("/sw.js"); check("sw.js con Service-Worker-Allowed: /", h.get("Service-Worker-Allowed") == "/", h.get("Service-Worker-Allowed"))
 c, _ = get("/api/nodes"); check("con los recursos PWA públicos, /api/nodes sigue exigiendo contraseña", c == 401, c)
+# OTA: solo el binario con token es público (lo pide el ESP); subir firmware y dar la orden exigen contraseña
+c, _ = get("/fw/ota.bin?t=1");  check("OTA: /fw/ota.bin sin contraseña llega a la comprobación del token -> 403 (no 401)", c == 403, c)
+for path in ("/api/firmware", "/api/tone", "/api/profiles"):
+    c, _ = get(path); check(f"OTA/nuevas: {path} sin contraseña -> 401", c == 401, c)
+def post(path, data=b"{}", user=None, pw=None):
+    req = urllib.request.Request("http://127.0.0.1:18081" + path, data=data, method="POST")
+    if user is not None: req.add_header("Authorization", "Basic " + base64.b64encode(f"{user}:{pw}".encode()).decode())
+    try: return urllib.request.urlopen(req, timeout=3).status
+    except urllib.error.HTTPError as e: return e.code
+check("OTA: POST /api/firmware sin contraseña -> 401", post("/api/firmware", b"x" * 70000) == 401)
+check("OTA: POST /api/ota sin contraseña -> 401", post("/api/ota", b'{"id":0}') == 401)
 print("RESULTADO AUTH:", "TODO OK" if ok else "HAY FALLOS"); sys.exit(0 if ok else 1)

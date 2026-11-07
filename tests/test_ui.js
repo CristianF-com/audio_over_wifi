@@ -191,6 +191,76 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('pestañas enlazadas con sus paneles (aria-controls / aria-labelledby)',await p.evaluate(()=>[...document.querySelectorAll('.tab')].every(t=>{const pane=document.getElementById(t.getAttribute('aria-controls'));return pane&&pane.getAttribute('aria-labelledby')===t.id;})));
   ok('los avisos se anuncian al lector de pantalla (región en vivo) y los errores como alerta',await p.evaluate(()=>{const tb=document.getElementById('tb');toast('prueba',false);const a=tb.querySelector('.toast.bad');const r=tb.getAttribute('role')==='status'&&tb.getAttribute('aria-live')==='polite'&&a&&a.getAttribute('role')==='alert';if(a)a.remove();return r;}));
   ok('volumen maestro con texto para lector de pantalla (aria-valuetext)',await p.evaluate(()=>/\d+ %/.test(document.getElementById('mvs').getAttribute('aria-valuetext')||'')));
+  // ── Funciones nuevas: probar altavoz, distancias, modo noche, LFE, perfiles, salud ──
+  await p.click('[data-tab=spk]');await p.click('#spks .spk[data-id="3"][data-side="0"]');await p.waitForSelector('#drawer.on');await sleep(300);
+  ok('cajón: ESP estéreo ofrece Izquierdo, Derecho y Ambos para probar',await p.locator('#d_tone button').count()===3);
+  await p.click('#d_tone button[data-side="2"]');
+  ok('probar: «Ambos» inicia el tono en el servidor y el botón queda pulsado',await until(async()=>{const t=await J('/api/tone');return t.active&&t.id===3;})&&await until(async()=>(await p.getAttribute('#d_tone button[data-side="2"]','aria-pressed'))==='true'),[await J('/api/tone'),await p.textContent('#d_toneh'),await J('/api/cal/status')]);
+  await p.click('#d_tone button[data-side="2"]');
+  ok('probar: pulsar otra vez lo para',await until(async()=>!(await J('/api/tone')).active));
+  await p.fill('#d_dist','2');await p.keyboard.press('Tab');
+  ok('distancia: se guarda sola desde el cajón (2 m)',await until(async()=>(await J('/api/nodes'))[3].dist_m===2));
+  await p.fill('#d_dist','');await p.keyboard.press('Tab');
+  ok('distancia: vaciar el campo la borra',await until(async()=>(await J('/api/nodes'))[3].dist_m===-1));
+  await p.fill('#d_dist','2');await p.keyboard.press('Tab');await sleep(900);
+  if(SHOTS)await p.screenshot({path:SHOTS+'/panel_cajon_probar.png'});
+  await p.keyboard.press('Escape');await until(async()=>!(await p.$('#drawer.on')));
+  await p.click('#spks .spk[data-id="4"][data-side="0"]');await p.waitForSelector('#drawer.on');await sleep(300);
+  await p.fill('#d_dist','3.5');await p.keyboard.press('Tab');
+  ok('distancia: segundo altavoz a 3,5 m',await until(async()=>(await J('/api/nodes'))[4].dist_m===3.5));
+  await p.keyboard.press('Escape');await until(async()=>!(await p.$('#drawer.on')));
+  await p.click('.tab[data-tab="lat"]');await sleep(600);
+  ok('latencia: con dos distancias aparece la tabla de cálculo y «Aplicar» se activa',await p.locator('#distw tbody tr').count()===2&&!(await p.isDisabled('#distapply')));
+  const dtxt=await p.textContent('#distw');
+  ok('latencia: el más lejano (3,5 m) sin retardo y el de 2 m con 4,4 ms',dtxt.includes('3,5 m')&&dtxt.includes('4,4 ms')&&dtxt.includes('57%'),dtxt);
+  if(SHOTS)await p.screenshot({path:SHOTS+'/panel_latencia_distancias.png',fullPage:true});
+  await p.click('#distapply');
+  ok('distancias: «Aplicar» fija retardo 4373 µs y volumen 146 en el altavoz de 2 m',await until(async()=>{const x=(await J('/api/nodes'))[3];return Math.abs(x.latency_offset_us-4373)<=1&&x.volume_l===146&&x.volume_r===146;}),(await J('/api/nodes'))[3]);
+  ok('distancias: el más lejano queda a 255 y 0 µs',await until(async()=>{const x=(await J('/api/nodes'))[4];return x.latency_offset_us===0&&x.volume_l===255;}));
+  ok('salud: la tabla tiene columnas WiFi y Firmware y 11 columnas por fila',await p.evaluate(()=>[...document.querySelectorAll('#health tr')].every(r=>r.children.length===11)&&[...document.querySelectorAll('thead th')].some(t=>t.textContent==='WiFi')&&[...document.querySelectorAll('thead th')].some(t=>t.textContent==='Firmware')));
+  ok('aviso de desconexión: un altavoz que pasa de en línea a desconectado muestra un aviso',await p.evaluate(()=>{wasOn[3]=true;nodes=nodes.map(n=>n.id===3?{...n,online:false,enabled:true}:n);watchOnline();return [...document.querySelectorAll('#tb .toast.bad')].some(t=>t.textContent.includes('#3')&&t.textContent.includes('se desconectó'));}));
+  await p.evaluate(()=>document.querySelectorAll('#tb .toast').forEach(t=>t.remove()));
+  await p.click('.tab[data-tab="snd"]');await sleep(300);
+  await p.click('#ntseg button[data-v="2"]');
+  ok('modo noche: «Medio» llega al servidor y queda marcado',await until(async()=>(await J('/api/status')).night===2)&&await until(async()=>(await p.getAttribute('#ntseg button[data-v="2"]','aria-pressed'))==='true'));
+  ok('modo noche: el texto explica el nivel elegido',(await p.textContent('#nth')).startsWith('Medio'));
+  await p.click('#sw_lfe');
+  ok('LFE en frontales: el interruptor llega al servidor',await until(async()=>(await J('/api/status')).lfe_front===true));
+  await p.evaluate(()=>{const e=document.getElementById('lfes');e.value=4;e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));});
+  ok('LFE: el nivel +4 dB llega al servidor',await until(async()=>(await J('/api/status')).lfe_db===4));
+  await p.fill('#pfname','Cine noche');await p.click('#pfsave');
+  ok('perfiles: guardar muestra el perfil en la lista',await until(async()=>(await p.locator('#pflist .pfrow').count())===1&&(await p.textContent('#pflist')).includes('Cine noche')));
+  await p.click('#ntseg button[data-v="0"]');await p.click('#sw_lfe');
+  await until(async()=>{const s=await J('/api/status');return s.night===0&&s.lfe_front===false;});
+  await p.click('#pflist [data-load="0"]');
+  ok('perfiles: cargar restaura modo noche 2 y LFE activado, y lo marca «En uso»',await until(async()=>{const s=await J('/api/status');return s.night===2&&s.lfe_front===true&&s.lfe_db===4;})&&await until(async()=>(await p.textContent('#pflist')).includes('En uso')));
+  if(SHOTS)await p.screenshot({path:SHOTS+'/panel_sonido_nuevo.png',fullPage:true});
+  await p.click('#pflist [data-del="0"]');
+  ok('perfiles: borrar pide confirmar con una segunda pulsación',(await p.locator('#pflist .pfrow').count())===1&&(await p.textContent('#pflist [data-del="0"]')).includes('Seguro'));
+  await p.click('#pflist [data-del="0"]');
+  ok('perfiles: segunda pulsación lo borra',await until(async()=>(await p.locator('#pflist .pfrow').count())===0&&(await J('/api/profiles')).profiles.length===0));
+  await p.click('#pfsave');
+  ok('perfiles: guardar sin nombre avisa y no crea nada',(await J('/api/profiles')).profiles.length===0&&await p.locator('#tb .toast.bad').count()>=1);
+  await p.evaluate(()=>document.querySelectorAll('#tb .toast').forEach(t=>t.remove()));
+  await fetch(BASE+'/api/dsp',{method:'POST',body:JSON.stringify({night:0,lfe:false,lfe_db:0})});
+  for(const i of [3,4]){await fetch(BASE+'/api/calibrate',{method:'POST',body:JSON.stringify({esp_id:i,latency_us:0})});await fetch(BASE+'/api/node',{method:'POST',body:JSON.stringify({id:i,volume_l:255,volume_r:255,dist_m:-1})});}
+  // Actualización de firmware por WiFi: tarjeta en Latencia (el arnés simula ESP con firmware antiguo, sin versión)
+  {const fsx=require('fs');const img=Buffer.alloc(80000,5);img[0]=0xE9;img[1]=1;img.writeUInt16LE(0x17,12);img.writeUInt32LE(0xABCD5432,32);img.write('9.9-ui',48);
+   fsx.writeFileSync('/tmp/fw_ui_bad.bin',Buffer.alloc(70000,7));fsx.writeFileSync('/tmp/fw_ui_ok.bin',img);
+   await p.click('.tab[data-tab="lat"]');await sleep(300);
+   ok('firmware: aviso de «sin probar en hardware» y de flashear la primera vez por cable',(await p.textContent('#fwwarn')).includes('sin probar')&&(await p.textContent('#fwwarn')).includes('por cable'));
+   await p.click('#fwup');
+   ok('firmware: subir sin elegir archivo avisa',await p.locator('#tb .toast.bad').count()>=1);
+   await p.evaluate(()=>document.querySelectorAll('#tb .toast').forEach(t=>t.remove()));
+   await p.setInputFiles('#fwfile','/tmp/fw_ui_bad.bin');await p.click('#fwup');
+   ok('firmware: un archivo que no es firmware se rechaza con un mensaje claro',await until(async()=>(await p.locator('#tb .toast.bad').allTextContents()).some(t=>t.includes('ESP-IDF'))));
+   await p.evaluate(()=>document.querySelectorAll('#tb .toast').forEach(t=>t.remove()));
+   await p.setInputFiles('#fwfile','/tmp/fw_ui_ok.bin');await p.click('#fwup');
+   ok('firmware: un .bin válido se carga y se muestra versión, tamaño y chip',await until(async()=>{const t=await p.textContent('#fwinfo');return t.includes('9.9-ui')&&t.includes('78 KB')&&t.includes('C5');}),await p.textContent('#fwinfo'));
+   ok('firmware: los ESP sin versión no se pueden actualizar por WiFi (botón desactivado y motivo visible)',await p.evaluate(()=>{const b=[...document.querySelectorAll('#fwlist [data-ota]')];return b.length===5&&b.every(x=>x.disabled)&&document.getElementById('fwlist').textContent.includes('primero por cable');}));
+   if(SHOTS)await p.screenshot({path:SHOTS+'/panel_firmware.png',fullPage:true});}
+  ok('nuevas funciones: sin errores de JS',errs.length===0,errs);
+  await p.click('.tab[data-tab="spk"]');
   // Móvil
   const m=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
   const q=await m.newPage();await q.goto(BASE+'/');await q.waitForSelector('#spks .spk');await sleep(800);
@@ -214,6 +284,15 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   await q.tap('#dclose');await q.click('.tab[data-tab="snd"]');await sleep(300);
   ok('móvil: Sonido sin scroll horizontal',await q.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
   if(SHOTS)await q.screenshot({path:SHOTS+'/movil_sonido.png'});
+  await q.click('.tab[data-tab="snd"]');await q.evaluate(()=>window.scrollTo(0,document.getElementById('c_nt').getBoundingClientRect().top+scrollY-70));await sleep(300);
+  ok('móvil: modo noche, LFE y perfiles sin scroll horizontal',await q.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
+  ok('móvil: los segmentos de modo noche miden 44 px',await q.evaluate(()=>[...document.querySelectorAll('#ntseg button')].every(b=>b.getBoundingClientRect().height>=43.5)));
+  if(SHOTS)await q.screenshot({path:SHOTS+'/movil_sonido_nuevo.png'});
+  await q.tap('.tab[data-tab="spk"]');await q.tap('#spks .spk[data-id="0"]');await q.waitForSelector('#drawer.on');await sleep(400);
+  ok('móvil: los botones de prueba miden 36 px o más y caben sin scroll horizontal',await q.evaluate(()=>[...document.querySelectorAll('#d_tone button')].every(b=>b.getBoundingClientRect().height>=35.5)&&document.documentElement.scrollWidth<=window.innerWidth+1));
+  await q.evaluate(()=>document.getElementById('d_tone').scrollIntoView({block:'center'}));await sleep(200);
+  if(SHOTS)await q.screenshot({path:SHOTS+'/movil_cajon_probar.png'});
+  await q.tap('#dclose');
   await m.close();
   // /ble con Web Bluetooth simulado
   const bp=await ctx.newPage();const berr=[];bp.on('pageerror',e=>berr.push(String(e)));
@@ -412,8 +491,8 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
     let ov=0;for(let i=0;i<bs.length;i++)for(let j=i+1;j<bs.length;j++){const a=bs[i],b=bs[j];if(a.left<b.right-2&&b.left<a.right-2&&a.top<b.bottom-2&&b.top<a.bottom-2)ov++;}
     const m=document.querySelector('#room .me').getBoundingClientRect();
     return {cap:getComputedStyle(document.querySelector('#spks .spk .cap')).display,w:bs[0].width,h:bs[0].height,mw:m.width,ov,z:document.getElementById('zval').textContent,ta:getComputedStyle(document.getElementById('room')).touchAction};});
-  const zm0=await mg();await mp.locator('#room').scrollIntoViewIfNeeded();
-  await mp.tap('#zin');await mp.tap('#zin');await sleep(150);const zm1=await mg();
+  const zm0=await mg();await mp.locator('#room').scrollIntoViewIfNeeded();await sleep(600);   // sin esta pausa el primer toque puede caer mientras la página aún se desplaza
+  await mp.tap('#zin');await sleep(250);await mp.tap('#zin');await sleep(250);const zm1=await mg();
   ok('Móvil: tocar «+» dos veces acerca a 156 % sin cambiar el tamaño de altavoces ni de «Escucha»; el fondo deja de deslizar la página',zm1.z==='156%'&&Math.abs(zm1.w-zm0.w)<0.6&&Math.abs(zm1.h-zm0.h)<0.6&&zm1.mw===zm0.mw&&zm1.ta==='none'&&zm0.ta==='pan-y',[zm0,zm1]);
   if(SHOTS){await mp.screenshot({path:SHOTS+'/movil_zoom_mas.png'});}
   await mp.tap('#zval');await mp.tap('#zout');await mp.tap('#zout');await sleep(150);const zm2=await mg();

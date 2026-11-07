@@ -31,3 +31,6 @@ Después se configura igual que el C5: ID y WiFi por Bluetooth desde el panel (�
 ## Si da problemas
 * Si el Bluetooth falta de memoria junto al WiFi: en `menuconfig`, `Component config → Bluetooth → NimBLE`, baja las conexiones; o desactiva `SONOS_BLE_ENABLE` y configura el WiFi por Kconfig/NVS.
 * El ESP32 clásico tiene un solo ADC/GPIO sensible al arranque: GPIO22/25/26 no son pines de arranque, pero evita mover los pines a GPIO0/2/12/15.
+
+## Actualización por WiFi (OTA)
+Comparte `ota_update.c` con el C5. `partitions.csv` define dos aplicaciones de 1,5 MB y `sdkconfig.defaults` fija flash de 4 MB (los WROOM-32D suelen traer 4 MB; con menos no cabe). La primera vez hay que flashear por cable. **No compilado ni probado.**

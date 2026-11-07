@@ -50,6 +50,7 @@
 #include "protocol.h"
 #include "reorder.h"
 #include "ble_prov.h"
+#include "ota_update.h"
 
 static const char* TAG = "RECV";
 
@@ -82,7 +83,12 @@ static const char* TAG = "RECV";
 #ifndef CONFIG_SONOS_BLE_WINDOW_S
   #define CONFIG_SONOS_BLE_WINDOW_S 300
 #endif
-#define FW_VERSION          5
+#define FW_VERSION          6   /* 6: OTA por WiFi, versión/chip en el HELLO y RSSI en el REPORT (protocolo sin cambios: v5) */
+#if CONFIG_IDF_TARGET_ESP32C5
+#define FW_CHIP_ID          FW_CHIP_C5
+#else
+#define FW_CHIP_ID          FW_CHIP_ESP32
+#endif
 
 #define I2S_DMA_DESC        6
 #define I2S_DMA_FRAMES      FRAMES_PER_PACKET
@@ -419,6 +425,7 @@ static void control_task(void* pv)
     hello.magic = PROTOCOL_MAGIC; hello.pkt_type = PKT_HELLO;
     hello.esp_id = g_receiver_id; hello.version = PROTOCOL_VERSION;
     hello.audio_port = PORT_AUDIO;
+    hello.reserved = HELLO_PACK(FW_VERSION, FW_CHIP_ID);   /* la RPi lo muestra en el panel y comprueba el chip antes de una OTA */
     esp_wifi_get_mac(WIFI_IF_STA, hello.mac);
 
     int64_t last_hello = -10000000, last_sync = 0, last_welcome = 0;
@@ -428,7 +435,7 @@ static void control_task(void* pv)
     while (1) {
         int64_t now = esp_timer_get_time();
 
-        if (now - last_hello >= 2000000) {
+        if (!ota_update_active() && now - last_hello >= 2000000) {   /* durante la OTA se calla: así la RPi sabe que sigue descargando */
             last_hello = now;
             sendto(g_ctrl_sock, &hello, sizeof(hello), 0, (struct sockaddr*)&bcast, sizeof(bcast));
             if (g_rpi_ip_cfg[0]) {      /* IP fija: sirve aunque el router filtre el broadcast (aislamiento de clientes, etc.) */
@@ -437,7 +444,7 @@ static void control_task(void* pv)
                     sendto(g_ctrl_sock, &hello, sizeof(hello), 0, (struct sockaddr*)&uni, sizeof(uni));
             }
         }
-        if (g_welcomed) {
+        if (g_welcomed && !ota_update_active()) {
             if (now - last_welcome > WELCOME_TIMEOUT_US) {
                 ESP_LOGW(TAG, "RPi no responde — parando audio, rediscovery");
                 g_welcomed = false; sync_reset(); g_flush = true;
@@ -511,6 +518,15 @@ static void control_task(void* pv)
             SyncRespPacket r; memcpy(&r, buf, sizeof(r));
             if (r.esp_id != g_receiver_id) break;
             sync_add((int64_t)r.t1_us, (int64_t)r.t2_us, (int64_t)r.t3_us, t4);
+            break;
+        }
+        case PKT_OTA: {                                       /* orden de actualización: solo de la RPi con la que hablamos */
+            if (n < (int)sizeof(OtaPacket) || !g_welcomed) break;
+            OtaPacket o; memcpy(&o, buf, sizeof(o));
+            if (o.esp_id != g_receiver_id || src.sin_addr.s_addr != g_rpi_addr.sin_addr.s_addr) break;
+            char ip[16];
+            if (!inet_ntop(AF_INET, &src.sin_addr, ip, sizeof(ip))) break;
+            ota_update_start(ip, o.http_port, o.size, o.token);
             break;
         }
         default: break;
@@ -718,6 +734,7 @@ static void i2s_task(void* pv)
 }
 
 /* ─── Tarea de reportes ────────────────────────────────────────────────────── */
+static bool g_fw_confirmed = false;                       /* solo report_task */
 static void report_task(void* pv)
 {
     uint32_t prev_drop = 0, prev_ins = 0, prev_frames = 0;
@@ -741,6 +758,8 @@ static void report_task(void* pv)
         }
 #endif
         if (!g_welcomed) continue;
+        if (ota_update_active()) continue;                    /* descargando firmware: sin REPORT */
+        if (g_sync_valid && !g_fw_confirmed) { ota_mark_valid(); g_fw_confirmed = true; }   /* arrancó, se conectó y sincronizó: el firmware nuevo es bueno */
 
         uint32_t d = g_corr_drop, i = g_corr_ins, f = g_frames_played;
         uint32_t df = f - prev_frames;
@@ -760,6 +779,8 @@ static void report_task(void* pv)
         r.lost_packets = g_lost; r.late_packets = g_late; r.underruns = g_underruns;
         r.recovered_packets = g_ro.recovered;
         r.drift_ppm = g_drift_ppm;
+        {   wifi_ap_record_t ap;
+            if (g_wifi_up && esp_wifi_sta_get_ap_info(&ap) == ESP_OK) r.rssi_dbm = ap.rssi; }
         struct sockaddr_in rpi;
         portENTER_CRITICAL(&g_mux); rpi = g_rpi_addr; portEXIT_CRITICAL(&g_mux);
         sendto(g_ctrl_sock, &r, sizeof(r), 0, (struct sockaddr*)&rpi, sizeof(rpi));

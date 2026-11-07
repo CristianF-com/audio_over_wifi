@@ -19,6 +19,8 @@
 #include <sstream>
 #include <cstdio>
 #include <algorithm>
+#include <chrono>
+#include <random>
 
 // ─── JSON helpers ──────────────────────────────────────────────────────────────
 static std::string jesc(const std::string& s) {
@@ -141,13 +143,14 @@ struct Conn {
     }
 };
 
+static constexpr long MAX_BODY = 16384, MAX_FW_BODY = 3 * 1024 * 1024;   // el firmware (.bin) es lo único que pasa de 16 KB
 static bool readHTTP(Conn& c, std::string& method, std::string& path, std::string& body, std::string& auth) {
     const int fd = c.fd;
-    std::string raw; raw.reserve(4096); char tmp[1024];
+    std::string raw; raw.reserve(4096); char tmp[16384];
     struct timeval tv{5, 0};
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
     while (true) {
-        int n = (int)c.rd(tmp, sizeof(tmp)); if (n <= 0) return false;
+        int n = (int)c.rd(tmp, 1024); if (n <= 0) return false;
         raw.append(tmp, n);
         if (raw.find("\r\n\r\n") != std::string::npos) break;
         if (raw.size() > 16384) return false;
@@ -172,7 +175,7 @@ static bool readHTTP(Conn& c, std::string& method, std::string& path, std::strin
         size_t ee = hdrs.find("\r\n", pp);
         std::string v = hdrs.substr(pp, ee == std::string::npos ? std::string::npos : ee - pp);
         while (!v.empty() && v.front() == ' ') v.erase(v.begin());
-        if (!parseInt(v, 0, 16384, clen)) return false;
+        if (!parseInt(v, 0, path == "/api/firmware" ? MAX_FW_BODY : MAX_BODY, clen)) return false;
     }
     body = raw.substr(he + 4);
     while ((long)body.size() < clen) {
@@ -303,7 +306,9 @@ void WebServer::handleClient(int cfd, bool tls) {
         else if (p == "/icons/icon-512.png")   { pwaBin = PWA_ICON_512;  pwaBinLen = sizeof(PWA_ICON_512); }
         else if (p == "/icons/icon-maskable-512.png") { pwaBin = PWA_ICON_MASKABLE_512; pwaBinLen = sizeof(PWA_ICON_MASKABLE_512); }
     }
-    const bool pwa = pwaTxt || pwaBin;
+    bool fwget = false;                                     // GET /fw/ota.bin?t=<token>: lo pide el ESP, que no puede enviar contraseña; lo protege un token de un solo uso por orden
+    if (m == "GET" && p.rfind("/fw/ota.bin", 0) == 0) fwget = true;
+    const bool pwa = pwaTxt || pwaBin || fwget;
     bool authed = password_.empty();
     if (!authed && auth.size() > 6 && strncasecmp(auth.c_str(), "Basic ", 6) == 0) {
         std::string up = b64decode(auth.substr(6));
@@ -314,16 +319,17 @@ void WebServer::handleClient(int cfd, bool tls) {
         code = 401; resp = "{\"error\":\"unauthorized\"}";
         extra = "WWW-Authenticate: Basic realm=\"SonosWiFi\", charset=\"UTF-8\"\r\n";
     }
+    else if (fwget) { resp = serveFirmware(p, code); ct = code == 200 ? "application/octet-stream" : "application/json"; }
     else if (pwaTxt) { resp = pwaTxt; ct = pwaCt; }
     else if (pwaBin) { resp.assign(reinterpret_cast<const char*>(pwaBin), pwaBinLen); ct = "image/png"; }
-    else if ((p == "/" || p == "/index.html") && m == "GET") { resp = PAGE_PANEL; ct = "text/html; charset=utf-8"; }
-    else if (p == "/calibrate" && m == "GET") { resp = PAGE_CAL; ct = "text/html; charset=utf-8"; }
-    else if (p == "/ble"       && m == "GET") { resp = PAGE_BLE; ct = "text/html; charset=utf-8"; }
+    else if ((p == "/" || p == "/index.html") && m == "GET") { resp = loadPage("panel.html", PAGE_PANEL); ct = "text/html; charset=utf-8"; }
+    else if (p == "/calibrate" && m == "GET") { resp = loadPage("calibrate.html", PAGE_CAL); ct = "text/html; charset=utf-8"; }
+    else if (p == "/ble"       && m == "GET") { resp = loadPage("ble.html", PAGE_BLE); ct = "text/html; charset=utf-8"; }
     else if (m == "GET")  resp = handleGET(p, code);
     else if (m == "POST") resp = handlePOST(p, b, code);
     else { code = 405; resp = "{\"error\":\"method not allowed\"}"; }
     const char* st = code == 200 ? "OK" : code == 400 ? "Bad Request" : code == 401 ? "Unauthorized" :
-                     code == 404 ? "Not Found" : code == 409 ? "Conflict" : "Error";
+                     code == 403 ? "Forbidden" : code == 404 ? "Not Found" : code == 409 ? "Conflict" : "Error";
     std::ostringstream r;
     r << "HTTP/1.1 " << code << " " << st << "\r\nContent-Type: " << ct << "\r\n"
       << extra << "Cache-Control: no-store\r\n"
@@ -340,6 +346,28 @@ void WebServer::handleClient(int cfd, bool tls) {
 #endif
     ::close(cfd);
 }
+// Con -w <carpeta> las páginas se leen del disco en cada petición y se montan igual que gen_web_pages.py
+// (solo nombres fijos: no hay forma de pedir otro fichero). Si algo falla, se sirve la copia incrustada.
+std::string WebServer::loadPage(const char* file, const char* embedded) {
+    if (web_dir_.empty()) return embedded;
+    auto rd = [&](const std::string& f, std::string& out) {
+        FILE* fp = fopen((web_dir_ + "/" + f).c_str(), "rb");
+        if (!fp) return false;
+        char buf[8192]; size_t n; out.clear();
+        while ((n = fread(buf, 1, sizeof(buf), fp)) > 0) out.append(buf, n);
+        fclose(fp); return true;
+    };
+    auto trim = [](std::string& t) { while (!t.empty() && isspace((unsigned char)t.back())) t.pop_back(); size_t i = 0; while (i < t.size() && isspace((unsigned char)t[i])) i++; t.erase(0, i); };
+    std::string h, css, ana, theme;
+    if (!rd(file, h) || !rd("shared.css", css) || !rd("analysis.js", ana) || !rd("theme.js", theme)) return embedded;
+    trim(css); trim(ana); trim(theme); trim(h);
+    auto rep = [&](const char* tag, const std::string& v) {
+        const std::string t = tag; size_t pos = 0;
+        while ((pos = h.find(t, pos)) != std::string::npos) { h.replace(pos, t.size(), v); pos += v.size(); }
+    };
+    rep("/*@SHARED_CSS@*/", css); rep("/*@ANALYSIS@*/", ana); rep("/*@THEME_JS@*/", theme);
+    return h;
+}
 std::string WebServer::handleGET(const std::string& p, int& code) {
     if (p == "/api/status") return getStatus();
     if (p == "/api/levels") return getLevels();
@@ -352,6 +380,9 @@ std::string WebServer::handleGET(const std::string& p, int& code) {
     if (p == "/api/nodes")  return getNodes();
     if (p == "/api/latency") return getLatency();
     if (p == "/api/ble/status") return bleStatus();
+    if (p == "/api/tone")     return toneStatus();
+    if (p == "/api/firmware") return firmwareInfo();
+    if (p == "/api/profiles") return profilesList();
     code = 404; return "{\"error\":\"not found\"}";
 }
 std::string WebServer::handlePOST(const std::string& p, const std::string& b, int& code) {
@@ -365,6 +396,12 @@ std::string WebServer::handlePOST(const std::string& p, const std::string& b, in
     else if (p == "/api/eq")        r = setEq(b);
     else if (p == "/api/latency")   r = setLatency(b);
     else if (p == "/api/calibrate") r = setCalibration(b);
+    else if (p == "/api/tone")      r = toneStart(b);
+    else if (p == "/api/tone/stop") { streamer_.toneStop(); r = "{\"ok\":true}"; }
+    else if (p == "/api/profiles")  r = profilesPost(b);
+    else if (p == "/api/firmware")  r = firmwareUpload(b);
+    else if (p == "/api/ota")       r = otaStart(b);
+    else if (p == "/api/ota/cancel") r = otaCancel(b);
     else if (p == "/api/ble/wifi")      r = bleWifi(b);
     else if (p == "/api/ble/scan")      r = bleScan(b);
     else if (p == "/api/ble/provision") r = bleProvision(b);
@@ -450,6 +487,8 @@ std::string WebServer::getStatus() {
       << jnum("xover_hz", streamer_.xoverHz()) << ","
       << jbool("dsp_xover", streamer_.xoverOn()) << "," << jbool("dsp_eq", streamer_.eqOn()) << "," << jnum("lipsync_extra_ms", streamer_.lipsyncExtraMs()) << ","
       << jbool("running", capture_.isRunning()) << ","
+      << jbool("lfe_front", streamer_.lfeFront()) << "," << jnum("lfe_db", streamer_.lfeDb()) << "," << jbool("lfe_active", streamer_.lfeActive()) << ","
+      << jnum("night", streamer_.nightLevel()) << "," << jnum("profile_active", streamer_.profileActive()) << ","
       << jnum("master_volume", streamer_.masterVolume()) << "}";
     return o.str();
 }
@@ -490,7 +529,10 @@ std::string WebServer::getNodes() {
           << jnum("drift_ppm",    n.drift_ppm)    << ","
           << jnum("buffer_frames",n.buffer_frames) << ","
           << jnum("latency_offset_us", n.latency_offset_us) << ","
-          << jnum("fill_pct", fill)
+          << jnum("fill_pct", fill) << ","
+          << jnum("dist_m", n.dist_m < 0 ? -1.0 : std::round(n.dist_m * 100.0) / 100.0) << ","
+          << jnum("fw_version", n.fw_version) << "," << jnum("chip", n.chip) << "," << jnum("rssi_dbm", n.rssi_dbm) << ","
+          << jbool("ota_busy", n.ota_busy)
           << "}";
     }
     o << "]";
@@ -531,6 +573,10 @@ std::string WebServer::setNode(const std::string& b) {
         if (!parseFloat(sx, 0, 100, px) || !parseFloat(sy, 0, 100, py)) return BAD;
         if (!streamer_.setNodePos((uint8_t)id, (float)px, (float)py, 0)) return BAD;
     }
+    if (!(s = jsonGet(b, "dist_m")).empty()) {                               // distancia a quien escucha (m); "-1" la borra
+        double d;
+        if (!parseFloat(s, -1.0, 30.0, d) || !streamer_.setNodeDist((uint8_t)id, (float)d)) return "{\"error\":\"dist_m fuera de rango (0.2..30, o -1 para borrar)\"}";
+    }
     std::string tx = jsonGet(b, "pos2_x"), ty = jsonGet(b, "pos2_y");      // canal derecho (altavoz estéreo)
     if (!tx.empty() || !ty.empty()) {
         double qx, qy;
@@ -545,8 +591,9 @@ std::string WebServer::setLayout(const std::string& b) {
     if (v < 0 || !streamer_.setLayout(v)) return "{\"error\":\"layout debe ser stereo5 o mono10\"}";
     return "{\"ok\":true}";
 }
-// {"xover":true|false,"eq":true|false}  (cada clave es opcional). Ambos false = pass-through.
+// {"xover":bool,"eq":bool,"lfe":bool,"lfe_db":-12..10,"night":0..3}  (cada clave es opcional). xover y eq en false = pass-through.
 std::string WebServer::setDsp(const std::string& b) {
+    static const char* BAD = "{\"error\":\"usa xover, eq, lfe (true|false), lfe_db (-12..10) y/o night (0..3)\"}";
     auto flag = [&](const char* k, int& out) -> bool {          // out: -1 sin cambio, 0/1
         std::string v = jsonGet(b, k); out = -1;
         if (v.empty()) return true;
@@ -554,11 +601,134 @@ std::string WebServer::setDsp(const std::string& b) {
         if (v == "false" || v == "0") { out = 0; return true; }
         return false;
     };
-    int xo, eq;
-    if (!flag("xover", xo) || !flag("eq", eq) || (xo < 0 && eq < 0)) return "{\"error\":\"usa xover y/o eq = true|false\"}";
+    int xo, eq, lf;
+    if (!flag("xover", xo) || !flag("eq", eq) || !flag("lfe", lf)) return BAD;
+    double ldb = 0; long nt = 0;
+    const std::string sl = jsonGet(b, "lfe_db"), sn = jsonGet(b, "night");
+    if (!sl.empty() && !parseFloat(sl, -12.0, 10.0, ldb)) return BAD;
+    if (!sn.empty() && !parseInt(sn, 0, 3, nt)) return BAD;
+    if (xo < 0 && eq < 0 && lf < 0 && sl.empty() && sn.empty()) return BAD;
     if (xo >= 0) streamer_.setXoverOn(xo == 1);
     if (eq >= 0) streamer_.setEqOn(eq == 1);
+    if (lf >= 0) streamer_.setLfeFront(lf == 1);
+    if (!sl.empty()) streamer_.setLfeDb((float)ldb);
+    if (!sn.empty()) streamer_.setNightLevel((int)nt);
     return "{\"ok\":true}";
+}
+// Tono de prueba por altavoz: {"id":N,"side":0|1|2,"ms":1000..10000,"solo":bool,"level_db":-40..-6}
+std::string WebServer::toneStart(const std::string& b) {
+    long id, side = 2, ms = 3000; double lvl = -20; std::string s;
+    if (!parseInt(jsonGet(b, "id"), 0, MAX_NODES - 1, id)) return "{\"error\":\"id fuera de rango (0-9)\"}";
+    if (!(s = jsonGet(b, "side")).empty() && !parseInt(s, 0, 2, side)) return "{\"error\":\"side debe ser 0, 1 o 2\"}";
+    if (!(s = jsonGet(b, "ms")).empty() && !parseInt(s, 1000, 10000, ms)) return "{\"error\":\"ms fuera de rango (1000..10000)\"}";
+    if (!(s = jsonGet(b, "level_db")).empty() && !parseFloat(s, -40.0, -6.0, lvl)) return "{\"error\":\"level_db fuera de rango (-40..-6)\"}";
+    const bool solo = jsonGet(b, "solo") != "false" && jsonGet(b, "solo") != "0";   // por defecto calla el resto
+    if (!streamer_.toneStart((uint8_t)id, (int)side, (int)ms, solo, (float)lvl))
+        return "{\"error\":\"no se pudo: el altavoz debe estar en línea y habilitado, y sin calibración en curso\"}";
+    return "{\"ok\":true}";
+}
+std::string WebServer::toneStatus() {
+    std::ostringstream o;
+    o << "{" << jbool("active", streamer_.toneActive()) << "," << jnum("id", streamer_.toneNode()) << ","
+      << jnum("side", streamer_.toneSide()) << "," << jnum("remaining_ms", (double)streamer_.toneRemainingMs()) << "}";
+    return o.str();
+}
+// ─── Actualización de firmware por WiFi (OTA) ─────────────────────────────────────
+// Flujo: 1) el usuario sube el .bin (POST /api/firmware, cuerpo binario) y se guarda en memoria;
+//        2) POST /api/ota {"id":N}: se crea un token y se manda al ESP la orden PKT_OTA por UDP (puerto HTTP, tamaño y token);
+//        3) el ESP descarga GET /fw/ota.bin?t=<token> por HTTP y se reinicia; al volver a anunciarse (HELLO) termina la OTA.
+// SIN VERIFICAR EN HARDWARE: el lado del ESP (esp_https_ota, particiones, rollback) no se ha compilado con ESP-IDF real.
+static uint64_t nowUs() { return (uint64_t)std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
+// Imagen de aplicación de ESP-IDF: byte 0 = 0xE9; chip id en 12..13; esp_app_desc_t con magic 0xABCD5432 en el byte 32 (versión en 48..79).
+// Devuelve FW_CHIP_* (1 C5, 2 ESP32), 0 si el chip no se reconoce, -1 si no es una imagen de aplicación.
+static int imageChip(const std::string& d, std::string& ver) {
+    ver.clear();
+    if (d.size() < 80 || (unsigned char)d[0] != 0xE9 || d[1] < 1 || d[1] > 16) return -1;
+    const unsigned magic = (unsigned char)d[32] | ((unsigned char)d[33] << 8) | ((unsigned char)d[34] << 16) | ((unsigned)(unsigned char)d[35] << 24);
+    if (magic != 0xABCD5432u) return -1;
+    for (int i = 48; i < 80 && d[i]; i++) if ((unsigned char)d[i] >= 0x20 && (unsigned char)d[i] < 0x7f) ver += d[i];
+    const unsigned chip = (unsigned char)d[12] | ((unsigned char)d[13] << 8);
+    return chip == 0x0000 ? FW_CHIP_ESP32 : chip == 0x0017 ? FW_CHIP_C5 : FW_CHIP_UNKNOWN;
+}
+std::string WebServer::firmwareUpload(const std::string& b) {
+    if (b.size() < 65536) return "{\"error\":\"El archivo es demasiado pequeño para ser un firmware (mínimo 64 KB)\"}";
+    std::string ver; const int chip = imageChip(b, ver);
+    if (chip < 0) return "{\"error\":\"No es un firmware de aplicación de ESP-IDF (usa build/receiver.bin, no el bootloader ni la tabla de particiones)\"}";
+    std::lock_guard<std::mutex> lk(fw_mtx_);
+    fw_data_ = b; fw_chip_ = chip; fw_ver_ = ver; fw_token_ = 0;
+    std::ostringstream o;
+    o << "{\"ok\":true," << jnum("size", (double)b.size()) << "," << jnum("chip", chip) << "," << jstr("version", ver) << "}";
+    return o.str();
+}
+std::string WebServer::firmwareInfo() {
+    std::lock_guard<std::mutex> lk(fw_mtx_);
+    std::ostringstream o;
+    o << "{" << jbool("loaded", !fw_data_.empty()) << "," << jnum("size", (double)fw_data_.size()) << "," << jnum("chip", fw_chip_) << "," << jstr("version", fw_ver_) << "}";
+    return o.str();
+}
+std::string WebServer::otaStart(const std::string& b) {
+    long id;
+    if (!parseInt(jsonGet(b, "id"), 0, MAX_NODES - 1, id)) return "{\"error\":\"id fuera de rango (0-9)\"}";
+    const auto nodes = streamer_.getNodes();
+    const ESPNode& n = nodes[id];
+    if (!n.online) return "{\"error\":\"El altavoz no está en línea\"}";
+    if (n.ota_busy) return "{\"error\":\"Ese altavoz ya se está actualizando\"}";
+    if (n.fw_version == 0) return "{\"error\":\"Este altavoz tiene un firmware antiguo sin actualización por WiFi: la primera vez hay que flashearlo por cable\"}";
+    uint32_t size; uint64_t tok;
+    {
+        std::lock_guard<std::mutex> lk(fw_mtx_);
+        if (fw_data_.empty()) return "{\"error\":\"Primero sube el archivo de firmware\"}";
+        if (fw_chip_ > 0 && n.chip > 0 && fw_chip_ != n.chip)
+            return "{\"error\":\"Este firmware es para otro chip (" + std::string(fw_chip_ == FW_CHIP_C5 ? "ESP32-C5" : "ESP32 clásico") + "), no para este altavoz\"}";
+        std::random_device rd;
+        tok = ((uint64_t)rd() << 32) ^ rd(); if (!tok) tok = 1;
+        fw_token_ = tok; fw_token_until_us_ = nowUs() + 300ull * 1000000ull;   // el ESP tiene 5 min para empezar la descarga
+        size = (uint32_t)fw_data_.size();
+    }
+    if (!streamer_.sendOta((uint8_t)id, port_, size, tok)) return "{\"error\":\"No se pudo enviar la orden de actualización\"}";
+    return "{\"ok\":true}";
+}
+std::string WebServer::otaCancel(const std::string& b) {
+    long id;
+    if (!parseInt(jsonGet(b, "id"), 0, MAX_NODES - 1, id)) return "{\"error\":\"id fuera de rango (0-9)\"}";
+    streamer_.cancelOta((uint8_t)id);
+    return "{\"ok\":true}";
+}
+// GET /fw/ota.bin?t=<token hex>: devuelve el firmware solo con el token vigente. Va por HTTP sin cifrar (LAN de confianza).
+std::string WebServer::serveFirmware(const std::string& path, int& code) {
+    const size_t q = path.find("?t=");
+    const std::string t = q == std::string::npos ? "" : path.substr(q + 3);
+    char* end = nullptr; const unsigned long long tok = t.empty() ? 0 : strtoull(t.c_str(), &end, 16);
+    std::lock_guard<std::mutex> lk(fw_mtx_);
+    if (!tok || !end || *end || tok != fw_token_ || nowUs() > fw_token_until_us_ || fw_data_.empty()) { code = 403; return "{\"error\":\"token no válido\"}"; }
+    return fw_data_;
+}
+// Perfiles guardados: GET lista; POST {"save":"nombre"} | {"load":idx} | {"delete":idx}
+std::string WebServer::profilesList() {
+    auto names = streamer_.profileNames();
+    std::ostringstream o;
+    o << "{" << jnum("active", streamer_.profileActive()) << "," << jnum("max", UdpStreamer::MAX_PROFILES) << ",\"profiles\":[";
+    for (size_t i = 0; i < names.size(); i++) o << (i ? "," : "") << "\"" << jesc(names[i]) << "\"";
+    o << "]}";
+    return o.str();
+}
+std::string WebServer::profilesPost(const std::string& b) {
+    static const char* BAD = "{\"error\":\"usa save (nombre), load (índice) o delete (índice)\"}";
+    long idx; std::string nm = jsonGet(b, "save"), ld = jsonGet(b, "load"), dl = jsonGet(b, "delete");
+    if (!nm.empty()) {
+        std::string err;
+        if (!streamer_.profileSave(nm, err)) return "{\"error\":\"" + jesc(err) + "\"}";
+        return profilesList();
+    }
+    if (!ld.empty()) {
+        if (!parseInt(ld, 0, UdpStreamer::MAX_PROFILES - 1, idx) || !streamer_.profileLoad((int)idx)) return "{\"error\":\"perfil inexistente\"}";
+        return profilesList();
+    }
+    if (!dl.empty()) {
+        if (!parseInt(dl, 0, UdpStreamer::MAX_PROFILES - 1, idx) || !streamer_.profileDelete((int)idx)) return "{\"error\":\"perfil inexistente\"}";
+        return profilesList();
+    }
+    return BAD;
 }
 std::string WebServer::setBass(const std::string& b) {
     double hz;

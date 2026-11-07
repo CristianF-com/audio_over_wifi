@@ -26,6 +26,14 @@ int main(int argc, char** argv) {
         std::this_thread::sleep_for(std::chrono::seconds(6));
         w.stop(); return 0;
     }
+    // Modo "webdir <carpeta>": web servida desde disco (flag -w de la RPi) — lo usa test_webdir.py
+    if (argc > 2 && std::string(argv[1]) == "webdir") {
+        UdpStreamer s; AudioConfig c; AudioCapture cap(c);
+        WebServer w(s, cap, 18082); w.setWebDir(argv[2]);
+        if (!w.start()) return 1;
+        std::this_thread::sleep_for(std::chrono::seconds(8));
+        w.stop(); return 0;
+    }
     UdpStreamer s;
     s.setConfigPath("/tmp/sonos_harness_config.txt");
     AudioConfig cfg;
@@ -43,6 +51,7 @@ int main(int argc, char** argv) {
         fr[0] =  0x40000000;              // -> s16  16384
         fr[1] = -0x40000000;              // -> s16 -16384
         fr[2] =  0x20000000;              // -> s16   8192
+        if (getenv("SONOS_LFE_DC")) fr[3] = 0x20000000;   // canal LFE con señal (solo test_lfe.py); por defecto en silencio
     }
     uint64_t tone_n = 0;                  // canal 4: seno de 1414 Hz, amplitud 8192 (s16), fase continua entre bloques
     uint64_t t0 = now_us();

@@ -17,7 +17,8 @@ static void sigHandler(int) { g_running.store(false); }
 static void usage(const char* a0) {
     fprintf(stderr, "Uso: %s [-d hw:N,0|auto] [-p puerto_http] [-P frames_periodo]\n"
                     "         [-S puerto_https] [-C cert.pem] [-K key.pem]\n"
-                    "         [-c fichero_config] [-W fichero_password] [-B ayudante_ble.py]\n", a0);
+                    "         [-c fichero_config] [-W fichero_password] [-B ayudante_ble.py]\n"
+                    "         [-w carpeta_web]   (desarrollo: sirve panel/calibrar/ble desde rpi/web sin recompilar)\n", a0);
 }
 
 int main(int argc, char* argv[]) {
@@ -29,6 +30,7 @@ int main(int argc, char* argv[]) {
     uint16_t web_port = 8080, tls_port = 8443;
     std::string cert = "/etc/sonos_wifi/cert.pem", key = "/etc/sonos_wifi/key.pem";
     std::string cfgfile = "/var/lib/sonos_wifi/config.txt", pwfile = "/etc/sonos_wifi/password";
+    std::string webdir;
     std::string blehelper = "/usr/local/lib/sonos_wifi/sonos_ble_prov.py";
 
     for (int i = 1; i < argc; i++) {
@@ -50,6 +52,7 @@ int main(int argc, char* argv[]) {
         else if (!strcmp(argv[i], "-c") && i + 1 < argc)  cfgfile = argv[++i];
         else if (!strcmp(argv[i], "-W") && i + 1 < argc)  pwfile = argv[++i];
         else if (!strcmp(argv[i], "-B") && i + 1 < argc)  blehelper = argv[++i];
+        else if (!strcmp(argv[i], "-w") && i + 1 < argc)  webdir = argv[++i];
         else { usage(argv[0]); return 2; }
     }
 
@@ -67,6 +70,7 @@ int main(int argc, char* argv[]) {
     UdpStreamer  streamer;
     WebServer    web(streamer, capture, web_port);
     if (tls_port) web.setTLS(tls_port, cert, key);
+    if (!webdir.empty()) { web.setWebDir(webdir); fprintf(stderr, "[Main] Web servida desde %s (modo desarrollo)\n", webdir.c_str()); }
     web.setBle(blehelper, cfgfile.empty() ? std::string() : cfgfile + ".ble");   // WiFi de los altavoces (0600) + ayudante Bluetooth
     {   // Contraseña opcional (HTTP Basic; usuario libre): solo si existe el fichero y no está vacío
         FILE* pf = fopen(pwfile.c_str(), "r");

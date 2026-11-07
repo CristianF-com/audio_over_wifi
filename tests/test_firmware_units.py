@@ -36,8 +36,8 @@ check("esp_wifi_set_country_code() con CONFIG_SONOS_WIFI_COUNTRY", "esp_wifi_set
 check("el país se fija entre esp_wifi_init() y esp_wifi_start()",
       rm.index("esp_wifi_init(&cfg)") < rm.index("apply_country();") < rm.index("esp_wifi_start()"))
 sd = open(f"{here}/../esp32/sdkconfig.defaults").read()
-check("sdkconfig.defaults: partición de aplicación grande (el binario supera 1 MB)",
-      "CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y" in sd)
+check("sdkconfig.defaults: tabla de particiones propia con dos aplicaciones de 1,5 MB (OTA; el binario supera 1 MB)",
+      "CONFIG_PARTITION_TABLE_CUSTOM=y" in sd and 'CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"' in sd and "SINGLE_APP_LARGE" not in sd.replace("# ", ""))
 check("ble_store_config_init() declarada antes de usarla (ESP-IDF no la expone)",
       "void ble_store_config_init(void);" in c and c.index("void ble_store_config_init(void);") < c.index("    ble_store_config_init();"))
 
@@ -46,13 +46,13 @@ check("ble_store_config_init() declarada antes de usarla (ESP-IDF no la expone)"
 import re as _re
 w = f"{here}/../esp32_wroom"
 sd = open(f"{w}/sdkconfig.defaults").read()
-check("wroom: target esp32 (clásico) y partición grande", 'CONFIG_IDF_TARGET="esp32"' in sd and "SINGLE_APP_LARGE=y" in sd and "esp32c5" not in sd.replace("# ", ""))
+check("wroom: target esp32 (clásico) y tabla de particiones OTA", 'CONFIG_IDF_TARGET="esp32"' in sd and "CONFIG_PARTITION_TABLE_CUSTOM=y" in sd and "esp32c5" not in sd.replace("# ", ""))
 wk = open(f"{w}/main/Kconfig.projbuild").read()
 pins = {n: int(_re.search(r"config I2S_%s_GPIO\n\s+int .*\n\s+default (\d+)" % n, wk).group(1)) for n in ("BCK", "WS", "DOUT")}
 check("wroom: pines I2S por defecto 26/25/22", pins == {"BCK": 26, "WS": 25, "DOUT": 22}, pins)
 check("wroom: sin selección de banda 5 GHz (solo 2.4)", "SONOS_WIFI_BAND" not in wk and 'default "AR"' in wk)
 wc = open(f"{w}/main/CMakeLists.txt").read()
-check("wroom: compila los mismos fuentes que el C5", "../../esp32/main/receiver_main.c" in wc and "../../esp32/main/ble_prov.c" in wc and "../../common" in wc)
+check("wroom: compila los mismos fuentes que el C5", "../../esp32/main/receiver_main.c" in wc and "../../esp32/main/ble_prov.c" in wc and "../../esp32/main/ota_update.c" in wc and "../../common" in wc)
 check("wroom: README con pines y aviso de no probado", "GPIO26" in open(f"{w}/README.md").read() and "No probado" in open(f"{w}/README.md").read())
 src = open(f"{here}/../esp32/main/receiver_main.c").read()
 check("C5 y WROOM: apply_band_mode protegido por el chip (C5 igual que antes)", "#if CONFIG_IDF_TARGET_ESP32C5" in src and src.count("static void apply_band_mode") == 2 and src.count("esp_wifi_set_band_mode") == 1)
@@ -66,4 +66,30 @@ def _balanced(t):
     return d == 0
 check("receiver_main.c: #if/#endif balanceados", _balanced(src))
 
+# ── OTA por WiFi, versión/chip en el HELLO y RSSI en el REPORT (NO compilado con ESP-IDF real: solo comprobaciones de coherencia) ──
+ou = open(f"{here}/../esp32/main/ota_update.c").read()
+fwv = int(_re.search(r"#define FW_VERSION\s+(\d+)", src).group(1))
+check("FW_VERSION = 6 y cabe en 6 bits del HELLO (≤ 63)", fwv == 6 and fwv <= 63, fwv)
+check("HELLO: reserved = HELLO_PACK(FW_VERSION, chip) con el chip según el target", "hello.reserved = HELLO_PACK(FW_VERSION, FW_CHIP_ID)" in src and "#define FW_CHIP_ID          FW_CHIP_C5" in src and "#define FW_CHIP_ID          FW_CHIP_ESP32" in src)
+check("REPORT: rssi_dbm sale de esp_wifi_sta_get_ap_info", "r.rssi_dbm = ap.rssi" in src)
+check("PKT_OTA: solo de la RPi con la que se habla, con el id propio y tras el WELCOME", "case PKT_OTA:" in src and "o.esp_id != g_receiver_id" in src and "src.sin_addr.s_addr != g_rpi_addr.sin_addr.s_addr" in src and "!g_welcomed" in src)
+check("durante la OTA el ESP calla (HELLO, SYNC y REPORT) para que la RPi sepa que sigue descargando", src.count("ota_update_active()") >= 3)
+check("el firmware nuevo se confirma (rollback) solo tras conectar y sincronizar", "g_sync_valid && !g_fw_confirmed" in src and "ota_mark_valid()" in src)
+check("ota_update.c: valida el tamaño recibido contra el anunciado y aborta si no coincide", "esp_https_ota_get_image_len_read" in ou and "esp_https_ota_abort" in ou and "esp_https_ota_finish" in ou)
+check("ota_update.c: el token va en la URL con 16 dígitos hexadecimales (la RPi lo compara como número)", "?t=%016llx" in ou)
+check("tras fallar, la OTA se libera (el ESP vuelve a anunciarse y la RPi la da por terminada)", "s_active = false;" in ou and "vTaskDelete" in ou)
+for d, extra in (("esp32", ""), ("esp32_wroom", "")):
+    t = open(f"{here}/../{d}/sdkconfig.defaults").read()
+    check(f"{d}: OTA por HTTP permitido, rollback activado y flash de 4 MB", "CONFIG_ESP_HTTPS_OTA_ALLOW_HTTP=y" in t and "CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y" in t and "CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y" in t)
+    cm = open(f"{here}/../{d}/main/CMakeLists.txt").read()
+    check(f"{d}: CMake incluye ota_update.c y los componentes app_update, esp_http_client y esp_https_ota", "ota_update.c" in cm and all(x in cm for x in ("app_update", "esp_http_client", "esp_https_ota")))
+    rows = [[x.strip() for x in l.split(",")] for l in open(f"{here}/../{d}/partitions.csv") if l.strip() and not l.startswith("#")]
+    part = {r[0]: (int(r[3], 16), int(r[4], 16), r[1], r[2]) for r in rows}
+    check(f"{d}: partitions.csv tiene nvs, otadata, ota_0 y ota_1", {"nvs", "otadata", "ota_0", "ota_1"} <= set(part), list(part))
+    check(f"{d}: ota_0 y ota_1 miden 1,5 MB, alineadas a 64 KB y sin solaparse", part["ota_0"][1] == part["ota_1"][1] == 0x180000 and part["ota_0"][0] % 0x10000 == 0 and part["ota_1"][0] % 0x10000 == 0 and part["ota_0"][0] + part["ota_0"][1] <= part["ota_1"][0])
+    ends = sorted((o, o + z) for o, z, _t, _s in part.values())
+    check(f"{d}: ninguna partición se solapa y todo cabe en 4 MB", all(a[1] <= b[0] for a, b in zip(ends, ends[1:])) and ends[-1][1] <= 0x400000, ends[-1])
+    check(f"{d}: otadata de 8 KB (ESP-IDF lo exige)", part["otadata"][1] == 0x2000)
+check("C5 y WROOM comparten ota_update.c (mismo código, sin #if por chip)", "CONFIG_IDF_TARGET" not in ou)
+check("protocol.h: PKT_OTA = 0x0A y OtaPacket de 24 bytes", "PKT_OTA" in open(f"{here}/../common/protocol.h").read() and "== 24, \"OtaPacket\"" in open(f"{here}/../common/protocol.h").read())
 sys.exit(0 if ok else 1)

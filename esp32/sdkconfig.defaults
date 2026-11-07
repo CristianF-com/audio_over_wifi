@@ -1,9 +1,16 @@
 # Target (XIAO ESP32-C5). Requiere ESP-IDF >= 5.5
 CONFIG_IDF_TARGET="esp32c5"
 
-# Partición de aplicación grande (factory 1,5 MB): con NimBLE + WiFi el binario pasa de 1 MB
-# (la tabla por defecto de ESP-IDF da solo 1 MB y la compilación falla: "app partition is too small")
-CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
+# OTA por WiFi: dos particiones de aplicación de 1,5 MB (partitions.csv) y flash de 4 MB.
+# (con NimBLE + WiFi el binario pasa de 1 MB). Si tu placa tiene menos de 4 MB no se puede usar OTA.
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
+# Si el firmware nuevo no arranca o no llega a conectarse y sincronizar, el bootloader vuelve al anterior
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+# La descarga va por HTTP dentro de la LAN (token de un solo uso); sin esto esp_https_ota exige HTTPS
+CONFIG_ESP_HTTPS_OTA_ALLOW_HTTP=y
 
 # Tick de 1 ms (la sincronía usa vTaskDelay/timeouts finos)
 CONFIG_FREERTOS_HZ=1000

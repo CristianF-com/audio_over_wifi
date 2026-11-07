@@ -22,6 +22,15 @@ echo; echo "== Autenticación web =="
 /tmp/sonos_harness auth & AP=$!
 sleep 0.6; python3 test_auth.py || { kill $AP 2>/dev/null; exit 1; }
 kill $AP 2>/dev/null || true; wait $AP 2>/dev/null || true
+echo; echo "== Web servida desde carpeta (-w) =="
+/tmp/sonos_harness webdir "$PWD/../rpi/web" & WP=$!
+sleep 0.6; python3 test_webdir.py || { kill $WP 2>/dev/null; exit 1; }
+kill $WP 2>/dev/null || true; wait $WP 2>/dev/null || true
+echo; echo "== LFE a los frontales (mezcla real) =="
+rm -f /tmp/sonos_harness_config.txt
+SONOS_LFE_DC=1 /tmp/sonos_harness & LP=$!
+sleep 0.8; python3 test_lfe.py || { kill $LP 2>/dev/null; pkill -x sonos_harness; exit 1; }
+kill $LP 2>/dev/null || true; wait $LP 2>/dev/null || true; pkill -x sonos_harness 2>/dev/null || true; sleep 0.3
 echo; echo "== Protocolo, web, HTTPS, calibración =="
 rm -f /tmp/sonos_harness_config.txt
 python3 ble_mock_setup.py

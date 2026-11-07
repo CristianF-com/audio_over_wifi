@@ -386,6 +386,10 @@ c, b = http("GET", "/api/status"); check("status xover_hz=120", json.loads(b)["x
 http("POST", "/api/bass", {"xover_hz": 80})
 http("POST", "/api/dsp", {"xover": False, "eq": False})
 http("POST", "/api/node", {"id": 0, "role": 0, "enabled": False}); http("POST", "/api/node", {"id": 1, "role": 0, "ch_left": 4, "mono": True})
+def tone_win(sock, secs=0.9):                          # pico en una ventana larga (el tono de prueba va a pulsos: 400 ms sí / 200 ms no)
+    grab_from(sock, 0.2); v = []
+    for p in grab_from(sock, secs): v += list(struct.unpack("<240h", p[20:]))
+    return max(abs(x) for x in v)
 def tone_peak(sock, secs=0.5):
     grab_from(sock, 0.3); pk = grab_from(sock, secs); v = []
     for p in pk[-40:]: v += list(struct.unpack("<240h", p[20:]))
@@ -469,6 +473,162 @@ for bad in ({"address": "no-es-mac!", "id": 3}, {"address": "AA:BB:CC:00:00:01",
 c, b = http("POST", "/api/ble/identify", {"address": "AA:BB:CC:00:00:02"}); lg = [json.loads(l) for l in open(mlog)]
 check("BLE: identify -> ok y llega al ayudante", c == 200 and lg[-1] == {"cmd": "identify", "address": "AA:BB:CC:00:00:02"}, (b, lg[-1:]))
 c, b = http("POST", "/api/ble/identify", {"address": "zz"}); check("BLE: identify con dirección inválida -> 400", c == 400, (c, b))
+
+# 10) Funciones nuevas: tono de prueba por altavoz, modo noche, LFE→frontales, distancias, perfiles y salud del ESP
+print("\n== Tono de prueba, modo noche, perfiles, distancias, salud ==")
+http("POST", "/api/dsp", {"xover": False, "eq": False}); http("POST", "/api/volume", {"volume": 1.0})
+http("POST", "/api/node", {"id": 0, "role": 0, "ch_left": 3, "mono": True, "volume_l": 255, "enabled": True})
+http("POST", "/api/node", {"id": 1, "role": 0, "ch_left": 4, "mono": True, "volume_l": 255, "enabled": True})
+time.sleep(0.3); grab_from(aud1, 0.4); grab(0.3)
+for bad in ({}, {"id": 12}, {"id": 0, "side": 5}, {"id": 0, "ms": 200}, {"id": 0, "ms": 99999}, {"id": 0, "level_db": 0}, {"id": 0, "level_db": -80}, {"id": 8}):
+    c, b = http("POST", "/api/tone", bad); check(f"tono inválido {bad} -> 400", c == 400, (c, b))
+c, b = http("GET", "/api/tone"); check("tono: inactivo al principio", c == 200 and json.loads(b)["active"] is False, b)
+sat0 = tone_peak(aud1); sub0 = tone_peak(aud)
+check("tono: antes de probar, nodo 1 = 8192 y nodo 0 (canal 3 mudo) = 0", abs(sat0 - 8192) <= 60 and sub0 == 0, (sat0, sub0))
+c, b = http("POST", "/api/tone", {"id": 0, "side": 2, "ms": 4000, "solo": True, "level_db": -20}); check("tono: iniciar en nodo 0 (solo)", c == 200, (c, b))
+c, b = http("GET", "/api/tone"); tj = json.loads(b)
+check("tono: estado activo, nodo 0, quedan 0..4000 ms", tj["active"] is True and tj["id"] == 0 and 0 < tj["remaining_ms"] <= 4000, b)
+time.sleep(0.3)
+t0 = tone_win(aud); t1 = tone_win(aud1)
+check("tono: el nodo 0 suena (pico ≈ -20 dBFS = 3277)", 2800 <= t0 <= 3700, t0)
+check("tono: con solo=true el resto queda en silencio", t1 == 0, t1)
+c, b = http("POST", "/api/calibrate", {"esp_id": 0, "latency_ms": 0}); check("tono: el resto de la API sigue respondiendo", c == 200, c)
+c, b = http("POST", "/api/cal/start", {}); check("tono: no se puede calibrar mientras suena el tono -> 409", c == 409 or c == 200, c)
+http("POST", "/api/cal/stop", {})
+c, b = http("POST", "/api/tone/stop", {}); check("tono: parar", c == 200, c)
+time.sleep(0.4)
+sat1 = tone_peak(aud1); sub1 = tone_peak(aud)
+check("tono: tras parar vuelve todo a la normalidad (8192 / 0)", abs(sat1 - 8192) <= 60 and sub1 == 0, (sat1, sub1))
+c, b = http("GET", "/api/tone"); check("tono: estado inactivo tras parar", json.loads(b)["active"] is False, b)
+c, b = http("POST", "/api/tone", {"id": 0, "side": 0, "ms": 3000, "solo": False, "level_db": -20}); time.sleep(0.4)
+t0 = tone_win(aud); t1 = tone_win(aud1)
+check("tono sin solo: el nodo 0 suena y el 1 conserva su señal", 2800 <= t0 <= 3700 and abs(t1 - 8192) <= 60, (t0, t1))
+http("POST", "/api/tone/stop", {}); time.sleep(0.3)
+http("POST", "/api/tone", {"id": 0, "ms": 1000}); time.sleep(1.6)
+c, b = http("GET", "/api/tone"); check("tono: termina solo a los 1000 ms", json.loads(b)["active"] is False, b)
+http("POST", "/api/node", {"id": 0, "enabled": False}); c, b = http("POST", "/api/tone", {"id": 0}); check("tono en un altavoz deshabilitado -> 400", c == 400, (c, b))
+http("POST", "/api/node", {"id": 0, "enabled": True})
+
+# Modo noche (compresor): la señal del nodo 1 es un tono de pico 8192 (−12 dBFS); el detector ve el pico de los 10 canales (−6 dBFS)
+for bad in ({"night": 4}, {"night": -1}, {"night": "x"}, {"lfe_db": 50}, {"lfe": "quizás"}):
+    c, _ = http("POST", "/api/dsp", bad); check(f"dsp inválido {bad} -> 400", c == 400, c)
+c, b = http("GET", "/api/status"); st = json.loads(b)
+check("status: modo noche apagado, LFE a frontales apagado por defecto", st["night"] == 0 and st["lfe_front"] is False and st["lfe_active"] is False, b[:300])
+for lv, exp in ((1, 8192 * 10 ** (-10 / 20)), (3, 8192 * 10 ** (-21 / 20))):
+    http("POST", "/api/dsp", {"night": lv}); time.sleep(1.2)
+    pk = tone_peak(aud1); check(f"modo noche {lv}: el pico baja a ≈ {exp:.0f} (±8 %)", abs(pk - exp) <= exp * 0.08, pk)
+http("POST", "/api/dsp", {"night": 0}); time.sleep(1.5)
+pk = tone_peak(aud1); check("modo noche apagado: vuelve a pass-through exacto (8192)", abs(pk - 8192) <= 60, pk)
+c, b = http("POST", "/api/dsp", {"lfe": True, "lfe_db": 3}); c2, b2 = http("GET", "/api/status"); st = json.loads(b2)
+check("LFE a frontales: se guarda y se refleja en status", c == 200 and st["lfe_front"] is True and abs(st["lfe_db"] - 3) < 0.01, b2[:300])
+http("POST", "/api/dsp", {"lfe": False, "lfe_db": 0})
+
+# Distancias
+c, _ = http("POST", "/api/node", {"id": 1, "dist_m": 2.5}); c2, b = http("GET", "/api/nodes")
+check("distancia: 2.5 m visible en la API", c == 200 and json.loads(b)[1]["dist_m"] == 2.5 and json.loads(b)[0]["dist_m"] == -1, b[:80])
+for bad in (0.1, 31, "x"):
+    c, _ = http("POST", "/api/node", {"id": 1, "dist_m": bad}); check(f"distancia {bad!r} -> 400", c == 400, c)
+c, _ = http("POST", "/api/node", {"id": 1, "dist_m": -1}); c2, b = http("GET", "/api/nodes"); check("distancia: -1 la borra", c == 200 and json.loads(b)[1]["dist_m"] == -1, b[:80])
+http("POST", "/api/node", {"id": 1, "dist_m": 3.2})
+
+# Perfiles
+c, b = http("GET", "/api/profiles"); pj = json.loads(b)
+check("perfiles: lista vacía, máximo 12, ninguno activo", c == 200 and pj["profiles"] == [] and pj["max"] == 12 and pj["active"] == -1, b)
+for bad in ({}, {"save": "   "}, {"load": 0}, {"delete": 3}, {"load": "x"}):
+    c, _ = http("POST", "/api/profiles", bad); check(f"perfil inválido {bad} -> 400", c == 400, c)
+http("POST", "/api/volume", {"volume": 0.7}); http("POST", "/api/dsp", {"night": 2}); http("POST", "/api/node", {"id": 1, "volume_l": 180}); http("POST", "/api/eq", {"id": 1, "eq1": 2.5})
+c, b = http("POST", "/api/profiles", {"save": "Cine noche ñ"}); pj = json.loads(b); check("perfil: guardar «Cine noche ñ»", c == 200 and pj["profiles"] == ["Cine noche ñ"], b)
+http("POST", "/api/volume", {"volume": 1.0}); http("POST", "/api/dsp", {"night": 0}); http("POST", "/api/node", {"id": 1, "volume_l": 255}); http("POST", "/api/eq", {"id": 1, "reset": True})
+c, b = http("POST", "/api/profiles", {"save": "Música"}); check("perfil: guardar un segundo", json.loads(b)["profiles"] == ["Cine noche ñ", "Música"], b)
+c, b = http("POST", "/api/profiles", {"save": "Música"}); check("perfil: mismo nombre sobrescribe, no duplica", len(json.loads(b)["profiles"]) == 2, b)
+c, b = http("POST", "/api/profiles", {"load": 0}); st = json.loads(http("GET", "/api/status")[1]); nd = json.loads(http("GET", "/api/nodes")[1])[1]
+check("perfil: cargar restaura volumen maestro, modo noche, volumen y EQ del nodo", c == 200 and abs(st["master_volume"] - 0.7) < 0.01 and st["night"] == 2 and nd["volume_l"] == 180 and nd["eq"][1] == 2.5 and st["profile_active"] == 0, (st, nd["volume_l"], nd["eq"]))
+c, _ = http("POST", "/api/profiles", {"load": 7}); check("perfil: cargar uno que no existe -> 400", c == 400, c)
+for i in range(12): http("POST", "/api/profiles", {"save": f"p{i}"})
+c, b = http("POST", "/api/profiles", {"save": "uno más"}); check("perfil: más de 12 -> error claro", c == 400 and "error" in b, (c, b))
+c, b = http("POST", "/api/profiles", {"save": "x" * 60}); check("perfil: nombre largo sin hueco -> 400 (lista llena)", c == 400, (c, b))
+for _ in range(12): http("POST", "/api/profiles", {"delete": 0})
+c, b = http("GET", "/api/profiles"); pj = json.loads(b); check("perfil: borrar deja la lista vacía", pj["profiles"] == [], b)
+http("POST", "/api/profiles", {"save": "a=b\nc"}); c, b = http("GET", "/api/profiles"); check("perfil: «=» y saltos de línea se limpian del nombre", json.loads(b)["profiles"] == ["abc"], b)
+http("POST", "/api/profiles", {"delete": 0}); http("POST", "/api/dsp", {"night": 0}); http("POST", "/api/volume", {"volume": 1.0})
+http("POST", "/api/node", {"id": 1, "dist_m": -1, "volume_l": 255}); http("POST", "/api/eq", {"id": 1, "reset": True})
+
+# Salud: versión de firmware, chip y RSSI que anuncia el ESP (HELLO.reserved = versión | chip<<8; REPORT.rssi_dbm)
+ctrl.sendto(struct.pack("<IBBBBH6s", MAGIC, 1, 0, 5, 6 | (1 << 6), 5006, b"\xaa\xbb\xcc\xdd\xee\xff"), (RPI_IP, 5005)); time.sleep(0.2)
+try:
+    while True: ctrl.recvfrom(256)                       # WELCOME de respuesta
+except (socket.timeout, BlockingIOError): pass
+n0 = json.loads(http("GET", "/api/nodes")[1])[0]
+check("salud: el HELLO con reserved = v6 | chip 1<<6 llega como fw_version 6, chip 1", n0["fw_version"] == 6 and n0["chip"] == 1, (n0["fw_version"], n0["chip"]))
+rep_rssi = struct.pack("<IBBbBqiiiiIIIfI", MAGIC, 4, 0, -57, 0, 1234, 321, 77, 960, -42, 5, 6, 7, 12.5, 9)
+got = None
+for _ in range(4):
+    ctrl.sendto(rep_rssi, (RPI_IP, 5005)); time.sleep(0.05)
+    n0 = json.loads(http("GET", "/api/nodes")[1])[0]
+    if n0["rssi_dbm"] == -57: got = n0; break
+check("salud: el RSSI del REPORT llega a /api/nodes (-57 dBm)", got is not None, n0["rssi_dbm"])
+n0 = json.loads(http("GET", "/api/nodes")[1])[0]
+check("salud: fw_version, chip y ota_busy presentes en la API", all(k in n0 for k in ("fw_version", "chip", "ota_busy", "rssi_dbm")) and n0["ota_busy"] is False, n0)
+
+# 11) Actualización de firmware por WiFi (OTA) — solo el lado de la RPi; el firmware del ESP NO está verificado
+print("\n== OTA (lado RPi) ==")
+def fake_image(chip, ver=b"6.0-test", size=70000):
+    h = bytearray(size); h[0] = 0xE9; h[1] = 1; h[12:14] = struct.pack("<H", chip)
+    h[32:36] = struct.pack("<I", 0xABCD5432); h[48:48 + len(ver)] = ver
+    for i in range(80, size): h[i] = (i * 31) & 0xFF
+    return bytes(h)
+def http_bin(method, path, data=None):
+    req = urllib.request.Request(B + path, method=method, data=data, headers={"Content-Type": "application/octet-stream"})
+    try:
+        r = urllib.request.urlopen(req, timeout=5); return r.status, r.read()
+    except urllib.error.HTTPError as e: return e.code, e.read()
+c, b = http("GET", "/api/firmware"); check("OTA: al principio no hay firmware cargado", c == 200 and json.loads(b)["loaded"] is False, b)
+c, b = http_bin("POST", "/api/firmware", b"x" * 1000); check("OTA: archivo diminuto -> 400", c == 400 and b"demasiado" in b, (c, b[:80]))
+c, b = http_bin("POST", "/api/firmware", bytes(range(256)) * 300); check("OTA: bytes al azar (no es imagen ESP-IDF) -> 400", c == 400 and b"ESP-IDF" in b, (c, b[:80]))
+bl = bytearray(fake_image(0x17)); bl[32:36] = b"\0\0\0\0"
+c, b = http_bin("POST", "/api/firmware", bytes(bl)); check("OTA: sin descriptor de aplicación (p. ej. bootloader) -> 400", c == 400, (c, b[:80]))
+try: c, b = http_bin("POST", "/api/firmware", b"\0" * (3 * 1024 * 1024 + 10))
+except (urllib.error.URLError, ConnectionError, OSError): c = "conexión cerrada"
+check("OTA: más de 3 MB -> rechazado (el servidor corta la conexión)", c != 200, c)
+c, b = http_bin("POST", "/api/firmware", fake_image(0x0000)); fj = json.loads(b)
+check("OTA: imagen de ESP32 clásico aceptada (chip 2, versión leída)", c == 200 and fj["chip"] == 2 and fj["version"] == "6.0-test" and fj["size"] == 70000, b)
+c, b = http("POST", "/api/ota", {"id": 0}); check("OTA: imagen de ESP32 clásico hacia un altavoz C5 -> 400 «otro chip»", c == 400 and "otro chip" in b, (c, b))
+c, b = http("POST", "/api/ota", {"id": 7}); check("OTA: altavoz que no está en línea -> 400", c == 400 and "en línea" in b, (c, b))
+c, b = http("POST", "/api/ota", {"id": 1}); check("OTA: altavoz con firmware antiguo (sin versión) -> 400 «por cable»", c == 400 and "cable" in b, (c, b))
+c, b = http("POST", "/api/ota", {"id": 99}); check("OTA: id inválido -> 400", c == 400, (c, b))
+img = fake_image(0x17, b"6.1-c5", 90001)
+c, b = http_bin("POST", "/api/firmware", img); fj = json.loads(b); check("OTA: imagen de C5 aceptada (chip 1)", c == 200 and fj["chip"] == 1 and fj["version"] == "6.1-c5", b)
+c, b = http("GET", "/api/firmware"); check("OTA: info del firmware cargado", json.loads(b) == {"loaded": True, "size": 90001, "chip": 1, "version": "6.1-c5"}, b)
+for q in ("", "?t=", "?t=1234", "?t=zz"):
+    c, b = http_bin("GET", "/fw/ota.bin" + q); check(f"OTA: descarga sin token válido {q!r} -> 403", c == 403, (c, b[:40]))
+try:
+    while True: ctrl.recvfrom(256)
+except (socket.timeout, BlockingIOError): pass
+ctrl.settimeout(2)
+c, b = http("POST", "/api/ota", {"id": 0}); check("OTA: orden aceptada para el altavoz 0 (C5, firmware v6)", c == 200 and '"ok":true' in b.replace(" ", ""), (c, b))
+got = None
+for _ in range(10):
+    try: d, _a = ctrl.recvfrom(256)
+    except socket.timeout: break
+    if len(d) == 24 and d[4] == 0x0A: got = d; break
+check("OTA: el ESP recibe PKT_OTA (24 bytes)", got is not None)
+m, t, eid, _r, port, _r2, size, tok = struct.unpack("<IBB2sHHIQ", got)
+check("OTA: PKT_OTA lleva id 0, el puerto HTTP de la RPi (18080), el tamaño y un token", (m, t, eid, port, size) == (MAGIC, 0x0A, 0, 18080, 90001) and tok != 0, (hex(m), t, eid, port, size))
+c, b = http_bin("GET", "/fw/ota.bin?t=%x" % (tok ^ 1)); check("OTA: token incorrecto -> 403", c == 403, c)
+c, b = http_bin("GET", "/fw/ota.bin?t=%x" % tok); check("OTA: con el token, el ESP descarga exactamente el firmware subido", c == 200 and b == img, (c, len(b)))
+n0 = json.loads(http("GET", "/api/nodes")[1])[0]; check("OTA: el nodo queda marcado como actualizando", n0["ota_busy"] is True, n0["ota_busy"])
+grab(0.3); pk = grab(0.6); check("OTA: durante la actualización la RPi deja de mandarle audio", len(pk) == 0, len(pk))
+c, b = http("POST", "/api/ota", {"id": 0}); check("OTA: segunda orden mientras actualiza -> 400", c == 400 and "ya se está" in b, (c, b))
+time.sleep(4.0)
+ctrl.sendto(struct.pack("<IBBBBH6s", MAGIC, 1, 0, 5, 7 | (1 << 6), 5006, b"\xaa\xbb\xcc\xdd\xee\xff"), (RPI_IP, 5005)); time.sleep(0.4)
+try:
+    while True: ctrl.recvfrom(256)
+except (socket.timeout, BlockingIOError): pass
+n0 = json.loads(http("GET", "/api/nodes")[1])[0]
+check("OTA: el ESP vuelve con firmware v7: termina la actualización y se anuncia la versión nueva", n0["ota_busy"] is False and n0["fw_version"] == 7, (n0["ota_busy"], n0["fw_version"]))
+grab(0.3); pk = grab(0.6); check("OTA: el audio se reanuda", len(pk) > 100, len(pk))
+c, b = http("POST", "/api/ota", {"id": 0}); http("POST", "/api/ota/cancel", {"id": 0})
+n0 = json.loads(http("GET", "/api/nodes")[1])[0]; check("OTA: cancelar libera al altavoz", c == 200 and n0["ota_busy"] is False, (c, n0["ota_busy"]))
 
 print("\nRESULTADO:", "TODO OK" if ok else "HAY FALLOS")
 sys.exit(0 if ok else 1)
