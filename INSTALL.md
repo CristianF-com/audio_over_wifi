@@ -6,7 +6,7 @@ Dos partes independientes:
 2. **ESP32-C5 (XIAO)**: compilar el firmware, grabarlo y darle su número y su WiFi.
 
 > **Estado de verificación.** El código de la Raspberry se compila y se prueba con la batería de tests (`tests/run_tests.sh`).
-> El firmware del ESP32 **no se ha compilado con un ESP-IDF real ni probado en placas**: si el primer `idf.py build`
+> El firmware del **ESP32-C5 compila y se flashea con ESP-IDF real** (confirmado), pero el del **WROOM no se ha compilado** y el comportamiento en placa (audio, sync, OTA, Bluetooth) sigue sin verificarse: si un `idf.py build`
 > falla, copia el error completo y se corrige. Lo mismo para el Bluetooth desde la Raspberry (solo probado simulado).
 
 ---

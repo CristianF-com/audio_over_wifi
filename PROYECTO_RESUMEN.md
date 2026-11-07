@@ -99,13 +99,14 @@ Constantes clave (`protocol.h`): `FRAMES_PER_PACKET=120`, `PLAYOUT_DELAY_US=8000
 | Controlador de sync + PLC + cambio de playout | ✅ en simulación | `tests/sim_sync.py` (±150 ppm, offsets hasta 20 ms, 1–6 % pérdidas, 80→120 / 80→50 ms) |
 | Firmware: validador IPv4 y UUID C↔JS | ✅ | `tests/test_firmware_units.py` |
 | Firmware: reordenación/NACK + tarea RX real (PC, loopback) | ✅ | `tests/test_reorder.c`, `tests/test_esp_rx.c` |
-| Firmware ESP32-C5 (incl. BLE) | ⚠️ solo sintaxis con stubs | **no compilado con ESP-IDF real ni probado en placa** (NimBLE/pairing sin probar) |
+| Firmware ESP32-C5 (incl. BLE) | ⚠️ compila y se flashea | el usuario lo compiló con ESP-IDF real y lo flasheó sin problemas (v9.7); audio/sync/NimBLE/pairing en placa sin confirmar |
+| Firmware ESP32-WROOM (`esp32_wroom/`) | ❌ no compilado | el usuario no lo probará por ahora |
 | Calibración con móvil real / Web Bluetooth real | ❌ no probado | certificado autofirmado en iOS/Android, permisos de micrófono, pairing |
 | ALSA con Traktor real | ❌ no probado | sin hardware |
 | Audio/sync reales en WiFi | ❌ no probado | el plazo de reenvío y el colchón mínimo hay que ajustarlos en la red real (contadores `perd`/`rec`/`tarde`) |
 | EQ propuesto con móvil/altavoces reales | ❌ no probado | solo con respuestas sintéticas conocidas (error < 1 dB) |
 | OTA por WiFi (lado RPi: subida, token, orden UDP, pausa de audio, retorno) | ✅ | `tests/fake_esp.py` con ESP simulado |
-| OTA por WiFi (lado ESP: descarga, particiones, rollback, bootloader) | ❌ no probado | `ota_update.c` y `partitions.csv` sin compilar con ESP-IDF; hay que flashear por cable la primera vez |
+| OTA por WiFi (lado ESP: descarga, particiones, rollback, bootloader) | ⚠️ compila en C5 | compila y flashea en el C5; la descarga OTA, el rollback y `CONFIG_ESP_HTTPS_OTA_ALLOW_HTTP` sin probar en placa; WROOM sin compilar |
 | Mezcla LFE→frontales, modo noche, tono de prueba | ✅ | `tests/test_lfe.py`, `tests/fake_esp.py` (señales sintéticas; no escuchado en altavoces reales) |
 | Script mpv en mpv real | ⚠️ | probado con un mpv simulado contra la API real, no con mpv |
 
