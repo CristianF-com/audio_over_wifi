@@ -10,7 +10,7 @@ static const char PAGE_PANEL[] = R"HTML(<!DOCTYPE html>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#000000"><meta name="color-scheme" content="dark light">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="SonosWiFi"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AStream"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
@@ -57,7 +57,7 @@ static const char PAGE_PANEL[] = R"HTML(<!DOCTYPE html>
     apply();
   });
 })();</script>
-<title>SonosWiFi</title>
+<title>AStream</title>
 <style>
 /* Sistema de diseño compartido por las tres páginas (panel, /calibrate, /ble). Negro puro + azul señal. */
 @font-face{font-family:'Roboto';font-style:normal;font-weight:300;font-display:swap;src:url(/fonts/roboto-300.woff2) format('woff2')}
@@ -91,11 +91,11 @@ html[data-theme=graphite]{
 }
 html[data-theme=light]{
   --bg:#d5d9e0; --panel:#e4e7ec; --raise:#d9dde4; --line:#c3c8d1; --line2:#aab1bd;
-  --fg:#1a1f27; --mut:#4b5465; --ac:#0a58ac; --ac-bg:rgba(10,88,172,.11); --ac-ln:rgba(10,88,172,.45);
+  --fg:#1a1f27; --mut:#4b5465; --ac:#ffffff; --ac-bg:rgb(0 0 0 / 24%); --ac-ln:rgb(255 255 255 / 0%);
   --ctl:#667184; --ok:#0f6240; --warn:#7a4a00; --bad:#a82620;
   --on-ac:#ffffff; --ac-hi:#4aa3ff; --ac-lo:#7fa9d6; --bad-fg:#8f1a16; --bad-ln:rgba(179,42,37,.5); --warn-ln:rgba(138,83,0,.45);
   --top-bg:rgba(213,217,224,.92); --top-solid:#d5d9e0; --tabs-bg:rgba(228,231,236,.95); --scrim:rgba(26,31,39,.35); --code-bg:#cfd4dc; --bar-bg:#0b0e14; --cl-off:#e0c3c1;
-  --thumb:#f4f5f8; --thumb-ring:rgba(10,88,172,.35); --cap-bg:rgba(228,231,236,.88); --glow:rgba(10,88,172,.06); --orb-glow:rgba(10,88,172,.3);
+  --thumb:#f4f5f8; --thumb-ring:#4b5465; --cap-bg:rgba(228,231,236,.88); --glow:rgba(10,88,172,.06); --orb-glow:rgba(10,88,172,.3);
   --room-bg:#e4e7ec; --led-g:#1fa84a; --led-y:#d9a400; --led-r:#e0342b;
   color-scheme:light;
 }
@@ -136,6 +136,7 @@ h2{font-size:1.02rem;font-weight:650}
 .switch::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:var(--mut);transition:transform .15s,background .15s}
 .switch[aria-checked=true]{background:var(--ac);border-color:var(--ac)}
 .switch[aria-checked=true]::after{transform:translateX(20px);background:var(--on-ac)}
+html[data-theme=light] .switch[aria-checked=true]{background:var(--mut);border-color:var(--ac)}
 
 input[type=range].rng{-webkit-appearance:none;appearance:none;width:100%;height:28px;background:transparent;border-radius:0;cursor:pointer;
   --f:.5;--rh:28px;--tw:38px;--th:26px;height:var(--rh);
@@ -302,7 +303,7 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
    verde que destella en rojo cada vez que el nivel sube ~3 dB; al bajar se apaga y vuelve a destellar en la siguiente subida */
 .lamp{display:block;width:22px;height:22px;border-radius:5px;background:var(--bar-bg);border:1.5px solid var(--ctl)}
 .lamp[data-st=cable],.lamp[data-st=sig]{background:var(--led-g);border-color:var(--led-g);opacity:.55}
-.lamp.on{background:var(--led-r);border-color:var(--led-r);box-shadow:0 0 10px 1px var(--led-r);opacity:1}
+.lamp.on{background:var(--led-r);border-color:var(--led-r);box-shadow:none;opacity:1}   /* rojo liso: sin brillo ni sombra */
 .mc .lvn{font:300 .78rem/1 var(--font);font-variant-numeric:tabular-nums;color:var(--fg);min-height:1em}
 .ms{color:var(--mut);font-size:.74rem;margin-top:10px}
 /* Vúmetro vertical junto a cada altavoz: misma altura que el dibujo */
@@ -412,7 +413,7 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
 </style>
 </head><body>
 <div class="top"><div class="in">
-  <a class="brand" href="/"><svg class="logo" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 13h2M8 8v10M13 4v18M18 8v10M23 13h-2"/></svg>SonosWiFi</a>
+  <a class="brand" href="/"><svg class="logo" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 13h2M8 8v10M13 4v18M18 8v10M23 13h-2"/></svg>AStream</a>
   <span class="chip" id="st"><i class="dot" id="dot"></i><span id="hs">Conectando…</span></span>
   <div class="mv" title="Volumen maestro">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
@@ -1198,7 +1199,7 @@ static const char PAGE_CAL[] = R"HTML(<!DOCTYPE html>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#000000"><meta name="color-scheme" content="dark light">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="SonosWiFi"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AStream"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
@@ -1245,7 +1246,7 @@ static const char PAGE_CAL[] = R"HTML(<!DOCTYPE html>
     apply();
   });
 })();</script>
-<title>SonosWiFi — Calibración</title>
+<title>AStream — Calibración</title>
 <style>
 /* Sistema de diseño compartido por las tres páginas (panel, /calibrate, /ble). Negro puro + azul señal. */
 @font-face{font-family:'Roboto';font-style:normal;font-weight:300;font-display:swap;src:url(/fonts/roboto-300.woff2) format('woff2')}
@@ -1279,11 +1280,11 @@ html[data-theme=graphite]{
 }
 html[data-theme=light]{
   --bg:#d5d9e0; --panel:#e4e7ec; --raise:#d9dde4; --line:#c3c8d1; --line2:#aab1bd;
-  --fg:#1a1f27; --mut:#4b5465; --ac:#0a58ac; --ac-bg:rgba(10,88,172,.11); --ac-ln:rgba(10,88,172,.45);
+  --fg:#1a1f27; --mut:#4b5465; --ac:#ffffff; --ac-bg:rgb(0 0 0 / 24%); --ac-ln:rgb(255 255 255 / 0%);
   --ctl:#667184; --ok:#0f6240; --warn:#7a4a00; --bad:#a82620;
   --on-ac:#ffffff; --ac-hi:#4aa3ff; --ac-lo:#7fa9d6; --bad-fg:#8f1a16; --bad-ln:rgba(179,42,37,.5); --warn-ln:rgba(138,83,0,.45);
   --top-bg:rgba(213,217,224,.92); --top-solid:#d5d9e0; --tabs-bg:rgba(228,231,236,.95); --scrim:rgba(26,31,39,.35); --code-bg:#cfd4dc; --bar-bg:#0b0e14; --cl-off:#e0c3c1;
-  --thumb:#f4f5f8; --thumb-ring:rgba(10,88,172,.35); --cap-bg:rgba(228,231,236,.88); --glow:rgba(10,88,172,.06); --orb-glow:rgba(10,88,172,.3);
+  --thumb:#f4f5f8; --thumb-ring:#4b5465; --cap-bg:rgba(228,231,236,.88); --glow:rgba(10,88,172,.06); --orb-glow:rgba(10,88,172,.3);
   --room-bg:#e4e7ec; --led-g:#1fa84a; --led-y:#d9a400; --led-r:#e0342b;
   color-scheme:light;
 }
@@ -1324,6 +1325,7 @@ h2{font-size:1.02rem;font-weight:650}
 .switch::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:var(--mut);transition:transform .15s,background .15s}
 .switch[aria-checked=true]{background:var(--ac);border-color:var(--ac)}
 .switch[aria-checked=true]::after{transform:translateX(20px);background:var(--on-ac)}
+html[data-theme=light] .switch[aria-checked=true]{background:var(--mut);border-color:var(--ac)}
 
 input[type=range].rng{-webkit-appearance:none;appearance:none;width:100%;height:28px;background:transparent;border-radius:0;cursor:pointer;
   --f:.5;--rh:28px;--tw:38px;--th:26px;height:var(--rh);
@@ -1439,7 +1441,7 @@ input[type=checkbox]:checked::after{content:"";width:5px;height:10px;border:soli
 @media (max-width:560px){.opts{grid-template-columns:1fr}.mets{grid-template-columns:1fr 1fr}.steps span em{display:none}}
 </style></head><body>
 <div class="top"><div class="in">
-  <a class="brand" href="/"><svg class="logo" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 13h2M8 8v10M13 4v18M18 8v10M23 13h-2"/></svg>SonosWiFi</a>
+  <a class="brand" href="/"><svg class="logo" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 13h2M8 8v10M13 4v18M18 8v10M23 13h-2"/></svg>AStream</a>
   <span style="margin-left:auto;display:flex;gap:6px"><button class="btn ghost sm themebtn" data-theme-btn type="button"></button><a class="btn ghost sm" href="/">Volver al panel</a></span>
 </div></div>
 <main>
@@ -1707,7 +1709,7 @@ static const char PAGE_BLE[] = R"HTML(<!DOCTYPE html>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#000000"><meta name="color-scheme" content="dark light">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="SonosWiFi"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AStream"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
@@ -1754,7 +1756,7 @@ static const char PAGE_BLE[] = R"HTML(<!DOCTYPE html>
     apply();
   });
 })();</script>
-<title>SonosWiFi — Añadir altavoz</title>
+<title>AStream — Añadir altavoz</title>
 <style>
 /* Sistema de diseño compartido por las tres páginas (panel, /calibrate, /ble). Negro puro + azul señal. */
 @font-face{font-family:'Roboto';font-style:normal;font-weight:300;font-display:swap;src:url(/fonts/roboto-300.woff2) format('woff2')}
@@ -1788,11 +1790,11 @@ html[data-theme=graphite]{
 }
 html[data-theme=light]{
   --bg:#d5d9e0; --panel:#e4e7ec; --raise:#d9dde4; --line:#c3c8d1; --line2:#aab1bd;
-  --fg:#1a1f27; --mut:#4b5465; --ac:#0a58ac; --ac-bg:rgba(10,88,172,.11); --ac-ln:rgba(10,88,172,.45);
+  --fg:#1a1f27; --mut:#4b5465; --ac:#ffffff; --ac-bg:rgb(0 0 0 / 24%); --ac-ln:rgb(255 255 255 / 0%);
   --ctl:#667184; --ok:#0f6240; --warn:#7a4a00; --bad:#a82620;
   --on-ac:#ffffff; --ac-hi:#4aa3ff; --ac-lo:#7fa9d6; --bad-fg:#8f1a16; --bad-ln:rgba(179,42,37,.5); --warn-ln:rgba(138,83,0,.45);
   --top-bg:rgba(213,217,224,.92); --top-solid:#d5d9e0; --tabs-bg:rgba(228,231,236,.95); --scrim:rgba(26,31,39,.35); --code-bg:#cfd4dc; --bar-bg:#0b0e14; --cl-off:#e0c3c1;
-  --thumb:#f4f5f8; --thumb-ring:rgba(10,88,172,.35); --cap-bg:rgba(228,231,236,.88); --glow:rgba(10,88,172,.06); --orb-glow:rgba(10,88,172,.3);
+  --thumb:#f4f5f8; --thumb-ring:#4b5465; --cap-bg:rgba(228,231,236,.88); --glow:rgba(10,88,172,.06); --orb-glow:rgba(10,88,172,.3);
   --room-bg:#e4e7ec; --led-g:#1fa84a; --led-y:#d9a400; --led-r:#e0342b;
   color-scheme:light;
 }
@@ -1833,6 +1835,7 @@ h2{font-size:1.02rem;font-weight:650}
 .switch::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:var(--mut);transition:transform .15s,background .15s}
 .switch[aria-checked=true]{background:var(--ac);border-color:var(--ac)}
 .switch[aria-checked=true]::after{transform:translateX(20px);background:var(--on-ac)}
+html[data-theme=light] .switch[aria-checked=true]{background:var(--mut);border-color:var(--ac)}
 
 input[type=range].rng{-webkit-appearance:none;appearance:none;width:100%;height:28px;background:transparent;border-radius:0;cursor:pointer;
   --f:.5;--rh:28px;--tw:38px;--th:26px;height:var(--rh);
@@ -1932,7 +1935,7 @@ details.adv .in2{padding:4px 0 14px;display:flex;flex-direction:column;gap:12px}
 @media (max-width:420px){.kv{grid-template-columns:1fr}}
 </style></head><body>
 <div class="top"><div class="in">
-  <a class="brand" href="/"><svg class="logo" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 13h2M8 8v10M13 4v18M18 8v10M23 13h-2"/></svg>SonosWiFi</a>
+  <a class="brand" href="/"><svg class="logo" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 13h2M8 8v10M13 4v18M18 8v10M23 13h-2"/></svg>AStream</a>
   <span style="margin-left:auto;display:flex;gap:6px"><button class="btn ghost sm themebtn" data-theme-btn type="button"></button><a class="btn ghost sm" href="/">Volver al panel</a></span>
 </div></div>
 <main>
@@ -2042,8 +2045,8 @@ $('save').onclick=async()=>{
 
 static const char PWA_MANIFEST[] = R"HTML({
   "id": "/",
-  "name": "SonosWiFi",
-  "short_name": "SonosWiFi",
+  "name": "AStream",
+  "short_name": "AStream",
   "description": "Control del audio multicanal inalámbrico: altavoces, sonido y latencia.",
   "lang": "es",
   "dir": "ltr",
@@ -2064,11 +2067,11 @@ static const char PWA_MANIFEST[] = R"HTML({
   ]
 })HTML";
 
-static const char PWA_SW[] = R"HTML(/* Service worker de SonosWiFi. Solo se registra en contexto seguro (HTTPS o localhost).
+static const char PWA_SW[] = R"HTML(/* Service worker de AStream. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * 5cce248382 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-5cce248382';
+ * 9d164b46db lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-9d164b46db';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png', '/fonts/roboto-400.woff2', '/fonts/roboto-500.woff2'];
 
 self.addEventListener('install', e => {
@@ -2092,7 +2095,7 @@ self.addEventListener('fetch', e => {
   }).catch(() => caches.match(r).then(hit => hit || (r.mode === 'navigate' ? caches.match('/') : undefined) || Response.error())));
 });)HTML";
 
-static const char PWA_ICON_SVG[] = R"HTML(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="SonosWiFi">
+static const char PWA_ICON_SVG[] = R"HTML(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="AStream">
   <rect width="512" height="512" fill="#000"/>
   <g fill="#4aa3ff">
     <rect x="78"  y="211" width="44" height="90"  rx="22"/>

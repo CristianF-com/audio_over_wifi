@@ -322,7 +322,7 @@ void WebServer::handleClient(int cfd, bool tls) {
     }
     if (!authed && !pwa) {
         code = 401; resp = "{\"error\":\"unauthorized\"}";
-        extra = "WWW-Authenticate: Basic realm=\"SonosWiFi\", charset=\"UTF-8\"\r\n";
+        extra = "WWW-Authenticate: Basic realm=\"AStream\", charset=\"UTF-8\"\r\n";
     }
     else if (fwget) { resp = serveFirmware(p, code); ct = code == 200 ? "application/octet-stream" : "application/json"; }
     else if (pwaTxt) { resp = pwaTxt; ct = pwaCt; }

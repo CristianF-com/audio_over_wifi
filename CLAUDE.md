@@ -16,7 +16,7 @@ Audio multicanal inalámbrico: Traktor Audio 10 (USB, 10 canales) → Raspberry 
 ## Páginas web
 * Las fuentes están en `rpi/web/` (`panel.html`, `calibrate.html`, `ble.html`, `shared.css`, `analysis.js`).
 * `rpi/include/web_pages.h` es GENERADO: tras editar `rpi/web/`, ejecuta `python3 scripts/gen_web_pages.py`. `tests/check_pages_js.sh` falla si no está al día.
-* Estilo: tema oscuro por defecto (fondo negro `#000`, acento azul `#4aa3ff`) y temas opcionales Grafito y Claro suave (nunca blanco puro); sin morado; interfaz en español.
+* Estilo: tema oscuro por defecto (fondo negro `#000`, acento azul `#4aa3ff`) y temas opcionales Grafito y Claro suave (nunca blanco puro); sin morado; interfaz en español. El nombre que se muestra en la web es **AStream** (el nombre BLE de los ESP sigue siendo `SonosWiFi-XXXX`). Excepción de diseño pedida por el usuario: en «Claro» el acento `--ac` es blanco (`--ac-bg: rgb(0 0 0 / 24%)`, interruptor activo en `--mut`), por lo que ahí el acento no cumple 4,5:1 (la prueba lo exceptúa).
 
 ## Reglas del proyecto
 * Protocolo en `common/protocol.h` (versión 5). Si cambia, hay que reflashear todos los ESP: actualiza `PROTOCOL_VERSION`, el firmware y los tests. Las ampliaciones compatibles (`HELLO.reserved`, `REPORT.rssi_dbm`, `PKT_OTA`, ID automático: `ESP_ID_AUTO`=255 en `HELLO.esp_id` y `WELCOME_F_ASSIGNED`) no suben la versión. El ESP no necesita ID: la RPi lo asigna por MAC (`ESPNode.mac`, persistido como `nodeN.mac`); el ESP lo guarda solo en RAM.

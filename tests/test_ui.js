@@ -48,9 +48,9 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('vúmetros: el número bajo cada cuadrado es el nivel (−6, −6, −12, —, −12)',lamps.slice(0,5).map(l=>l.num).join('|')==='−6|−6|−12|—|−12',lamps);
   const lp=await p.evaluate(()=>{const g=id=>getComputedStyle(document.getElementById(id)),on=g('lp0'),off=g('lp3');
     document.getElementById('lp3').dataset.st='cable';const cab=g('lp3').backgroundColor,cabAnim=g('lp3').animationName;document.getElementById('lp3').dataset.st='off';
-    document.getElementById('lp0').classList.add('on');const red=g('lp0').backgroundColor;document.getElementById('lp0').classList.remove('on');
-    return {red,offBg:off.backgroundColor,cab,anim:on.animationName,cabAnim,animOff:off.animationName,w:off.width,h:off.height};});
-  ok('vúmetros: sin señal = vacío; cable conectado = verde fijo; destello = rojo; ninguno usa animación continua',lp.red==='rgb(255, 69, 58)'&&lp.cab==='rgb(48, 209, 88)'&&lp.offBg!==lp.cab&&lp.offBg!==lp.red&&lp.anim==='none'&&lp.cabAnim==='none'&&lp.animOff==='none'&&lp.w===lp.h,lp);
+    document.getElementById('lp0').classList.add('on');const red=g('lp0').backgroundColor,sh=g('lp0').boxShadow,fl=g('lp0').filter;document.getElementById('lp0').classList.remove('on');
+    return {sh,fl,red,offBg:off.backgroundColor,cab,anim:on.animationName,cabAnim,animOff:off.animationName,w:off.width,h:off.height};});
+  ok('vúmetros: sin señal = vacío; cable conectado = verde fijo; destello = rojo liso, sin brillo ni sombra; ninguno usa animación continua',lp.red==='rgb(255, 69, 58)'&&lp.cab==='rgb(48, 209, 88)'&&lp.offBg!==lp.cab&&lp.offBg!==lp.red&&lp.sh==='none'&&lp.fl==='none'&&lp.anim==='none'&&lp.cabAnim==='none'&&lp.animOff==='none'&&lp.w===lp.h,lp);
   // Lógica de umbrales: −70..−40 cable fijo; −40..0 destella al subir ~3 dB sobre el último valle; al bajar se apaga y vuelve a destellar
   const seq=await p.evaluate(()=>{const s={ref:-90,until:0,tm:0},r=[];const st=(db,t)=>{const z=lampStep(s,db,t);r.push([db,z,t<s.until]);};
     [-95,-60,-45,-39,-39,-37,-36,-30,-33,-36,-31,-90,-39,-60].forEach((db,i)=>st(db,i*1000));return r;});
@@ -168,7 +168,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('panel sin errores de JS',errs.length===0,errs);
   // ── PWA ──
   const mf=await fetch(BASE+'/manifest.webmanifest');const mj=await mf.json();
-  ok('PWA: manifiesto válido (nombre, standalone, inicio, colores, 3 iconos, atajos)',mj.name==='SonosWiFi'&&mj.display==='standalone'&&mj.start_url==='/'&&mj.theme_color==='#000000'&&mj.background_color==='#000000'&&mj.lang==='es'&&mj.icons.length>=3&&mj.icons.some(i=>i.purpose==='maskable')&&mj.shortcuts.length>=2,mj);
+  ok('PWA: manifiesto válido (nombre, standalone, inicio, colores, 3 iconos, atajos)',mj.name==='AStream'&&mj.display==='standalone'&&mj.start_url==='/'&&mj.theme_color==='#000000'&&mj.background_color==='#000000'&&mj.lang==='es'&&mj.icons.length>=3&&mj.icons.some(i=>i.purpose==='maskable')&&mj.shortcuts.length>=2,mj);
   const pngSize=async u=>{const b=Buffer.from(await (await fetch(BASE+u)).arrayBuffer());return b.readUInt32BE(0)===0x89504e47?[b.readUInt32BE(16),b.readUInt32BE(20),b[25]]:null;};
   ok('PWA: iconos PNG con el tamaño declarado y sin canal alfa (opacos, como pide Apple)',JSON.stringify(await pngSize('/icons/icon-180.png'))==='[180,180,2]'&&JSON.stringify(await pngSize('/icons/icon-192.png'))==='[192,192,2]'&&JSON.stringify(await pngSize('/icons/icon-512.png'))==='[512,512,2]'&&JSON.stringify(await pngSize('/icons/icon-maskable-512.png'))==='[512,512,2]');
   const sw=await (await fetch(BASE+'/sw.js')).text();
@@ -416,8 +416,13 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
     c=await setTheme(t);
     ok('Tema '+t+': data-theme, theme-color y color-scheme correctos',c.theme===t&&c.meta===meta&&c.cs===cs,c);
     ok('Tema '+t+': texto/fondo y texto atenuado ≥ 4,5:1',cr(c.fg,c.bg)>=4.5&&cr(c.mut,c.bg)>=4.5,[cr(c.fg,c.bg),cr(c.mut,c.bg)]);
+    // Excepción decidida por el usuario: en «light» el acento es blanco (#fff) y los estados activos son un recuadro gris oscuro translúcido;
+    // el blanco sobre ese recuadro (~2,2:1) y el blanco sobre el fondo no cumplen 4,5:1. Se comprueba que siga siendo blanco y que ok/aviso/error cumplan.
+    if(t==='light'){
+      ok('Tema light: ok, aviso y error ≥ 4,5:1 sobre el fondo; el acento es blanco por decisión de diseño (excepción documentada)',['ok','warn','bad'].every(k=>cr(rgbOf(c[k]),c.bg)>=4.5)&&rgbOf(c.ac)==='rgb(255,255,255)',['ok','warn','bad'].map(k=>[k,cr(rgbOf(c[k]),c.bg)]).concat([['ac',c.ac]]));
+    }else{
     ok('Tema '+t+': acento y estados (ok, aviso, error) ≥ 4,5:1 sobre el fondo',['ac','ok','warn','bad'].every(k=>cr(rgbOf(c[k]),c.bg)>=4.5),['ac','ok','warn','bad'].map(k=>[k,cr(rgbOf(c[k]),c.bg)]));
-    ok('Tema '+t+': texto del botón primario sobre el acento ≥ 4,5:1',cr(rgbOf(c.onac),rgbOf(c.ac))>=4.5,[c.onac,c.ac]);
+    ok('Tema '+t+': texto del botón primario sobre el acento ≥ 4,5:1',cr(rgbOf(c.onac),rgbOf(c.ac))>=4.5,[c.onac,c.ac]);}
     ok('Tema '+t+': sin morado en los acentos',noPurple(c),c);
     ok('Tema '+t+': persiste al recargar (sin destello)',await p.evaluate(()=>localStorage.getItem('sonos_theme'))===t&&c.theme===t);
     if(SHOTS)await p.screenshot({path:SHOTS+'/tema_'+t+'_panel.png',fullPage:false});

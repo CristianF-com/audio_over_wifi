@@ -1,4 +1,4 @@
-/* Service worker de SonosWiFi. Solo se registra en contexto seguro (HTTPS o localhost).
+/* Service worker de AStream. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
  * @BUILD@ lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */

@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "SonosWiFi",
-  "short_name": "SonosWiFi",
+  "name": "AStream",
+  "short_name": "AStream",
   "description": "Control del audio multicanal inalámbrico: altavoces, sonido y latencia.",
   "lang": "es",
   "dir": "ltr",

@@ -99,7 +99,7 @@ c, _ = http("POST", "/api/volume", b'{"volume":"x"}');                check("vol
 c, _ = http("POST", "/api/calibrate", {"esp_id": 0, "latency_ms": 9999}); check("latencia fuera de rango -> 400", c == 400, c)
 c, _ = http("GET", "/nope");                                          check("ruta desconocida -> 404", c == 404, c)
 c, b = http("GET", "/api/status");                                    check("status OK", c == 200 and json.loads(b)["sample_rate"] == 48000, b[:80])
-c, b = http("GET", "/");                                              check("panel servido completo (pass-through, plano, </html>)", c == 200 and "SonosWiFi" in b and "/api/dsp" in b and "id=\"room\"" in b and b.rstrip().endswith("</html>"))
+c, b = http("GET", "/");                                              check("panel servido completo (pass-through, plano, </html>)", c == 200 and "AStream" in b and "/api/dsp" in b and "id=\"room\"" in b and b.rstrip().endswith("</html>"))
 c, _ = http("POST", "/api/calibrate", {"esp_id": 0, "latency_ms": 10}); check("calibrate (ms) OK", c == 200)
 c, b = http("GET", "/api/nodes"); check("latency_offset_us=10000", json.loads(b)[0]["latency_offset_us"] == 10000)
 c, _ = http("POST", "/api/calibrate", {"esp_id": 0, "latency_us": 1234}); check("calibrate (us) OK", c == 200)
