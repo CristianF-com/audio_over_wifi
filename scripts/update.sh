@@ -20,6 +20,8 @@ if [ "$OLD" = "$NEW" ] && [ -x /usr/local/bin/sonos_wifi ]; then
     echo "Ya estaba al día ($NEW). No se reinicia el servicio."; echo ok > "$STATE/update.state"; exit 0
 fi
 echo "Nueva versión: $NEW. Compilando (puede tardar unos minutos)…"
+# build.sh (con sudo) deja rpi/build a nombre de root: se devuelve al usuario para poder compilar sin permisos de root
+chown -R "$RUSER" rpi/build 2>/dev/null || true
 as_user bash -c 'mkdir -p rpi/build && cd rpi/build && cmake .. -DCMAKE_BUILD_TYPE=Release >/dev/null && make -j"$(nproc)"' \
     || fail "falló la compilación; se mantiene la versión instalada ($OLD)"
 [ -x /usr/local/bin/sonos_wifi ] && cp -f /usr/local/bin/sonos_wifi /usr/local/bin/sonos_wifi.prev

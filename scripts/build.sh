@@ -19,6 +19,8 @@ rm -rf build && mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j"$(nproc)"
 
+# la carpeta de compilación queda del usuario (si no, la actualización desde la web no puede compilar)
+sudo chown -R "$REAL_USER" "$SCRIPT_DIR/../rpi/build" 2>/dev/null || true
 echo "Instalando binario..."
 sudo install -m 755 sonos_wifi /usr/local/bin/sonos_wifi
 sudo install -d /usr/local/lib/sonos_wifi
