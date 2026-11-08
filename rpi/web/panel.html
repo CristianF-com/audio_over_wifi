@@ -51,8 +51,8 @@ details.adv>.advbody{display:grid;gap:14px;padding-top:6px}
 .head h1{margin-right:auto}
 
 /* Plano de sala: cada canal es un altavoz dibujado; se coloca donde está en la sala */
-.roombar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
-.roombar .hint{order:9;flex:1 1 100%;margin:0}
+.roombar{display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.roombar .hint{order:9;flex:1 1 100%;margin:0;text-align:left}
 #lble{min-width:44px;padding-left:0;padding-right:0;justify-content:center}
 .room{--hw:64px;--ht:80px;--hb:72px;user-select:none;-webkit-user-select:none;position:relative;width:100%;aspect-ratio:16/9;min-height:360px;border:1px solid var(--line);border-radius:var(--r-sheet);overflow:hidden;background:var(--room-bg)}
 .room>*{z-index:1}
@@ -1125,7 +1125,7 @@ async function wifiDoScan(){wscan=true;wmsg='';drawWlist();const r=await J('/api
   else{wnets=null;wmsg=r.error||'No se pudo buscar redes. Escribe el nombre a mano.';}
   drawWlist();}
 /* ── Pestaña «Raspberry»: red de la RPi y actualización del servidor ── */
-let sysI=null,sysBusy=false,sysSeenDown=false,sysVer0='',rscan=false,rnets=null;
+let sysI=null,sysBusy=false,sysSeenDown=false,sysReloading=false,sysVer0='',rscan=false,rnets=null;
 async function sysLoad(){let j=null;try{j=await (await fetch('/api/system',{cache:'no-store'})).json();}catch(e){j=null;}
   if(!j){if(sysBusy){sysSeenDown=true;$('upd_msg').textContent='Reiniciando el servicio… espera unos segundos.';}return;}
   const first=!sysI;sysI=j;if(!sysVer0)sysVer0=j.version;
@@ -1139,7 +1139,7 @@ async function sysLoad(){let j=null;try{j=await (await fetch('/api/system',{cach
   sysBusy=u.state==='running'||w.state==='connecting';
   $('upd_msg').textContent=u.state==='running'?'Actualizando… no cierres esta página.':u.state==='ok'?(j.version!==sysVer0?'Actualizado a '+j.version+'. Recargando…':'Listo.'):u.state==='failed'?'La actualización falló: se mantiene la versión anterior. Mira el registro.':'';
   $('upd_msg').style.color=u.state==='failed'?'var(--bad)':'';
-  if(u.state==='ok'&&sysSeenDown&&j.version!==sysVer0){sysSeenDown=false;setTimeout(()=>location.reload(),1500);}
+  if(u.state==='ok'&&j.version!==sysVer0&&!sysReloading){sysReloading=true;setTimeout(()=>location.reload(),1200);}
 }
 function rpiDrawList(){const l=$('rpi_wlist');l.innerHTML=(rnets||[]).map((n,i)=>'<button class="wnet'+(n.ssid===$('rpi_ssid').value?' on':'')+'" type="button" role="option" aria-selected="'+(n.ssid===$('rpi_ssid').value)+'" data-r="'+i+'"><b>'+esc(n.ssid)+'</b><span class="hint">'+n.band+' · '+wBars(n.signal)+' ('+n.signal+'%)'+(n.security?'':' · abierta')+'</span></button>').join('');
   l.querySelectorAll('[data-r]').forEach(x=>x.onclick=()=>{$('rpi_ssid').value=rnets[+x.dataset.r].ssid;rpiDrawList();$('rpi_pass').focus();});
@@ -1153,7 +1153,7 @@ $('rpi_go').onclick=async()=>{const ssid=$('rpi_ssid').value.trim();if(!ssid){$(
   if(r.ok){$('rpi_pass').value='';log('Red de la Raspberry: cambiando a «'+ssid+'»');sysBusy=true;sysLoad();}else{$('rpi_wmsg').textContent=r.error||'No se pudo cambiar';$('rpi_wmsg').style.color='var(--bad)';}};
 $('upd_btn').onclick=async()=>{if(!confirm('Se descargará la última versión, se compilará y se reiniciará el servicio (el audio se corta unos segundos). ¿Actualizar?'))return;
   const r=await J('/api/update',{});if(r.ok){log('Actualización del servidor iniciada');sysBusy=true;sysSeenDown=false;sysVer0=(sysI&&sysI.version)||sysVer0;sysLoad();}else{$('upd_msg').textContent=r.error||'No se pudo actualizar';$('upd_msg').style.color='var(--bad)';}};
-setInterval(()=>{if(document.hidden)return;if(!$('sp_rpi').hidden&&!$('p_sys').hidden)sysLoad();else if(sysBusy)sysLoad();},sysBusy?2000:4000);
+(function sysTick(){if(!document.hidden){if(sysBusy||(!$('sp_rpi').hidden&&!$('p_sys').hidden))sysLoad();}setTimeout(sysTick,sysBusy?1500:4000);})();
 let bleScanned=false;
 async function bleSaveWifi(){const r=await J('/api/ble/wifi',{ssid:$('b_ssid').value,pass:$('b_pass').value,rpi_ip:$('b_rip').value.trim()});
   if(r.ok){toast('WiFi guardada');log('WiFi de los altavoces guardada: «'+$('b_ssid').value+'»');try{bs=await (await fetch('/api/ble/status')).json();}catch(e){}bleBuild();}

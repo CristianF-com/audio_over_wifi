@@ -289,6 +289,12 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
    await p.click('.tab[data-tab="sys"]');await p.click('#sy_rpi');
    ok('Raspberry: muestra la red actual y la versión instalada',await until(async()=>(await p.textContent('#rpi_cur')).includes('CasaHogar')&&(await p.textContent('#upd_ver')).length>0&&(await p.textContent('#upd_ver'))!=='—'));
    ok('Raspberry: sin contraseña avisa y deja cambiar la red y actualizar desactivados',await p.evaluate(()=>!document.getElementById('rpi_nopw').hidden&&document.getElementById('rpi_chg').disabled&&document.getElementById('upd_btn').disabled&&document.getElementById('rpi_go').disabled));
+   // Tras «Actualizar servidor» la página se recarga sola cuando la versión cambia (aunque no se haya visto la caída del servicio)
+   {await p.evaluate(()=>{window.__rl=0;sysVer0='viejaaa';sysBusy=true;sysSeenDown=false;sysReloading=false;});
+    await p.route('**/api/system',r=>r.fulfill({contentType:'application/json',body:JSON.stringify({version:'nuevaaa',protected:true,wifi:{available:true,ssid:'CasaHogar',iface:'wlan0',state:'ok',msg:'',target:''},update:{state:'ok',log:''}})}));
+    const nav=p.waitForNavigation({timeout:9000}).then(()=>true).catch(()=>false);
+    ok('Actualizar servidor: al cambiar la versión la página se recarga sola',await nav);
+    await p.unroute('**/api/system');await p.waitForSelector('.tab[data-tab="sys"]');await p.click('.tab[data-tab="sys"]');await p.click('#sy_rpi');}
    await p.click('.tab[data-tab="sys"]');await p.click('#sy_fw');await sleep(300);
    ok('firmware: aviso de «sin probar en hardware» y de flashear la primera vez por cable',(await p.textContent('#fwwarn')).includes('sin probar')&&(await p.textContent('#fwwarn')).includes('por cable'));
    await p.click('#fwup');
@@ -486,6 +492,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   await p.evaluate(()=>localStorage.removeItem('sonos_theme'));await p.reload();await p.waitForSelector('.spk');
   const hb=await p.evaluate(()=>['#lble','#lcal','#medit'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return [r.top,r.height];}));
   ok('Plano: Añadir altavoces (+), Calibrar y Editar plano están juntos, alineados y con la misma altura',hb.every(x=>Math.abs(x[0]-hb[0][0])<1&&Math.abs(x[1]-hb[0][1])<1),hb);
+  ok('Plano: los botones quedan pegados a la derecha de la barra y el texto de ayuda va debajo, alineado a la izquierda',await p.evaluate(()=>{const bar=document.querySelector('.roombar').getBoundingClientRect(),e=document.getElementById('medit').getBoundingClientRect(),l=document.getElementById('lble').getBoundingClientRect(),h=document.getElementById('mhint').getBoundingClientRect();return Math.abs(bar.right-e.right)<2&&l.left>bar.left+bar.width/3&&h.top>=e.bottom-1&&Math.abs(h.left-bar.left)<2;}));
   ok('Calibrar no se subraya como enlace',await p.evaluate(()=>getComputedStyle(document.getElementById('lcal')).textDecorationLine)==='none');
 
   // ── Plano de la sala: un dibujo por altavoz (canal), con ESP, canal y estado; se mueven uno a uno ──
