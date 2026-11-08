@@ -18,7 +18,14 @@ add_executable(sonos_wifi
     src/udp_streamer.cpp
     src/web_server.cpp
     src/ble_manager.cpp
+    src/system_manager.cpp
 )
+# versión (commit) que se muestra en la web
+execute_process(COMMAND git rev-parse --short HEAD WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                OUTPUT_VARIABLE SONOS_GIT_REV OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+if(SONOS_GIT_REV)
+  set_source_files_properties(src/system_manager.cpp PROPERTIES COMPILE_DEFINITIONS SONOS_GIT="${SONOS_GIT_REV}")
+endif()
 target_link_libraries(sonos_wifi ${ALSA_LIBRARIES} Threads::Threads)
 if(OpenSSL_FOUND)
   target_compile_definitions(sonos_wifi PRIVATE WITH_TLS)

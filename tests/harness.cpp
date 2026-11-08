@@ -22,8 +22,9 @@ int main(int argc, char** argv) {
     if (argc > 1 && std::string(argv[1]) == "auth") {
         UdpStreamer s; AudioConfig c; AudioCapture cap(c);
         WebServer w(s, cap, 18081); w.setPassword("s3cret:clave");
+        if (const char* d = getenv("SONOS_UPDATE_DIR")) w.setStateDir(d);
         if (!w.start()) return 1;
-        std::this_thread::sleep_for(std::chrono::seconds(6));
+        std::this_thread::sleep_for(std::chrono::seconds(14));
         w.stop(); return 0;
     }
     // Modo "webdir <carpeta>": web servida desde disco (flag -w de la RPi) — lo usa test_webdir.py
@@ -39,6 +40,7 @@ int main(int argc, char** argv) {
     AudioConfig cfg;
     AudioCapture cap(cfg);                // NO se abre: solo para config() en /api/status
     WebServer web(s, cap, 18080);
+    if (const char* d = getenv("SONOS_UPDATE_DIR")) web.setStateDir(d);
     if (const char* h = getenv("SONOS_BLE_HELPER")) web.setBle(h, "/tmp/sonos_harness_ble.txt");   // Bluetooth simulado (SONOS_BLE_MOCK)
     web.setTLS(18443, "/tmp/sonos_test_cert.pem", "/tmp/sonos_test_key.pem");
     if (!s.init() || !web.start()) return 1;

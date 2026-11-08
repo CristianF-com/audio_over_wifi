@@ -36,4 +36,43 @@ def post(path, data=b"{}", user=None, pw=None):
     except urllib.error.HTTPError as e: return e.code
 check("OTA: POST /api/firmware sin contraseña -> 401", post("/api/firmware", b"x" * 70000) == 401)
 check("OTA: POST /api/ota sin contraseña -> 401", post("/api/ota", b'{"id":0}') == 401)
-print("RESULTADO AUTH:", "TODO OK" if ok else "HAY FALLOS"); sys.exit(0 if ok else 1)
+print("RESULTADO AUTH:", "TODO OK" if ok else "HAY FALLOS"); # ── Red de la RPi y actualización del servidor (solo con contraseña) ───────────────
+import json, time
+def post(path, body, user="sonos", pw="s3cret:clave"):
+    req = urllib.request.Request("http://127.0.0.1:18081" + path, data=json.dumps(body).encode(), method="POST", headers={"Content-Type": "application/json"})
+    if user is not None: req.add_header("Authorization", "Basic " + base64.b64encode(f"{user}:{pw}".encode()).decode())
+    try:
+        r = urllib.request.urlopen(req, timeout=5); return r.status, json.loads(r.read() or b"{}")
+    except urllib.error.HTTPError as e:
+        try: return e.code, json.loads(e.read() or b"{}")
+        except Exception: return e.code, {}
+def sysinfo():
+    req = urllib.request.Request("http://127.0.0.1:18081/api/system", headers={"Authorization": "Basic " + base64.b64encode(b"sonos:s3cret:clave").decode()})
+    return json.loads(urllib.request.urlopen(req, timeout=5).read())
+def esperar(f, t=6):
+    end = time.time() + t
+    while time.time() < end:
+        v = f()
+        if v: return v
+        time.sleep(0.2)
+    return None
+c, _ = post("/api/update", {}, None);        check("actualizar sin credenciales -> 401", c == 401, c)
+c, _ = post("/api/rpi/wifi", {"ssid": "X"}, None); check("cambiar la WiFi de la RPi sin credenciales -> 401", c == 401, c)
+si = sysinfo()
+check("/api/system: versión, protegido y WiFi actual de la RPi (CasaHogar en wlan0)", si["protected"] is True and si["version"] and si["wifi"]["ssid"] == "CasaHogar" and si["wifi"]["iface"] == "wlan0", si)
+c, r = post("/api/rpi/wifi", {"ssid": "Casa", "pass": "corta"}); check("WiFi de la RPi: contraseña corta -> 400", c == 400, (c, r))
+c, r = post("/api/rpi/wifi", {"ssid": "-malo", "pass": "clave12345"}); check("WiFi de la RPi: nombre que empieza por «-» -> 400", c == 400, (c, r))
+c, r = post("/api/rpi/wifi", {"ssid": "Mala", "pass": "clave12345"}); check("WiFi de la RPi: cambio aceptado (asíncrono) -> 200", c == 200, (c, r))
+w = esperar(lambda: (lambda x: x if x["wifi"]["state"] in ("ok", "failed") else None)(sysinfo()))
+check("WiFi de la RPi: si falla, vuelve a la red anterior y lo dice", w and w["wifi"]["state"] == "failed" and "Se volvió a «CasaHogar»" in w["wifi"]["msg"], w and w["wifi"])
+lg = open("/tmp/fake_nmcli.log").read()
+check("WiFi de la RPi: usó nmcli con ssid, contraseña e interfaz, y luego «con up id CasaHogar»", "connect dev wifi connect Mala password clave12345 ifname wlan0" in lg and "up con up id CasaHogar" in lg, lg)
+c, r = post("/api/rpi/wifi", {"ssid": "Casa-5G", "pass": "clave12345"}); check("WiFi de la RPi: nueva red válida -> 200", c == 200, (c, r))
+w = esperar(lambda: (lambda x: x if x["wifi"]["state"] in ("ok", "failed") else None)(sysinfo()))
+check("WiFi de la RPi: conectada a «Casa-5G»", w and w["wifi"]["state"] == "ok" and "Casa-5G" in w["wifi"]["msg"], w and w["wifi"])
+check("WiFi de la RPi: la contraseña no sale nunca por la API", "clave12345" not in json.dumps(sysinfo()))
+c, r = post("/api/update", {}); check("actualizar el servidor -> 200", c == 200, (c, r))
+u = esperar(lambda: (lambda x: x if x["update"]["state"] == "ok" else None)(sysinfo()))
+check("actualizar: estado «ok» y registro visible", u and "Listo" in u["update"]["log"], u and u["update"])
+
+sys.exit(0 if ok else 1)

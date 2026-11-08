@@ -158,6 +158,13 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   // Añadir altavoces por Bluetooth desde la Raspberry (ayudante simulado)
   const fs=require('fs');await p.click('.tab[data-tab="spk"]');
   await p.click('#lble');await p.waitForSelector('#bdrawer.on');await p.waitForSelector('#b_ssid');
+  await p.click('#b_wscan');await p.waitForSelector('#b_wlist .wnet');
+  ok('WiFi: «Buscar redes WiFi» lista las redes (5 GHz primero, con banda y señal)',await p.evaluate(()=>{const l=[...document.querySelectorAll('#b_wlist .wnet')];return l.length===4&&/Casa-5G/.test(l[0].textContent)&&/5 GHz/.test(l[0].textContent)&&/Señal/.test(l[0].textContent)&&/abierta/.test(l[3].textContent)&&l.every(x=>x.getBoundingClientRect().height>=43.5);}));
+  await p.click('#b_wlist .wnet:nth-child(3)');
+  ok('WiFi: al tocar una red de 2,4 GHz se rellena el nombre y avisa que 5 GHz va mejor',(await p.inputValue('#b_ssid'))==='Casa-2G'&&/2,4 GHz/.test(await p.textContent('#b_wmsg'))&&(await p.getAttribute('#b_wlist .wnet:nth-child(3)','aria-selected'))==='true');
+  await p.click('#b_wlist .wnet:nth-child(1)');
+  ok('WiFi: al tocar una de 5 GHz se rellena el nombre, sin aviso, y el foco pasa a la contraseña',(await p.inputValue('#b_ssid'))==='Casa-5G'&&!(await p.textContent('#b_wmsg')).includes('2,4')&&await p.evaluate(()=>document.activeElement.id==='b_pass'));
+  await p.fill('#b_ssid','');
   await p.fill('#b_ssid','Casa5G');await p.fill('#b_pass','corta');await p.click('#b_save');
   ok('BLE: contraseña corta -> error visible',await until(async()=>(await p.textContent('#b_ss')).includes('8 y 63')));
   await p.fill('#b_pass','clave12345');await p.click('#b_save');
@@ -279,6 +286,9 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   // Actualización de firmware por WiFi: tarjeta en Latencia (el arnés simula ESP con firmware antiguo, sin versión)
   {const fsx=require('fs');const img=Buffer.alloc(80000,5);img[0]=0xE9;img[1]=1;img.writeUInt16LE(0x17,12);img.writeUInt32LE(0xABCD5432,32);img.write('9.9-ui',48);
    fsx.writeFileSync('/tmp/fw_ui_bad.bin',Buffer.alloc(70000,7));fsx.writeFileSync('/tmp/fw_ui_ok.bin',img);
+   await p.click('.tab[data-tab="sys"]');await p.click('#sy_rpi');
+   ok('Raspberry: muestra la red actual y la versión instalada',await until(async()=>(await p.textContent('#rpi_cur')).includes('CasaHogar')&&(await p.textContent('#upd_ver')).length>0&&(await p.textContent('#upd_ver'))!=='—'));
+   ok('Raspberry: sin contraseña avisa y deja cambiar la red y actualizar desactivados',await p.evaluate(()=>!document.getElementById('rpi_nopw').hidden&&document.getElementById('rpi_chg').disabled&&document.getElementById('upd_btn').disabled&&document.getElementById('rpi_go').disabled));
    await p.click('.tab[data-tab="sys"]');await p.click('#sy_fw');await sleep(300);
    ok('firmware: aviso de «sin probar en hardware» y de flashear la primera vez por cable',(await p.textContent('#fwwarn')).includes('sin probar')&&(await p.textContent('#fwwarn')).includes('por cable'));
    await p.click('#fwup');

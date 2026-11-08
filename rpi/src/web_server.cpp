@@ -385,6 +385,7 @@ std::string WebServer::handleGET(const std::string& p, int& code) {
     if (p == "/api/nodes")  return getNodes();
     if (p == "/api/latency") return getLatency();
     if (p == "/api/ble/status") return bleStatus();
+    if (p == "/api/system") return systemInfo();
     if (p == "/api/tone")     return toneStatus();
     if (p == "/api/firmware") return firmwareInfo();
     if (p == "/api/profiles") return profilesList();
@@ -411,13 +412,19 @@ std::string WebServer::handlePOST(const std::string& p, const std::string& b, in
     else if (p == "/api/ota/cancel") r = otaCancel(b);
     else if (p == "/api/ble/wifi")      r = bleWifi(b);
     else if (p == "/api/ble/scan")      r = bleScan(b);
+    else if (p == "/api/wifi/scan")     r = wifiScan();
+    else if (p == "/api/rpi/wifi" || p == "/api/update") {
+        // cambian la red de la RPi o ejecutan una actualización: solo con contraseña configurada
+        if (password_.empty()) { code = 403; return "{\"error\":\"Configura una contraseña para usar esto: sudo ./scripts/set_password.sh \\\"tu clave\\\"\"}"; }
+        r = (p == "/api/update") ? updatePost() : rpiWifiPost(b);
+    }
     else if (p == "/api/ble/provision") r = bleProvision(b);
     else if (p == "/api/ble/identify")  r = bleIdentify(b);
     else if (p == "/api/cal/start") { r = calStart(b); if (r.find("\"error\"") != std::string::npos) { code = 409; return r; } }
     else if (p == "/api/cal/stop")  { streamer_.calStop(); r = "{\"ok\":true}"; }
     else { code = 404; return "{\"error\":\"not found\"}"; }
     // /api/ble/*: la respuesta del ayudante puede traer «"error": null» dentro de la lista de dispositivos; solo cuenta si empieza por {"error"
-    const bool is_err = p.rfind("/api/ble/", 0) == 0 ? r.rfind("{\"error\"", 0) == 0 : r.find("\"error\"") != std::string::npos;
+    const bool is_err = (p.rfind("/api/ble/", 0) == 0 || p.rfind("/api/wifi/", 0) == 0 || p.rfind("/api/rpi/", 0) == 0 || p == "/api/update") ? r.rfind("{\"error\"", 0) == 0 : r.find("\"error\"") != std::string::npos;
     if (is_err) code = 400;
     return r;
 }
@@ -433,6 +440,38 @@ std::string WebServer::bleWifi(const std::string& b) {
     std::string err;
     if (!ble_.setSettings(jsonGet(b, "ssid"), jsonGet(b, "pass"), jsonGet(b, "rpi_ip"), err)) return "{\"error\":\"" + jesc(err) + "\"}";
     return "{\"ok\":true}";
+}
+std::string WebServer::systemInfo() {
+    SystemManager::Wifi w; const bool wok = sys_.wifiNow(w);
+    auto u = sys_.updateStatus();
+    std::ostringstream o;
+    o << "{" << jstr("version", SystemManager::version()) << "," << jbool("protected", !password_.empty()) << ","
+      << "\"wifi\":{" << jbool("available", wok) << "," << jstr("ssid", w.ssid) << "," << jstr("iface", w.iface) << ","
+      << jstr("state", w.state.empty() ? "idle" : w.state) << "," << jstr("msg", w.msg) << "," << jstr("target", w.target) << "},"
+      << "\"update\":{" << jstr("state", u.state) << "," << jstr("log", u.log) << "}}";
+    return o.str();
+}
+std::string WebServer::rpiWifiPost(const std::string& b) {
+    std::string err;
+    if (!sys_.wifiConnect(jsonGet(b, "ssid"), jsonGet(b, "pass"), err)) return "{\"error\":\"" + jesc(err) + "\"}";
+    return "{\"ok\":true}";
+}
+std::string WebServer::updatePost() {
+    std::string err;
+    if (!sys_.updateStart(err)) return "{\"error\":\"" + jesc(err) + "\"}";
+    return "{\"ok\":true}";
+}
+std::string WebServer::wifiScan() {
+    std::vector<BleManager::WifiNet> nets; std::string err;
+    if (!ble_.scanWifi(nets, err)) return "{\"error\":\"" + jesc(err) + "\"}";
+    std::ostringstream o; o << "{\"networks\":[";
+    for (size_t i = 0; i < nets.size(); i++) {
+        const auto& n = nets[i];
+        o << (i ? "," : "") << "{" << jstr("ssid", n.ssid) << "," << jnum("signal", n.signal) << "," << jnum("freq", n.freq) << ","
+          << jstr("band", n.freq >= 5925 ? "6 GHz" : n.freq >= 4900 ? "5 GHz" : "2,4 GHz") << "," << jstr("security", n.security) << "}";
+    }
+    o << "]}";
+    return o.str();
 }
 std::string WebServer::bleScan(const std::string& b) {
     long secs = 6; std::string s = jsonGet(b, "seconds");

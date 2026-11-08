@@ -2,6 +2,7 @@
 #include "udp_streamer.h"
 #include "audio_capture.h"
 #include "ble_manager.h"
+#include "system_manager.h"
 #include <thread>
 #include <atomic>
 #include <string>
@@ -14,6 +15,7 @@ public:
     void setTLS(uint16_t port, const std::string& cert, const std::string& key);   // antes de start()
     void setBle(const std::string& helper, const std::string& settings_file) { ble_.configure(helper, settings_file); }
     void setWebDir(const std::string& d) { web_dir_ = d; }   // desarrollo: lee las páginas de esta carpeta en cada petición
+    void setStateDir(const std::string& d) { sys_.configure(d); }   // update.state / update.log del servicio de actualización
     void setPassword(const std::string& pw) { password_ = pw; }   // vacío = sin autenticación
     bool start();
     void stop();
@@ -51,10 +53,15 @@ private:
     std::string bleStatus();
     std::string bleWifi(const std::string& body);
     std::string bleScan(const std::string& body);
+    std::string wifiScan();
+    std::string systemInfo();
+    std::string rpiWifiPost(const std::string& body);
+    std::string updatePost();
     std::string bleProvision(const std::string& body);
     std::string bleIdentify(const std::string& body);
 
     BleManager        ble_;
+    SystemManager     sys_;
     UdpStreamer&      streamer_;
     AudioCapture&     capture_;
     uint16_t          port_;

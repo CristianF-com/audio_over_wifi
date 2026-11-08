@@ -22,6 +22,9 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 details.help{margin:8px 0}details.help>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;color:var(--mut);font-size:.9rem}
 details.help>summary:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 details.adv>.advbody{display:grid;gap:14px;padding-top:6px}
+.wlist{display:grid;gap:6px;margin-top:6px;max-height:240px;overflow:auto}
+.wnet{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:44px;padding:8px 12px;text-align:left;background:var(--raise);border:1px solid var(--line);color:var(--fg);font:inherit;cursor:pointer;border-radius:var(--r-card,0)}
+.wnet.on{border-color:var(--ac);background:var(--ac-bg)}.wnet:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 .vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin:8px 0}
 .vcard{background:var(--raise);border:1px solid var(--line);border-radius:var(--r-card,0);padding:12px 14px;display:grid;gap:4px;text-align:left;color:var(--fg);font:inherit;min-height:44px;cursor:pointer}
 .vcard b{display:flex;align-items:center;gap:8px}.vcard .why{color:var(--mut);font-size:.88rem}
@@ -436,6 +439,7 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
     <button class="sub" role="tab" id="sy_net" aria-controls="sp_net" data-sub="net" aria-selected="true">Red</button>
     <button class="sub" role="tab" id="sy_in" aria-controls="sp_sin" data-sub="in" aria-selected="false" tabindex="-1">Entradas</button>
     <button class="sub" role="tab" id="sy_fw" aria-controls="sp_fw" data-sub="fw" aria-selected="false" tabindex="-1">Firmware</button>
+    <button class="sub" role="tab" id="sy_rpi" aria-controls="sp_rpi" data-sub="rpi" aria-selected="false" tabindex="-1">Raspberry</button>
     <button class="sub" role="tab" id="sy_log" aria-controls="sp_log" data-sub="log" aria-selected="false" tabindex="-1">Registro</button>
   </div><button class="sbm l" type="button" tabindex="-1" aria-hidden="true" data-dir="-1">‹</button><button class="sbm r" type="button" tabindex="-1" aria-hidden="true" data-dir="1">›</button></div>
   <div class="subpane" id="sp_net" role="tabpanel" aria-labelledby="sy_net">
@@ -461,6 +465,29 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
         <div class="pfnew"><input class="txt" id="fwfile" type="file" accept=".bin,application/octet-stream"><button class="btn sm" id="fwup" type="button">Subir</button></div></div>
       <p id="fwinfo">Todavía no hay ningún firmware cargado.</p>
       <div class="pflist" id="fwlist"></div>
+    </div>
+  </div></div>
+  <div class="subpane" id="sp_rpi" role="tabpanel" aria-labelledby="sy_rpi" hidden><div class="cards">
+    <div class="card" id="c_rwifi">
+      <h2>Red de la Raspberry</h2>
+      <p class="hint" id="rpi_cur">Leyendo la red actual…</p>
+      <div class="note warn" id="rpi_nopw" hidden>Para cambiar la red o actualizar hay que proteger la web con contraseña: ejecuta <code>sudo ./scripts/set_password.sh "tu clave"</code> en la Raspberry.</div>
+      <button class="btn ghost sm" id="rpi_chg" type="button">Cambiar de red…</button>
+      <div id="rpi_form" hidden>
+        <p class="hint">Es la red por la que entras a esta página (la de tu casa). Los altavoces siguen en su router aparte. Si falla, la Raspberry vuelve a la red anterior; si cambia de IP, la página se reconectará sola o entra por <code>raspberrypi.local</code>.</p>
+        <div style="display:flex;gap:8px;align-items:center"><button class="btn ghost sm" id="rpi_scan" type="button" style="white-space:nowrap;flex:none">Buscar redes WiFi</button><span class="hint" id="rpi_smsg" aria-live="polite"></span></div>
+        <div class="wlist" id="rpi_wlist" role="listbox" aria-label="Redes WiFi encontradas"></div>
+        <label for="rpi_ssid" style="margin-top:8px">Nombre de la red</label><input class="txt" id="rpi_ssid" maxlength="32" autocomplete="off" autocapitalize="off">
+        <label for="rpi_pass" style="margin-top:8px">Contraseña (vacía si es abierta)</label><input class="txt" id="rpi_pass" type="password" maxlength="63" autocomplete="new-password">
+        <div style="display:flex;gap:8px;align-items:center;margin-top:10px"><button class="btn sm" id="rpi_go" type="button">Conectar</button><span class="hint" id="rpi_wmsg" aria-live="polite"></span></div>
+      </div>
+    </div>
+    <div class="card" id="c_upd">
+      <h2>Actualizar servidor</h2>
+      <p class="hint">Versión instalada: <b id="upd_ver">—</b>. Descarga la última versión de GitHub, la compila y reinicia el servicio. Tarda unos minutos y el audio se corta unos segundos al reiniciar.</p>
+      <button class="btn sm" id="upd_btn" type="button">Actualizar servidor</button>
+      <p class="hint" id="upd_msg" aria-live="polite" style="margin-top:8px"></p>
+      <div class="log" id="upd_log" role="log" hidden></div>
     </div>
   </div></div>
   <div class="subpane" id="sp_log" role="tabpanel" aria-labelledby="sy_log" hidden>
@@ -1016,7 +1043,7 @@ function drawHealth(){const vis=nodes.filter(isKnown);drawVerdicts();drawWizard(
   $('health').innerHTML=vis.map(n=>'<tr><td><i class="dot '+(n.online?'ok':'bad')+'"></i> '+esc(spkName(n))+' · '+nodeLabel(n)+'</td><td>'+(n.online?((n.rtt_us||0)/1000).toFixed(1)+' ms':'—')+'</td><td>'+(n.jitter_us||0)+' µs</td><td'+cls(n.lost_packets||0,1,50)+'>'+(n.lost_packets||0)+'</td><td>'+(n.recovered_packets||0)+'</td><td'+cls(n.late_packets||0,5,50)+'>'+(n.late_packets||0)+'</td><td'+cls(n.underruns||0,1,10)+'>'+(n.underruns||0)+'</td><td>'+((n.sync_err_us||0))+' µs</td><td>'+Math.round(n.fill_pct||0)+'%</td><td'+(n.online&&n.rssi_dbm?cls(-n.rssi_dbm,76,83):'')+'>'+(n.online?wifiTxt(n):'—')+'</td><td>'+fwTxt(n)+'</td></tr>').join('')||'<tr><td colspan="11" class="mut">Sin altavoces</td></tr>';}
 
 /* Añadir altavoces por Bluetooth desde la Raspberry */
-let bs={available:false,ssid:'',has_pass:false,rpi_ip:''},bdevs=[],bscan=false,bres={};
+let bs={available:false,ssid:'',has_pass:false,rpi_ip:''},bdevs=[],bscan=false,bres={},wnets=null,wscan=false,wmsg='';
 const rssiTxt=r=>r==null?'':r>-60?'Señal fuerte':r>-75?'Señal media':'Señal débil';
 function openBle(){closeDrawer();$('bdrawer').classList.add('on');$('scrim').classList.add('on');$('bdrawer').setAttribute('aria-hidden','false');sheetOpen($('bdrawer'));
   fetch('/api/ble/status').then(r=>r.json()).then(j=>{bs=j;bleBuild();}).catch(()=>{bleBuild();});bleBuild();}
@@ -1029,6 +1056,7 @@ function bleBuild(){
   if(!bs.available)h+='<div class="note warn"><b>Esta Raspberry no tiene el ayudante Bluetooth.</b><br>Instala <code>python3-bleak</code> (lo hace <code>scripts/build.sh</code>) o configura el ESP32 desde el móvil con <a href="'+(window._bleHref||'#')+'">la página Bluetooth</a>.</div>';
   h+='<div class="fld"><b>WiFi de los altavoces</b><p class="hint" style="margin:3px 0 8px">Es la red 5 GHz a la que se unirá cada ESP32. Se guarda en la Raspberry.</p>'+
      '<label for="b_ssid">Nombre de la red</label><input class="txt" id="b_ssid" maxlength="32" autocomplete="off" autocapitalize="off" value="'+esc(bs.ssid||'')+'">'+
+     '<div style="display:flex;gap:8px;align-items:center;margin-top:8px"><button class="btn ghost sm" id="b_wscan" type="button" style="white-space:nowrap;flex:none">Buscar redes WiFi</button><span class="hint" id="b_wmsg" aria-live="polite"></span></div><div class="wlist" id="b_wlist" role="listbox" aria-label="Redes WiFi encontradas"></div>'+
      '<label for="b_pass" style="margin-top:8px">Contraseña</label><input class="txt" id="b_pass" type="password" maxlength="63" autocomplete="new-password" placeholder="'+(bs.has_pass?'Guardada (déjala vacía para conservarla)':'8 a 63 caracteres')+'">'+
      '<details style="margin-top:8px"><summary class="hint" style="cursor:pointer">Opciones avanzadas</summary><label for="b_rip" style="margin-top:8px">IP de la Raspberry (solo si el router bloquea el broadcast)</label><input class="txt" id="b_rip" maxlength="15" inputmode="decimal" placeholder="192.168.1.10" value="'+esc(bs.rpi_ip||'')+'"></details>'+
      '<div style="display:flex;gap:8px;align-items:center;margin-top:10px"><button class="btn sm" id="b_save">Guardar WiFi</button><span class="hint" id="b_ss">'+(credsOk?'Guardada: «'+esc(bs.ssid)+'»':'Falta guardarla')+'</span></div></div>'+
@@ -1046,11 +1074,54 @@ function bleBuild(){
   if(bs.available&&!bscan&&bdevs.length===0&&bleScanned)h+='<div class="empty">No se encontró ningún altavoz. Comprueba que está encendido y cerca, o que su Bluetooth sigue activo (se cierra a los 5 minutos de arrancar si ya tiene WiFi: reinícialo).</div>';
   h+='<p class="hint">¿Prefieres usar el móvil? <a href="'+(window._bleHref||'#')+'">Configurar desde el móvil</a>.</p>';
   $('bbody').innerHTML=h;
+  if($('b_wscan'))$('b_wscan').onclick=wifiDoScan;drawWlist();
   if($('b_save'))$('b_save').onclick=bleSaveWifi;if($('b_scan'))$('b_scan').onclick=bleDoScan;if($('b_all'))$('b_all').onclick=bleProvAll;
   $('bbody').querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>bleIdent(+b.dataset.id));
   $('bbody').querySelectorAll('[data-pv]').forEach(b=>b.onclick=()=>bleProv(+b.dataset.pv));
   if(keep&&$(keep)&&keep.startsWith('b_')&&keep!=='b_scan')$(keep).focus();
 }
+const wBars=sg=>sg>=70?'Señal fuerte':sg>=45?'Señal media':'Señal débil';
+function drawWlist(){const l=$('b_wlist'),m=$('b_wmsg'),b=$('b_wscan');if(!l)return;
+  b.disabled=wscan;b.textContent=wscan?'Buscando redes…':(wnets?'Volver a buscar':'Buscar redes WiFi');
+  m.textContent=wscan?'Tarda unos segundos.':wmsg;
+  const cur=($('b_ssid')||{}).value||'';
+  l.innerHTML=(wnets||[]).map((n,i)=>'<button class="wnet'+(n.ssid===cur?' on':'')+'" type="button" role="option" aria-selected="'+(n.ssid===cur)+'" data-w="'+i+'"><b>'+esc(n.ssid)+'</b><span class="hint">'+n.band+' · '+wBars(n.signal)+' ('+n.signal+'%)'+(n.security?'':' · abierta')+'</span></button>').join('');
+  l.querySelectorAll('[data-w]').forEach(x=>x.onclick=()=>{const n=wnets[+x.dataset.w];$('b_ssid').value=n.ssid;
+    wmsg=n.freq<4900?'«'+n.ssid+'» es de 2,4 GHz: el audio va mejor en 5 GHz (el ESP32 WROOM solo usa 2,4).':'';drawWlist();$('b_pass').focus();});}
+async function wifiDoScan(){wscan=true;wmsg='';drawWlist();const r=await J('/api/wifi/scan',{});wscan=false;
+  if(r.networks){wnets=r.networks;wmsg=r.networks.length?'Toca la red de tus altavoces.':'No se vio ninguna red.';log('WiFi: '+r.networks.length+' red(es) encontrada(s)');}
+  else{wnets=null;wmsg=r.error||'No se pudo buscar redes. Escribe el nombre a mano.';}
+  drawWlist();}
+/* ── Pestaña «Raspberry»: red de la RPi y actualización del servidor ── */
+let sysI=null,sysBusy=false,sysSeenDown=false,sysVer0='',rscan=false,rnets=null;
+async function sysLoad(){let j=null;try{j=await (await fetch('/api/system',{cache:'no-store'})).json();}catch(e){j=null;}
+  if(!j){if(sysBusy){sysSeenDown=true;$('upd_msg').textContent='Reiniciando el servicio… espera unos segundos.';}return;}
+  const first=!sysI;sysI=j;if(!sysVer0)sysVer0=j.version;
+  const w=j.wifi||{},u=j.update||{};
+  $('rpi_cur').textContent=w.available?'Conectada a «'+w.ssid+'» ('+w.iface+').':'No se pudo leer la red (¿la Raspberry no tiene WiFi o falta NetworkManager?).';
+  $('upd_ver').textContent=j.version;
+  $('rpi_nopw').hidden=j.protected;$('rpi_chg').disabled=!j.protected||!w.available;$('rpi_go').disabled=!j.protected||w.state==='connecting';$('upd_btn').disabled=!j.protected||u.state==='running';
+  $('rpi_wmsg').textContent=w.state==='connecting'?'Conectando a «'+w.target+'»…':(w.state==='ok'||w.state==='failed')?w.msg:'';
+  $('rpi_wmsg').style.color=w.state==='failed'?'var(--bad)':'';
+  const lg=$('upd_log');lg.hidden=!u.log;if(u.log){lg.textContent=u.log;lg.scrollTop=lg.scrollHeight;}
+  sysBusy=u.state==='running'||w.state==='connecting';
+  $('upd_msg').textContent=u.state==='running'?'Actualizando… no cierres esta página.':u.state==='ok'?(j.version!==sysVer0?'Actualizado a '+j.version+'. Recargando…':'Listo.'):u.state==='failed'?'La actualización falló: se mantiene la versión anterior. Mira el registro.':'';
+  $('upd_msg').style.color=u.state==='failed'?'var(--bad)':'';
+  if(u.state==='ok'&&sysSeenDown&&j.version!==sysVer0){sysSeenDown=false;setTimeout(()=>location.reload(),1500);}
+}
+function rpiDrawList(){const l=$('rpi_wlist');l.innerHTML=(rnets||[]).map((n,i)=>'<button class="wnet'+(n.ssid===$('rpi_ssid').value?' on':'')+'" type="button" role="option" aria-selected="'+(n.ssid===$('rpi_ssid').value)+'" data-r="'+i+'"><b>'+esc(n.ssid)+'</b><span class="hint">'+n.band+' · '+wBars(n.signal)+' ('+n.signal+'%)'+(n.security?'':' · abierta')+'</span></button>').join('');
+  l.querySelectorAll('[data-r]').forEach(x=>x.onclick=()=>{$('rpi_ssid').value=rnets[+x.dataset.r].ssid;rpiDrawList();$('rpi_pass').focus();});
+  $('rpi_scan').disabled=rscan;$('rpi_scan').textContent=rscan?'Buscando redes…':(rnets?'Volver a buscar':'Buscar redes WiFi');}
+$('rpi_chg').onclick=()=>{$('rpi_form').hidden=!$('rpi_form').hidden;};
+$('rpi_scan').onclick=async()=>{rscan=true;$('rpi_smsg').textContent='';rpiDrawList();const r=await J('/api/wifi/scan',{});rscan=false;
+  if(r.networks){rnets=r.networks;$('rpi_smsg').textContent=r.networks.length?'Toca tu red.':'No se vio ninguna red.';}else{rnets=null;$('rpi_smsg').textContent=r.error||'No se pudo buscar redes.';}rpiDrawList();};
+$('rpi_go').onclick=async()=>{const ssid=$('rpi_ssid').value.trim();if(!ssid){$('rpi_wmsg').textContent='Elige o escribe el nombre de la red.';return;}
+  if(!confirm('La Raspberry se conectará a «'+ssid+'». Si falla, vuelve a la red anterior. ¿Continuar?'))return;
+  const r=await J('/api/rpi/wifi',{ssid,pass:$('rpi_pass').value});
+  if(r.ok){$('rpi_pass').value='';log('Red de la Raspberry: cambiando a «'+ssid+'»');sysBusy=true;sysLoad();}else{$('rpi_wmsg').textContent=r.error||'No se pudo cambiar';$('rpi_wmsg').style.color='var(--bad)';}};
+$('upd_btn').onclick=async()=>{if(!confirm('Se descargará la última versión, se compilará y se reiniciará el servicio (el audio se corta unos segundos). ¿Actualizar?'))return;
+  const r=await J('/api/update',{});if(r.ok){log('Actualización del servidor iniciada');sysBusy=true;sysSeenDown=false;sysVer0=(sysI&&sysI.version)||sysVer0;sysLoad();}else{$('upd_msg').textContent=r.error||'No se pudo actualizar';$('upd_msg').style.color='var(--bad)';}};
+setInterval(()=>{if(document.hidden)return;if(!$('sp_rpi').hidden&&!$('p_sys').hidden)sysLoad();else if(sysBusy)sysLoad();},sysBusy?2000:4000);
 let bleScanned=false;
 async function bleSaveWifi(){const r=await J('/api/ble/wifi',{ssid:$('b_ssid').value,pass:$('b_pass').value,rpi_ip:$('b_rip').value.trim()});
   if(r.ok){toast('WiFi guardada');log('WiFi de los altavoces guardada: «'+$('b_ssid').value+'»');try{bs=await (await fetch('/api/ble/status')).json();}catch(e){}bleBuild();}

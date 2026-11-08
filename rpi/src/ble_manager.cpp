@@ -10,6 +10,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <cerrno>
+#include <algorithm>
 
 static std::string jerr(const std::string& m) {
     std::string o = "{\"error\":\"";
@@ -129,4 +130,95 @@ std::string BleManager::run(const std::string& cmd, const std::string& stdin_jso
     std::string tail = se; size_t le = tail.find_last_not_of("\r\n \t");
     if (le != std::string::npos) { size_t lb = tail.rfind('\n', le); tail = tail.substr(lb == std::string::npos ? 0 : lb + 1, le - (lb == std::string::npos ? 0 : lb + 1) + 1); }
     return jerr(tail.empty() ? "El ayudante Bluetooth no respondió" : "El ayudante Bluetooth falló: " + tail.substr(0, 200));
+}
+
+// ─── Redes WiFi visibles desde la RPi ─────────────────────────────────────────────
+// Ejecuta un programa sin shell y devuelve su stdout. false si no se pudo lanzar o venció el tiempo.
+bool execCapture(const std::vector<std::string>& argv, int timeout_s, std::string& so, int& status) {
+    int out[2], er[2];
+    if (pipe(out)) return false;
+    if (pipe(er)) { close(out[0]); close(out[1]); return false; }
+    pid_t pid = fork();
+    if (pid < 0) { for (int fd : {out[0], out[1], er[0], er[1]}) close(fd); return false; }
+    if (pid == 0) {
+        int dn = open("/dev/null", O_RDONLY); if (dn >= 0) dup2(dn, 0);
+        dup2(out[1], 1); dup2(er[1], 2);
+        for (int fd : {out[0], out[1], er[0], er[1]}) close(fd);
+        std::vector<char*> a; for (const auto& x : argv) a.push_back(const_cast<char*>(x.c_str())); a.push_back(nullptr);
+        execvp(a[0], a.data());
+        _exit(127);
+    }
+    close(out[1]); close(er[1]);
+    bool timed_out = false; double t0 = monoS();
+    struct pollfd p[2] = {{out[0], POLLIN, 0}, {er[0], POLLIN, 0}};
+    int open_n = 2;
+    while (open_n > 0) {
+        double left = timeout_s - (monoS() - t0);
+        if (left <= 0) { timed_out = true; break; }
+        int r = poll(p, 2, (int)(left * 1000) + 1);
+        if (r < 0) { if (errno == EINTR) continue; break; }
+        if (r == 0) continue;
+        for (int i = 0; i < 2; i++) {
+            if (p[i].fd < 0 || !(p[i].revents & (POLLIN | POLLHUP | POLLERR))) continue;
+            char buf[4096]; ssize_t n = read(p[i].fd, buf, sizeof(buf));
+            if (n > 0) { if (i == 0) { so.append(buf, (size_t)n); if (so.size() > (1u << 20)) { timed_out = true; open_n = 0; } } }
+            else { p[i].fd = -1; open_n--; }
+        }
+    }
+    if (timed_out) kill(pid, SIGKILL);
+    close(out[0]); close(er[0]);
+    waitpid(pid, &status, 0);
+    return !timed_out;
+}
+
+void BleManager::parseNmcli(const std::string& text, std::vector<WifiNet>& out) {
+    size_t pos = 0;
+    while (pos < text.size()) {
+        size_t nl = text.find('\n', pos); if (nl == std::string::npos) nl = text.size();
+        std::string line = text.substr(pos, nl - pos); pos = nl + 1;
+        std::vector<std::string> f = splitNmcli(line);
+        if (f.size() < 4 || f[0].empty() || f[0].size() > 32 || hasCtl(f[0])) continue;   // ocultas o inválidas
+        WifiNet n; n.ssid = f[0]; n.signal = atoi(f[1].c_str()); n.freq = atoi(f[2].c_str());
+        n.security = (f[3] == "--") ? "" : f[3].substr(0, 40);
+        bool dup = false;
+        for (auto& e : out) if (e.ssid == n.ssid && (e.freq >= 4900) == (n.freq >= 4900)) { if (n.signal > e.signal) e = n; dup = true; break; }
+        if (!dup) out.push_back(n);
+    }
+    // 5 GHz primero (mejor para el audio), luego por señal
+    std::stable_sort(out.begin(), out.end(), [](const WifiNet& a, const WifiNet& b) {
+        bool a5 = a.freq >= 4900, b5 = b.freq >= 4900;
+        if (a5 != b5) return a5;
+        return a.signal > b.signal;
+    });
+    if (out.size() > 40) out.resize(40);
+}
+
+bool BleManager::scanWifi(std::vector<WifiNet>& out, std::string& err) {
+    std::unique_lock<std::mutex> lk(wifi_busy_, std::try_to_lock);
+    if (!lk.owns_lock()) { err = "Ya hay una búsqueda de redes en curso"; return false; }
+    const char* e = getenv("SONOS_NMCLI");
+    std::string prog = (e && *e) ? e : "nmcli";
+    std::string so; int st = 0;
+    // primero obliga a re-escanear; si NetworkManager lo rechaza (escaneo reciente) se usa la lista que ya tiene
+    for (const char* rescan : {"yes", "no"}) {
+        so.clear(); st = 0;
+        if (!execCapture({prog, "-t", "-f", "SSID,SIGNAL,FREQ,SECURITY", "dev", "wifi", "list", "--rescan", rescan}, 20, so, st)) {
+            err = "La búsqueda de redes tardó demasiado"; return false;
+        }
+        if (WIFEXITED(st) && WEXITSTATUS(st) == 127) { err = "La Raspberry no tiene NetworkManager (nmcli). Escribe el nombre de la red a mano."; return false; }
+        if (WIFEXITED(st) && WEXITSTATUS(st) == 0) break;
+    }
+    if (!(WIFEXITED(st) && WEXITSTATUS(st) == 0)) { err = "No se pudo buscar redes: comprueba que la WiFi de la Raspberry está encendida"; return false; }
+    out.clear(); parseNmcli(so, out);
+    return true;
+}
+
+std::vector<std::string> splitNmcli(const std::string& line) {
+    std::vector<std::string> f(1);
+    for (size_t i = 0; i < line.size(); i++) {
+        if (line[i] == '\\' && i + 1 < line.size()) f.back() += line[++i];
+        else if (line[i] == ':') f.emplace_back();
+        else f.back() += line[i];
+    }
+    return f;
 }

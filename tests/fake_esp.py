@@ -130,6 +130,18 @@ if cfgpk:
 pk = grab(0.3); s = struct.unpack("<240h", pk[-1][20:])
 exp_l = round(8192 * (128 / 255) * 0.5)
 check("nuevo mapeo: L=ch2*(128/255)*0.5, R=ch1*1.0*0.5", abs(s[0] - exp_l) <= 1 and abs(s[1] - (-8192)) <= 1, (s[0], s[1], exp_l))
+c, b = http("POST", "/api/wifi/scan", {}); w = json.loads(b) if c == 200 else {}
+nets = w.get("networks", [])
+check("wifi/scan -> 200 con 4 redes (la oculta se descarta y Casa-5G se une en una)", c == 200 and len(nets) == 4, (c, len(nets)))
+check("wifi/scan: 5 GHz primero (por señal) y luego 2,4 GHz", [n["ssid"] for n in nets] == ["Casa-5G", "Casa:Sala", "Casa-2G", "Invitados"], [n["ssid"] for n in nets])
+check("wifi/scan: misma red en dos canales de 5 GHz -> se queda la más fuerte (71 %)", [n for n in nets if n["ssid"] == "Casa-5G"][0]["signal"] == 71 if nets else False, nets)
+check("wifi/scan: SSID con «:» sin escape y red abierta sin seguridad", any(n["ssid"] == "Casa:Sala" for n in nets) and [n for n in nets if n["ssid"] == "Invitados"][0]["security"] == "" if nets else False, nets)
+check("wifi/scan: banda según la frecuencia", [n for n in nets if n["ssid"] == "Casa-2G"][0]["band"] == "2,4 GHz" and [n for n in nets if n["ssid"] == "Casa:Sala"][0]["band"] == "5 GHz" if nets else False, nets)
+c, _ = http("GET", "/api/wifi/scan"); check("wifi/scan solo por POST (GET -> 404)", c == 404, c)
+c, b = http("GET", "/api/system"); si = json.loads(b) if c == 200 else {}
+check("/api/system sin contraseña: protected=false y WiFi actual de la RPi", c == 200 and si.get("protected") is False and si.get("wifi", {}).get("ssid") == "CasaHogar", si)
+c, _ = http("POST", "/api/update", {});               check("sin contraseña no se puede actualizar el servidor -> 403", c == 403, c)
+c, _ = http("POST", "/api/rpi/wifi", {"ssid": "X"});  check("sin contraseña no se puede cambiar la WiFi de la RPi -> 403", c == 403, c)
 c, _ = http("POST", "/api/node", {"id": 0, "name": "Sofá"});          check("nombre del altavoz -> 200", c == 200, c)
 c, b = http("GET", "/api/nodes"); n0 = [n for n in json.loads(b) if n["id"] == 0][0] if c == 200 else {}
 check("/api/nodes devuelve el nombre", n0.get("name") == "Sofá", n0.get("name"))
