@@ -5,6 +5,7 @@
 # Estado en /var/lib/sonos_wifi/update.state (running|ok|failed) y registro en update.log (la web los muestra).
 set -u
 REPO="@REPO@"; RUSER="@USER@"; STATE=/var/lib/sonos_wifi
+PH="@"   # los marcadores no se escriben enteros más abajo: así la copia instalada no los pierde al autoactualizarse
 mkdir -p "$STATE"; : > "$STATE/update.log"; echo running > "$STATE/update.state"
 exec >> "$STATE/update.log" 2>&1
 fail() { echo "ERROR: $1"; echo failed > "$STATE/update.state"; exit 1; }
@@ -29,7 +30,7 @@ install -m 755 rpi/build/sonos_wifi /usr/local/bin/sonos_wifi || fail "no se pud
 install -d /usr/local/lib/sonos_wifi
 install -m 755 scripts/sonos_ble_prov.py /usr/local/lib/sonos_wifi/sonos_ble_prov.py
 # la propia actualización también se actualiza (el script en ejecución sigue usando su copia antigua)
-sed "s|@REPO@|$REPO|; s|@USER@|$RUSER|" scripts/update.sh > "$STATE/update.sh.new" \
+sed "s|${PH}REPO${PH}|$REPO|; s|${PH}USER${PH}|$RUSER|" scripts/update.sh > "$STATE/update.sh.new" \
     && install -m 755 "$STATE/update.sh.new" /usr/local/lib/sonos_wifi/update.sh; rm -f "$STATE/update.sh.new"
 echo "Reiniciando el servicio… (la web se corta unos segundos)"
 systemctl restart sonos_wifi

@@ -41,5 +41,6 @@ kill $HP 2>/dev/null || true; wait $HP 2>/dev/null || true
 if [ $RC -eq 0 ] && command -v node >/dev/null; then
   echo; echo "== Análisis del navegador (Node) =="; node test_analysis.js || RC=1
   echo; echo "== Páginas web: generador + sintaxis JS =="; bash check_pages_js.sh || RC=1
+  echo; echo "== update.sh: autoactualización =="; bash check_update_sh.sh || RC=1
 fi
 exit $RC
