@@ -89,6 +89,15 @@ check("REPORT visible en /api/nodes", (n0["online"], n0["rtt_us"], n0["jitter_us
 check("fill_pct = 960 frames / 11520 (96 paquetes × 120)", abs(n0["fill_pct"] - 960 * 100 / 11520) < 0.01, n0["fill_pct"])
 check("ip del nodo", n0["ip"] == ESP_IP)
 check("recovered_packets del REPORT visible", n0["recovered_packets"] == 9, n0.get("recovered_packets"))
+# Errores recientes: el primer REPORT no cuenta el pasado del ESP; solo suman los eventos nuevos (ventana de 10 min)
+check("cortes recientes: el acumulado inicial del ESP no cuenta como reciente",
+      (n0["recent_lost"], n0["recent_late"], n0["recent_underruns"], n0["recent_min"]) == (0, 0, 0, 10),
+      (n0.get("recent_lost"), n0.get("recent_late"), n0.get("recent_underruns"), n0.get("recent_min")))
+rep = struct.pack("<IBB2xqiiiiIIIfI", MAGIC, 4, 0, 1234, 321, 77, 960, -42, 5 + 4, 6 + 2, 7 + 1, 12.5, 9)   # el hilo de keepalive usa la global
+ctrl.sendto(rep, (RPI_IP, 5005)); time.sleep(0.2)   # sin esperar: el nodo 0 se reconfigura a los 3 s y las pruebas de después cuentan con ello
+c, b = http("GET", "/api/nodes"); n0 = json.loads(b)[0]
+check("cortes recientes: 4 perdidos, 2 tarde y 1 vacío nuevos aparecen y el total acumulado sigue (9, 8, 8)",
+      (n0["recent_lost"], n0["recent_late"], n0["recent_underruns"], n0["lost_packets"], n0["late_packets"], n0["underruns"]) == (4, 2, 1, 9, 8, 8), n0)
 
 # 5) API robusta
 c, _ = http("POST", "/api/node", {"id": 0, "ch_left": 99});           check("ch_left=99 -> 400", c == 400, c)

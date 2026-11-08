@@ -654,7 +654,7 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
     <div class="vgrid" id="hverd"></div>
     <details class="help" id="hdet"><summary>Ver todos los números</summary>
   <div class="tw"><table><thead><tr><th>Altavoz</th><th>RTT</th><th>Jitter</th><th>Perdidos</th><th>Recuperados</th><th>Tarde</th><th>Vacíos</th><th>Sync</th><th>Búfer</th><th>WiFi</th><th>Firmware</th></tr></thead><tbody id="health"></tbody></table></div>
-      <p class="hint" style="margin-top:8px">Perdidos: paquetes que no llegaron. Tarde: llegaron fuera de plazo y se descartaron. Vacíos: tramos sin audio. Búfer: cuánto margen tiene el altavoz.</p>
+      <p class="hint" style="margin-top:8px">Los números son el total desde que arrancó el altavoz; el color (verde/ámbar/rojo) solo cuenta los últimos 10 minutos, así que un altavoz que ya anda bien vuelve a verde. Perdidos: paquetes que no llegaron. Tarde: llegaron fuera de plazo y se descartaron. Vacíos: tramos sin audio. Búfer: cuánto margen tiene el altavoz.</p>
     </details>
   </div>
   <div class="subpane" id="sp_sin" role="tabpanel" aria-labelledby="sy_in" hidden><div class="cards">
@@ -1259,10 +1259,10 @@ function cls(v,w,b){return v>=b?' class="bad"':v>=w?' class="warn"':'';}
 function verdict(n){
   if(!n.enabled)return{k:'ok',t:'Apagado',why:'No recibe audio.'};
   if(!n.online)return{k:'bad',t:'Sin conexión',why:'Revisa que tenga corriente y WiFi.'};
-  const lost=n.lost_packets||0,late=n.late_packets||0,un=n.underruns||0,weak=n.rssi_dbm&&n.rssi_dbm<=-83,mid=n.rssi_dbm&&n.rssi_dbm<=-76;
-  if(lost>=50||un>=10||weak)return{k:'bad',t:'Con cortes',why:weak?'Señal WiFi muy débil: acerca el altavoz o la antena al router.':'Pierde paquetes: revisa la señal WiFi y el canal.'};
-  if(lost>=1||late>=5||un>=1||mid)return{k:'warn',t:'Inestable',why:mid?'Señal WiFi justa.':'Algún corte aislado desde que arrancó.'};
-  return{k:'ok',t:'Bien',why:'Sin cortes ni retrasos.'};}
+  const rec=n.recent_min!==undefined,lost=rec?n.recent_lost||0:n.lost_packets||0,late=rec?n.recent_late||0:n.late_packets||0,un=rec?n.recent_underruns||0:n.underruns||0,weak=n.rssi_dbm&&n.rssi_dbm<=-83,mid=n.rssi_dbm&&n.rssi_dbm<=-76,win=rec?'en los últimos '+n.recent_min+' min':'desde que arrancó';
+  if(lost>=50||un>=10||weak)return{k:'bad',t:'Con cortes',why:weak?'Señal WiFi muy débil: acerca el altavoz o la antena al router.':'Pierde paquetes ('+win+'): revisa la señal WiFi y el canal.'};
+  if(lost>=1||late>=5||un>=1||mid)return{k:'warn',t:'Inestable',why:mid?'Señal WiFi justa.':'Algún corte aislado '+win+'.'};
+  return{k:'ok',t:'Bien',why:rec?'Sin cortes ni retrasos en los últimos '+n.recent_min+' min.':'Sin cortes ni retrasos.'};}
 function drawVerdicts(){const vis=nodes.filter(isKnown),el=$('hverd');if(!el)return;
   el.innerHTML=vis.map(n=>{const v=verdict(n);return '<button class="vcard v-'+v.k+'" type="button" data-id="'+n.id+'"><b><i class="dot '+v.k+'"></i>'+esc(spkName(n))+'<span class="vt">'+v.t+'</span></b><span class="why">'+v.why+'</span></button>';}).join('')||'<p class="hint">Aún no hay altavoces.</p>';
   el.querySelectorAll('.vcard').forEach(b=>b.onclick=()=>openDrawer(+b.dataset.id));}
@@ -1281,8 +1281,10 @@ function drawWizard(){const w=$('wiz');if(!w)return;const vis=nodes.filter(isKno
    '<div class="acts"><button class="btn sm" id="wz_add" type="button">Añadir altavoces</button><a class="btn ghost sm" id="wz_cal" href="#">Calibrar</a><button class="btn ghost sm" id="wz_hide" type="button">Ocultar guía</button></div>';
   $('wz_add').onclick=openBle;$('wz_hide').onclick=()=>{lsSet('sonos_wiz','off');w.hidden=true;};
   $('wz_cal').href=$('lcal').href;$('wz_cal').onclick=()=>lsSet('sonos_cal','1');}
+const rc=(n,r,t)=>n.recent_min!==undefined?n[r]||0:n[t]||0;   // errores recientes (últimos minutos); los acumulados solo si la RPi es antigua
+const rt=(n,r)=>n.recent_min!==undefined?' title="Últimos '+n.recent_min+' min: '+(n[r]||0)+'. El color se basa en este dato; el número es el total desde que arrancó el altavoz."':'';
 function drawHealth(){const vis=nodes.filter(isKnown);drawVerdicts();drawWizard();
-  $('health').innerHTML=vis.map(n=>'<tr><td><i class="dot '+(n.online?'ok':'bad')+'"></i> '+esc(spkName(n))+' · '+nodeLabel(n)+'</td><td>'+(n.online?((n.rtt_us||0)/1000).toFixed(1)+' ms':'—')+'</td><td>'+(n.jitter_us||0)+' µs</td><td'+cls(n.lost_packets||0,1,50)+'>'+(n.lost_packets||0)+'</td><td>'+(n.recovered_packets||0)+'</td><td'+cls(n.late_packets||0,5,50)+'>'+(n.late_packets||0)+'</td><td'+cls(n.underruns||0,1,10)+'>'+(n.underruns||0)+'</td><td>'+((n.sync_err_us||0))+' µs</td><td>'+Math.round(n.fill_pct||0)+'%</td><td'+(n.online&&n.rssi_dbm?cls(-n.rssi_dbm,76,83):'')+'>'+(n.online?wifiTxt(n):'—')+'</td><td>'+fwTxt(n)+'</td></tr>').join('')||'<tr><td colspan="11" class="mut">Sin altavoces</td></tr>';}
+  $('health').innerHTML=vis.map(n=>'<tr><td><i class="dot '+(n.online?'ok':'bad')+'"></i> '+esc(spkName(n))+' · '+nodeLabel(n)+'</td><td>'+(n.online?((n.rtt_us||0)/1000).toFixed(1)+' ms':'—')+'</td><td>'+(n.jitter_us||0)+' µs</td><td'+cls(rc(n,'recent_lost','lost_packets'),1,50)+rt(n,'recent_lost')+'>'+(n.lost_packets||0)+'</td><td>'+(n.recovered_packets||0)+'</td><td'+cls(rc(n,'recent_late','late_packets'),5,50)+rt(n,'recent_late')+'>'+(n.late_packets||0)+'</td><td'+cls(rc(n,'recent_underruns','underruns'),1,10)+rt(n,'recent_underruns')+'>'+(n.underruns||0)+'</td><td>'+((n.sync_err_us||0))+' µs</td><td>'+Math.round(n.fill_pct||0)+'%</td><td'+(n.online&&n.rssi_dbm?cls(-n.rssi_dbm,76,83):'')+'>'+(n.online?wifiTxt(n):'—')+'</td><td>'+fwTxt(n)+'</td></tr>').join('')||'<tr><td colspan="11" class="mut">Sin altavoces</td></tr>';}
 
 /* Añadir altavoces por Bluetooth desde la Raspberry */
 let bs={available:false,ssid:'',has_pass:false,rpi_ip:''},bdevs=[],bscan=false,bres={},wnets=null,wscan=false,wmsg='';
@@ -2362,8 +2364,8 @@ static const char PWA_MANIFEST[] = R"HTML({
 static const char PWA_SW[] = R"HTML(/* Service worker de AStream. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * b20f110be3 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-b20f110be3';
+ * eb8eafa514 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-eb8eafa514';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png', '/fonts/roboto-400.woff2', '/fonts/roboto-500.woff2'];
 
 self.addEventListener('install', e => {

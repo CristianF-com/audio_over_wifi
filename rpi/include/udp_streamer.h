@@ -54,6 +54,15 @@ struct ESPNode {
     uint32_t recovered_packets = 0;      // recuperados por reenvío (REPORT del ESP)
     uint32_t retx_sent       = 0;        // reenvíos servidos por la RPi
 
+    // Cortes recientes: los contadores del ESP son acumulados desde que arrancó; aquí se guardan por minuto (últimos RECENT_MIN)
+    // para que un altavoz que lleva un rato bien deje de figurar con errores.
+    static constexpr int RECENT_MIN = 10;
+    bool     cnt_init        = false;    // ya hay contadores de referencia (el primer REPORT no cuenta el pasado)
+    uint32_t cnt_lost = 0, cnt_late = 0, cnt_under = 0;
+    uint64_t bk_min[RECENT_MIN]   = {};  // minuto (mono) de cada cubeta, 0 = vacía
+    uint32_t bk_lost[RECENT_MIN]  = {}, bk_late[RECENT_MIN] = {}, bk_under[RECENT_MIN] = {};
+    uint32_t recent_lost = 0, recent_late = 0, recent_under = 0;   // suma de los últimos RECENT_MIN minutos (la rellena getNodes)
+
     // Ajuste de alineación (distancia/latencia acústica) en µs. + = retrasa este nodo.
     int32_t  latency_offset_us = 0;
 

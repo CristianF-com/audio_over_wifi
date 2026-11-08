@@ -230,6 +230,17 @@ void UdpStreamer::handleReport(const uint8_t* b, int n, const sockaddr_in& src) 
     nd.jitter_us     = r.jitter_us;
     nd.buffer_frames = r.buffer_frames;
     nd.sync_err_us   = r.sync_err_us;
+    {   // eventos nuevos desde el REPORT anterior (si el contador baja, el ESP se reinició: todo lo que trae es nuevo)
+        auto delta = [](uint32_t now, uint32_t prev) { return now >= prev ? now - prev : now; };
+        uint32_t dl = nd.cnt_init ? delta(r.lost_packets, nd.cnt_lost) : 0, dt = nd.cnt_init ? delta(r.late_packets, nd.cnt_late) : 0,
+                 du = nd.cnt_init ? delta(r.underruns, nd.cnt_under) : 0;
+        nd.cnt_init = true; nd.cnt_lost = r.lost_packets; nd.cnt_late = r.late_packets; nd.cnt_under = r.underruns;
+        if (dl || dt || du) {
+            uint64_t m = mono_us() / 60000000ULL + 1; int k = (int)(m % ESPNode::RECENT_MIN);
+            if (nd.bk_min[k] != m) { nd.bk_min[k] = m; nd.bk_lost[k] = nd.bk_late[k] = nd.bk_under[k] = 0; }
+            nd.bk_lost[k] += dl; nd.bk_late[k] += dt; nd.bk_under[k] += du;
+        }
+    }
     nd.lost_packets  = r.lost_packets;
     nd.late_packets  = r.late_packets;
     nd.underruns     = r.underruns;
@@ -581,6 +592,12 @@ std::array<ESPNode, MAX_NODES> UdpStreamer::getNodes() const {
         out = nodes_;
     }
     for (int i = 0; i < MAX_NODES; i++) out[i].retx_sent = retx_[i].load(std::memory_order_relaxed);
+    uint64_t m = mono_us() / 60000000ULL + 1;
+    for (auto& n : out) {
+        n.recent_lost = n.recent_late = n.recent_under = 0;
+        for (int k = 0; k < ESPNode::RECENT_MIN; k++)
+            if (n.bk_min[k] && m - n.bk_min[k] < (uint64_t)ESPNode::RECENT_MIN) { n.recent_lost += n.bk_lost[k]; n.recent_late += n.bk_late[k]; n.recent_under += n.bk_under[k]; }
+    }
     return out;
 }
 

@@ -72,7 +72,8 @@ int main(int argc, char* argv[]) {
     if (tls_port) web.setTLS(tls_port, cert, key);
     if (!webdir.empty()) { web.setWebDir(webdir); fprintf(stderr, "[Main] Web servida desde %s (modo desarrollo)\n", webdir.c_str()); }
     { std::string sd = cfgfile.empty() ? std::string("/var/lib/sonos_wifi") : cfgfile.substr(0, cfgfile.rfind('/') == std::string::npos ? 0 : cfgfile.rfind('/'));
-      if (sd.empty()) sd = "."; web.setStateDir(sd); }   // update.state / update.log junto al fichero de configuración
+      if (sd.empty()) sd = ".";
+      web.setStateDir(sd); }   // update.state / update.log junto al fichero de configuración
     web.setBle(blehelper, cfgfile.empty() ? std::string() : cfgfile + ".ble");   // WiFi de los altavoces (0600) + ayudante Bluetooth
     {   // Contraseña opcional (HTTP Basic; usuario libre): solo si existe el fichero y no está vacío
         FILE* pf = fopen(pwfile.c_str(), "r");

@@ -583,6 +583,7 @@ std::string WebServer::getNodes() {
           << jnum("lost_packets", n.lost_packets) << ","
           << jnum("late_packets", n.late_packets) << ","
           << jnum("underruns",    n.underruns)    << ","
+          << jnum("recent_lost", n.recent_lost) << "," << jnum("recent_late", n.recent_late) << "," << jnum("recent_underruns", n.recent_under) << "," << jnum("recent_min", ESPNode::RECENT_MIN) << ","
           << jnum("drift_ppm",    n.drift_ppm)    << ","
           << jnum("buffer_frames",n.buffer_frames) << ","
           << jnum("latency_offset_us", n.latency_offset_us) << ","

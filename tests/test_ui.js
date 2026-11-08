@@ -493,6 +493,10 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   const hb=await p.evaluate(()=>['#lble','#lcal','#medit'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return [r.top,r.height];}));
   ok('Plano: Añadir altavoces (+), Calibrar y Editar plano están juntos, alineados y con la misma altura',hb.every(x=>Math.abs(x[0]-hb[0][0])<1&&Math.abs(x[1]-hb[0][1])<1),hb);
   ok('Plano: los botones quedan pegados a la derecha de la barra y el texto de ayuda va debajo, alineado a la izquierda',await p.evaluate(()=>{const bar=document.querySelector('.roombar').getBoundingClientRect(),e=document.getElementById('medit').getBoundingClientRect(),l=document.getElementById('lble').getBoundingClientRect(),h=document.getElementById('mhint').getBoundingClientRect();return Math.abs(bar.right-e.right)<2&&l.left>bar.left+bar.width/3&&h.top>=e.bottom-1&&Math.abs(h.left-bar.left)<2;}));
+  ok('Estado de cada altavoz: cuenta los cortes de los últimos minutos y no los acumulados (un altavoz que ya anda bien vuelve a «Bien»)',await p.evaluate(()=>{const b={enabled:true,online:true,rssi_dbm:-60},v=x=>verdict(Object.assign({},b,x)).k;
+    return v({lost_packets:900,late_packets:90,underruns:40,recent_min:10,recent_lost:0,recent_late:0,recent_underruns:0})==='ok'
+      &&v({lost_packets:900,recent_min:10,recent_lost:2})==='warn'&&v({recent_min:10,recent_lost:80})==='bad'
+      &&v({lost_packets:900})==='bad'&&verdict(Object.assign({},b,{recent_min:10})).why.includes('10 min');}));
   ok('Calibrar no se subraya como enlace',await p.evaluate(()=>getComputedStyle(document.getElementById('lcal')).textDecorationLine)==='none');
 
   // ── Plano de la sala: un dibujo por altavoz (canal), con ESP, canal y estado; se mueven uno a uno ──
