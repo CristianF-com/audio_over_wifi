@@ -34,7 +34,7 @@ kill $LP 2>/dev/null || true; wait $LP 2>/dev/null || true; pkill -x sonos_harne
 echo; echo "== Protocolo, web, HTTPS, calibración =="
 rm -f /tmp/sonos_harness_config.txt
 python3 ble_mock_setup.py
-SONOS_NMCLI="$PWD/fake_nmcli.sh" SONOS_BLE_HELPER="$PWD/../scripts/sonos_ble_prov.py" SONOS_BLE_MOCK=/tmp/sonos_ble_mock.json /tmp/sonos_harness & HP=$!
+SONOS_AUTO_FAST=1 SONOS_NMCLI="$PWD/fake_nmcli.sh" SONOS_BLE_HELPER="$PWD/../scripts/sonos_ble_prov.py" SONOS_BLE_MOCK=/tmp/sonos_ble_mock.json /tmp/sonos_harness & HP=$!
 sleep 0.5
 python3 fake_esp.py && RC=0 || RC=$?
 kill $HP 2>/dev/null || true; wait $HP 2>/dev/null || true

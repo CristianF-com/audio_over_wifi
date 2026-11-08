@@ -30,6 +30,7 @@ private:
     std::string setVolume(const std::string& body);
     std::string setCalibration(const std::string& body);
     std::string setPlayout(const std::string& body);
+    std::string setPlayoutAuto(const std::string& body);
     std::string setLayout(const std::string& body);
     std::string setBass(const std::string& body);
     std::string setDsp(const std::string& body);

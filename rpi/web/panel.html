@@ -35,8 +35,7 @@ details.adv>.advbody{display:grid;gap:14px;padding-top:6px}
 .wiz li.done .n{background:var(--ac-bg);border-color:var(--ac)}.wiz li.done span.t{color:var(--mut);text-decoration:line-through}
 .wiz .acts{display:flex;gap:8px;flex-wrap:wrap}
 @media (min-width:1100px) and (min-height:620px){
-  body.has-dock main{padding-right:452px}
-  .drawer.on{box-shadow:none;top:64px}
+  .drawer.on{top:64px}   /* panel flotante sobre la vista: no cambia el tamaño de la página */
 }
 .links .btn{display:inline-flex;align-items:center;gap:6px}.links .ic{display:none;width:20px;height:20px;flex:none}
 #st{min-width:0}#hs{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -405,10 +404,28 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   <div class="cards">
     <div class="card">
       <div><div class="lbl">Retardo total del sistema</div><div class="big" id="bigtot">—<small>ms</small></div></div>
+      <div class="seg block" id="plmode" role="group" aria-label="Modo del margen de red"><button data-m="manual" aria-pressed="true">Manual</button><button data-m="auto" aria-pressed="false">Auto</button></div>
+      <div id="plmanual">
       <div class="fld"><div class="top2"><label for="pls">Margen de seguridad de red</label><b id="pld">80 ms</b></div>
         <input class="rng" id="pls" type="range" min="40" max="200" step="5" value="80"></div>
       <div class="seg block" id="plseg"><button data-pl="40" aria-pressed="false">40 baja</button><button data-pl="60" aria-pressed="false">60</button><button data-pl="80" aria-pressed="false">80 normal</button><button data-pl="120" aria-pressed="false">120 segura</button></div>
-      <p>Menos margen significa menos retardo y más riesgo de cortes. Si un altavoz aparece como «Inestable» o «Con cortes» en Sistema, súbelo.</p>
+      </div>
+      <div id="plauto" hidden>
+        <div class="fld"><div class="top2"><span>Margen actual (lo ajusta Auto)</span><b id="plcur">— ms</b></div></div>
+        <div class="fld"><div class="top2"><label for="plfloor">Mínimo: nunca baja de aquí</label><b id="plfloord">80 ms</b></div>
+          <input class="rng" id="plfloor" type="range" min="40" max="200" step="5" value="80"></div>
+        <div class="fld"><div class="top2"><label for="plmax">Tope: nunca sube de aquí</label><b id="plmaxd">160 ms</b></div>
+          <input class="rng" id="plmax" type="range" min="40" max="200" step="5" value="160"></div>
+        <div class="fld"><div class="top2"><label for="plre">Cortes por minuto para subir el margen</label><b id="plred">8</b></div>
+          <input class="rng" id="plre" type="range" min="1" max="50" step="1" value="8"></div>
+        <div class="fld"><div class="top2"><label for="plcm">Minutos sin cortes para bajarlo</label><b id="plcmd">10 min</b></div>
+          <input class="rng" id="plcm" type="range" min="1" max="60" step="1" value="10"></div>
+        <div class="fld"><div class="top2"><label for="plst">Cuánto sube cada vez</label><b id="plstd">10 ms</b></div>
+          <input class="rng" id="plst" type="range" min="5" max="40" step="5" value="10"></div>
+        <button class="btn ghost sm" id="plreset" type="button">Valores recomendados</button>
+        <p id="plautomsg"></p>
+      </div>
+      <p>Menos margen significa menos retardo y más riesgo de cortes. Si un altavoz aparece como «Inestable» o «Con cortes» en Sistema, súbelo. En Auto, el margen sube de 10 en 10 ms cuando hay cortes y baja de 5 en 5 ms tras un buen rato sin ellos. Cada cambio produce un breve salto en el audio y mueve el retardo que debe aplicar el reproductor.</p>
     </div>
     <div class="card">
       <div><div class="lbl">Sincronizar con la imagen</div><div class="big" id="bigad">—<small>ms</small></div></div>
@@ -1036,7 +1053,24 @@ $('fwup').onclick=async()=>{const f=$('fwfile').files[0];if(!f){toast('Elige pri
 /* Latencia */
 async function updLat(){try{const j=await (await fetch('/api/latency')).json();
   $('bigtot').innerHTML=Math.round(j.total_ms)+'<small>ms</small>';$('bigad').innerHTML=Math.round(j.audio_delay_ms)+'<small>ms</small>';
-  $('mpvcmd').textContent='mpv --audio-delay='+j.mpv_audio_delay_s.toFixed(3)+' vídeo.mkv';}catch(e){}}
+  $('mpvcmd').textContent='mpv --audio-delay='+j.mpv_audio_delay_s.toFixed(3)+' vídeo.mkv';plAutoUi(j);}catch(e){}}
+function plAutoUi(j){const a=j.auto;if(!a)return;setSeg($('plmode'),'m',a.on?'auto':'manual');$('plmanual').hidden=a.on;$('plauto').hidden=!a.on;if(!a.on)return;
+  $('plcur').textContent=Math.round(j.playout_ms)+' ms';
+  if(document.activeElement!==$('plfloor')){$('plfloor').value=a.floor_ms;$('plfloord').textContent=Math.round(a.floor_ms)+' ms';fillRng($('plfloor'));}
+  if(document.activeElement!==$('plmax')){$('plmax').value=a.max_ms;$('plmaxd').textContent=Math.round(a.max_ms)+' ms';fillRng($('plmax'));}
+  for(const [id,k,u] of [['plre','raise_events',''],['plcm','clean_min',' min'],['plst','step_ms',' ms']])if(document.activeElement!==$(id)){$(id).value=a[k];$(id+'d').textContent=a[k]+u;fillRng($(id));}
+  const t=a.last_change_ago_s<0?'Todavía no ha cambiado nada.':'Último cambio: '+(a.last_dir>0?'subió':'bajó')+' hace '+(a.last_change_ago_s<90?Math.round(a.last_change_ago_s)+' s':Math.round(a.last_change_ago_s/60)+' min')+' ('+a.changes+' en total).';
+  $('plautomsg').textContent='Auto activo: '+(a.recent_events>0?a.recent_events+' cortes en el último minuto. ':'sin cortes recientes. ')+t;}
+$('plmode').querySelectorAll('button').forEach(b=>b.onclick=async()=>{const on=b.dataset.m==='auto';const r=await J('/api/playout',{auto:on});if(r.ok){toast(on?'Latencia automática activada':'Latencia manual');log('Latencia: '+(on?'automática':'manual'));loadStatus();updLat();}else toast('No se pudo cambiar el modo. Vuelve a intentarlo.',false);});
+$('plfloor').oninput=function(){$('plfloord').textContent=this.value+' ms';fillRng(this);};
+$('plfloor').onchange=async function(){const r=await J('/api/playout',{ms:+this.value});if(r.ok){toast('Mínimo '+this.value+' ms');updLat();}else toast('No se pudo cambiar el mínimo.',false);};
+const plThr=async(o,m)=>{const r=await J('/api/playout',Object.assign({auto:true},o));if(r.ok){toast(m);updLat();}else toast('No se pudo guardar el ajuste. Vuelve a intentarlo.',false);};
+[['plre','raise_events','',v=>'Sube con '+v+' cortes por minuto'],['plcm','clean_min',' min',v=>'Baja tras '+v+' min sin cortes'],['plst','step_ms',' ms',v=>'Sube de '+v+' en '+v+' ms']].forEach(([id,k,u,msg])=>{
+  $(id).oninput=function(){$(id+'d').textContent=this.value+u;fillRng(this);};
+  $(id).onchange=function(){plThr({[k]:+this.value},msg(this.value));};});
+$('plreset').onclick=()=>plThr({raise_events:8,clean_min:10,step_ms:10},'Valores recomendados restaurados');
+$('plmax').oninput=function(){$('plmaxd').textContent=this.value+' ms';fillRng(this);};
+$('plmax').onchange=async function(){const r=await J('/api/playout',{auto:true,max_ms:+this.value});if(r.ok){toast('Tope '+this.value+' ms');updLat();}else toast('No se pudo cambiar el tope.',false);};
 async function setPL(v){const r=await J('/api/playout',{ms:+v});if(r.ok){toast('Colchón '+v+' ms');log('Colchón de red: '+v+' ms');loadStatus();updLat();}else toast('No se pudo cambiar el colchón de red. Vuelve a intentarlo.',false);}
 $('pls').oninput=function(){$('pld').textContent=this.value+' ms';fillRng(this);};
 $('pls').onchange=function(){setPL(this.value);};
@@ -1260,6 +1294,6 @@ $('logclr').onclick=()=>{$('lb').innerHTML='';};
 document.querySelectorAll('.rng').forEach(fillRng);
 const h0=(location.hash||'').slice(1);if(['spk','snd','lat','sys'].includes(h0))showTab(h0);else if(h0==='log'){showTab('sys');}
 drawNamesForm(true);loadStatus().then(loadNodes);updLat();loadProfiles();loadFw();lvLoop();
-setInterval(loadStatus,5000);setInterval(loadNodes,2500);
+setInterval(loadStatus,5000);setInterval(()=>{if(!document.hidden&&!$('p_lat').hidden)updLat();},3000);setInterval(loadNodes,2500);
 </script>
 </body></html>

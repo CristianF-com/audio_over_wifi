@@ -396,7 +396,7 @@ std::string WebServer::handlePOST(const std::string& p, const std::string& b, in
     std::string r;
     if      (p == "/api/node")      r = setNode(b);
     else if (p == "/api/volume")    r = setVolume(b);
-    else if (p == "/api/playout")   r = setPlayout(b);
+    else if (p == "/api/playout")   r = jsonGet(b, "auto").empty() ? setPlayout(b) : setPlayoutAuto(b);
     else if (p == "/api/layout")    r = setLayout(b);
     else if (p == "/api/bass")      r = setBass(b);
     else if (p == "/api/dsp")       r = setDsp(b);
@@ -865,12 +865,17 @@ std::string WebServer::setEq(const std::string& b) {
 }
 // Para el reproductor de vídeo: cuánto hay que ADELANTAR el audio. mpv: --audio-delay=<mpv_audio_delay_s> (negativo).
 std::string WebServer::getLatency() {
+    auto ap = streamer_.autoPlayout();
     double playout = streamer_.playoutUs() / 1000.0, extra = streamer_.lipsyncExtraMs();
     double period = capture_.config().period_size * 1000.0 / AUDIO_SAMPLE_RATE;
     double total = playout + extra;
     std::ostringstream o;
     o << "{" << jnum("playout_ms", playout) << "," << jnum("extra_ms", extra) << "," << jnum("period_ms", period) << ","
-      << jnum("total_ms", total) << "," << jnum("audio_delay_ms", -total) << "," << jnum("mpv_audio_delay_s", -total / 1000.0) << "}";
+      << jnum("total_ms", total) << "," << jnum("audio_delay_ms", -total) << "," << jnum("mpv_audio_delay_s", -total / 1000.0) << ","
+      << "\"auto\":{" << jbool("on", ap.on) << "," << jnum("floor_ms", ap.floor_us / 1000.0) << "," << jnum("max_ms", ap.max_us / 1000.0) << ","
+      << jnum("changes", ap.changes) << "," << jnum("last_change_ago_s", ap.last_change_ago_ms < 0 ? -1.0 : ap.last_change_ago_ms / 1000.0) << ","
+      << jnum("last_dir", ap.last_dir) << "," << jnum("recent_events", ap.recent_events) << ","
+      << jnum("raise_events", ap.raise_events) << "," << jnum("clean_min", ap.clean_min) << "," << jnum("step_ms", ap.step_us / 1000.0) << "}}";
     return o.str();
 }
 std::string WebServer::setLatency(const std::string& b) {
@@ -883,7 +888,23 @@ std::string WebServer::setPlayout(const std::string& b) {
     long ms;
     if (!parseInt(jsonGet(b, "ms"), PLAYOUT_MIN_US / 1000, PLAYOUT_MAX_US / 1000, ms))
         return "{\"error\":\"ms fuera de rango (" + std::to_string(PLAYOUT_MIN_US / 1000) + ".." + std::to_string(PLAYOUT_MAX_US / 1000) + ")\"}";
-    if (!streamer_.setPlayoutUs((uint32_t)ms * 1000)) return "{\"error\":\"no se pudo aplicar\"}";
+    if (!streamer_.setPlayoutManual((uint32_t)ms * 1000)) return "{\"error\":\"no se pudo aplicar\"}";
+    return "{\"ok\":true}";
+}
+// Latencia AUTO: {"auto":true|false,"max_ms":N}. El mínimo es el margen que había al activarlo (o el último que se fijó a mano).
+std::string WebServer::setPlayoutAuto(const std::string& b) {
+    std::string a = jsonGet(b, "auto");
+    if (a != "true" && a != "false") return "{\"error\":\"auto debe ser true o false\"}";
+    long mx = -1;
+    std::string m = jsonGet(b, "max_ms");
+    if (!m.empty() && !parseInt(m, PLAYOUT_MIN_US / 1000, PLAYOUT_MAX_US / 1000, mx))
+        return "{\"error\":\"max_ms fuera de rango (" + std::to_string(PLAYOUT_MIN_US / 1000) + ".." + std::to_string(PLAYOUT_MAX_US / 1000) + ")\"}";
+    long re = -1, cm = -1, st = -1;
+    if (!jsonGet(b, "raise_events").empty() && !parseInt(jsonGet(b, "raise_events"), 1, 100, re)) return "{\"error\":\"raise_events fuera de rango (1..100)\"}";
+    if (!jsonGet(b, "clean_min").empty() && !parseInt(jsonGet(b, "clean_min"), 1, 120, cm)) return "{\"error\":\"clean_min fuera de rango (1..120)\"}";
+    if (!jsonGet(b, "step_ms").empty() && (!parseInt(jsonGet(b, "step_ms"), 5, 40, st) || st % 5)) return "{\"error\":\"step_ms fuera de rango (5..40, de 5 en 5)\"}";
+    if (!streamer_.setAutoThresholds((int)re, (int)cm, (int)st)) return "{\"error\":\"umbrales no válidos\"}";
+    if (!streamer_.setAutoPlayout(a == "true", mx < 0 ? -1 : mx * 1000)) return "{\"error\":\"no se pudo aplicar\"}";
     return "{\"ok\":true}";
 }
 std::string WebServer::setVolume(const std::string& b) {

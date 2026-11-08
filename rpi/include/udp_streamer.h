@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <string>
 #include <array>
+#include <deque>
 #include <mutex>
 #include <atomic>
 #include <thread>
@@ -59,6 +60,7 @@ struct ESPNode {
     static constexpr int RECENT_MIN = 10;
     bool     cnt_init        = false;    // ya hay contadores de referencia (el primer REPORT no cuenta el pasado)
     uint32_t cnt_lost = 0, cnt_late = 0, cnt_under = 0;
+    uint32_t auto_events = 0;            // eventos (perdidos+tarde+vacíos) desde la última vuelta del modo AUTO de latencia
     uint64_t bk_min[RECENT_MIN]   = {};  // minuto (mono) de cada cubeta, 0 = vacía
     uint32_t bk_lost[RECENT_MIN]  = {}, bk_late[RECENT_MIN] = {}, bk_under[RECENT_MIN] = {};
     uint32_t recent_lost = 0, recent_late = 0, recent_under = 0;   // suma de los últimos RECENT_MIN minutos (la rellena getNodes)
@@ -142,6 +144,16 @@ public:
     uint32_t playoutUs() const { return playout_us_.load(); }
     bool     setPlayoutUs(uint32_t us);
 
+    // Latencia AUTO: sube el margen de red (de 10 en 10 ms, hasta un tope) si hay cortes y lo baja despacio cuando lleva un rato limpio
+    // (nunca por debajo del mínimo que eligió el usuario). Cada cambio reenvía CONFIG (breve salto en el audio y desplaza el sync con la imagen).
+    struct AutoPlayout { bool on; uint32_t floor_us, max_us, changes; int64_t last_change_ago_ms; int last_dir; uint32_t recent_events, raise_events, clean_min, step_us; };
+    AutoPlayout autoPlayout() const;
+    bool        setAutoPlayout(bool on, int64_t max_us = -1);
+    // Umbrales: cortes por minuto que hacen subir (1..100), minutos sin cortes para bajar (1..120) y paso de subida (5..40 ms, múltiplo de 5). -1 = no cambia.
+    bool        setAutoThresholds(int raise_events, int clean_min, int step_ms);   // max_us < 0: no cambia el tope. Al activar, el mínimo pasa a ser el margen actual
+    bool        setPlayoutManual(uint32_t us);                     // ajuste manual: con AUTO activo pasa a ser el nuevo mínimo
+    void        autoTick();                                       // lo llama el bucle de control (internamente va cada AUTO_TICK)
+
     // Persistencia (fichero key=value). loadConfig() al arrancar; saveConfig() es automático (~1 s tras cada cambio).
     void setConfigPath(const std::string& p) { cfg_path_ = p; }
     bool loadConfig();
@@ -223,6 +235,18 @@ private:
     std::atomic<bool> running_{false};
     std::atomic<float> master_vol_{1.0f};
     std::atomic<uint32_t> playout_us_{PLAYOUT_DELAY_US};
+    std::atomic<bool>     auto_on_{false};
+    std::atomic<uint32_t> auto_floor_us_{PLAYOUT_DELAY_US}, auto_max_us_{160000}, auto_changes_{0};
+    std::atomic<int>      auto_last_dir_{0};
+    std::atomic<uint64_t> auto_last_change_us_{0};
+    std::atomic<uint32_t> auto_recent_{0};
+    uint64_t auto_tick_us_ = 5000000, auto_window_us_ = 60000000, auto_cool_us_ = 30000000;
+    bool     auto_fast_ = false;                                 // solo pruebas (SONOS_AUTO_FAST=1): tiempos en décimas de segundo
+    std::atomic<uint32_t> auto_raise_events_{8}, auto_clean_min_{10}, auto_step_us_{10000};
+    uint64_t autoCleanUs() const { return auto_fast_ ? 3000000ULL : (uint64_t)auto_clean_min_.load() * 60000000ULL; }
+    uint64_t auto_last_tick_ = 0, auto_last_event_us_ = 0;
+    std::mutex auto_mtx_;
+    std::deque<std::pair<uint64_t, uint32_t>> auto_win_;       // (hora, eventos) dentro de la ventana
     std::string           cfg_path_;
     std::atomic<bool>     dirty_{false};
     std::atomic<int>      layout_{LAYOUT_STEREO5};

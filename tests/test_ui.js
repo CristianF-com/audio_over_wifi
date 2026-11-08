@@ -214,8 +214,11 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('controles segmentados visibles (no se pisan con los indicadores de señal)',sb&&sb.height>=30&&sb.width>=60,sb);
   ok('el cajón cerrado es inerte y está oculto (el teclado no entra en él)',await p.evaluate(()=>document.getElementById('drawer').inert===true&&document.getElementById('bdrawer').inert===true&&document.getElementById('drawer').getAttribute('aria-hidden')==='true'));
   ok('los cajones son diálogos modales con título',await p.evaluate(()=>['drawer','bdrawer'].every(i=>{const d=document.getElementById(i);return d.getAttribute('role')==='dialog'&&d.getAttribute('aria-modal')==='true'&&document.getElementById(d.getAttribute('aria-labelledby'))!==null;})));
-  await p.click('#spks .spk[data-id="2"]');await p.waitForSelector('#drawer.on');await adv(p);
-  ok('escritorio ancho: el cajón es un panel lateral fijo (sin velo, la página sigue activa y deja sitio a la derecha)',await until(async()=>await p.evaluate(()=>document.body.classList.contains('has-dock')&&!document.getElementById('scrim').classList.contains('on')&&!document.querySelector('main').inert&&!document.querySelector('.top').inert&&!document.getElementById('drawer').inert&&parseFloat(getComputedStyle(document.querySelector('main')).paddingRight)>=400)));
+  const room0=await p.evaluate(()=>({r:document.getElementById('room').getBoundingClientRect().width,m:document.querySelector('main').getBoundingClientRect().width,s:document.documentElement.scrollWidth}));
+  await p.click('#spks .spk[data-id="2"]');await p.waitForSelector('#drawer.on');await adv(p);await sleep(500);
+  const dk=await p.evaluate((r0)=>{const d=document.getElementById('drawer').getBoundingClientRect();const o={room:document.getElementById('room').getBoundingClientRect().width-r0.r,main:document.querySelector('main').getBoundingClientRect().width-r0.m,sw:document.documentElement.scrollWidth-r0.s,pr:parseFloat(getComputedStyle(document.querySelector('main')).paddingRight),dr:d.right-innerWidth,pos:getComputedStyle(document.getElementById('drawer')).position};o.ok=Math.abs(o.room)<1&&Math.abs(o.main)<1&&o.sw<=0&&o.pr<100&&o.dr<=0&&o.dr>=-24&&o.pos==='fixed';return o;},room0);
+  ok('escritorio ancho: abrir el panel del altavoz NO cambia el tamaño de la vista (el plano y la página miden lo mismo), el panel flota arriba a la derecha',dk.ok===true,JSON.stringify(dk));
+  ok('escritorio ancho: el cajón es un panel lateral fijo (sin velo, la página sigue activa)',await until(async()=>await p.evaluate(()=>document.body.classList.contains('has-dock')&&!document.getElementById('scrim').classList.contains('on')&&!document.querySelector('main').inert&&!document.querySelector('.top').inert&&!document.getElementById('drawer').inert)));
   await p.keyboard.press('Escape');
   ok('al cerrar con Esc: el foco vuelve al altavoz que lo abrió y la página deja de ser inerte',await until(async()=>await p.evaluate(()=>document.activeElement&&document.activeElement.classList.contains('spk')&&document.activeElement.dataset.id==='2'&&!document.querySelector('main').inert&&document.getElementById('drawer').inert)));
   await p.focus('.tab[data-tab="spk"]');await p.keyboard.press('ArrowRight');
@@ -497,6 +500,21 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
     return v({lost_packets:900,late_packets:90,underruns:40,recent_min:10,recent_lost:0,recent_late:0,recent_underruns:0})==='ok'
       &&v({lost_packets:900,recent_min:10,recent_lost:2})==='warn'&&v({recent_min:10,recent_lost:80})==='bad'
       &&v({lost_packets:900})==='bad'&&verdict(Object.assign({},b,{recent_min:10})).why.includes('10 min');}));
+  {await p.click('.tab[data-tab="lat"]');
+   ok('Latencia: por defecto el modo es Manual (slider y botones de margen visibles, ajustes de Auto ocultos)',await p.evaluate(()=>document.querySelector('#plmode [data-m=manual]').getAttribute('aria-pressed')==='true'&&!document.getElementById('plmanual').hidden&&document.getElementById('plauto').hidden));
+   await p.click('#plmode [data-m=auto]');
+   ok('Latencia: al elegir Auto aparecen margen actual, mínimo y tope, y se ocultan los controles manuales',await until(async()=>await p.evaluate(()=>!document.getElementById('plauto').hidden&&document.getElementById('plmanual').hidden&&document.querySelector('#plmode [data-m=auto]').getAttribute('aria-pressed')==='true'&&/\d+ ms/.test(document.getElementById('plcur').textContent)&&+document.getElementById('plmax').value>=+document.getElementById('plfloor').value)));
+   ok('Latencia Auto: muestra los umbrales con sus valores recomendados (8 cortes por minuto, 10 min, 10 ms)',await p.evaluate(()=>['plre','plcm','plst'].map(i=>document.getElementById(i).value).join()==='8,10,10'&&getComputedStyle(document.getElementById('plreset')).display!=='none'));
+   await p.evaluate(()=>{const e=document.getElementById('plre');e.value=20;e.dispatchEvent(new Event('input'));e.dispatchEvent(new Event('change'));});
+   ok('Latencia Auto: cambiar el umbral de cortes se guarda y «Valores recomendados» lo restaura',await until(async()=>(await (await fetch(BASE+'/api/latency')).json()).auto.raise_events===20));
+   await p.click('#plreset');
+   ok('Latencia Auto: «Valores recomendados» vuelve a 8, 10 y 10',await until(async()=>{const a=(await (await fetch(BASE+'/api/latency')).json()).auto;return a.raise_events===8&&a.clean_min===10&&a.step_ms===10;}));
+   ok('Latencia Auto: explica el estado y el efecto de cada cambio',await until(async()=>(await p.textContent('#plautomsg')).includes('Auto activo')&&(await p.textContent('#p_lat')).includes('breve salto')));
+   await p.evaluate(()=>{const e=document.getElementById('plmax');e.value=120;e.dispatchEvent(new Event('input'));e.dispatchEvent(new Event('change'));});
+   ok('Latencia Auto: cambiar el tope se guarda en la Raspberry',await until(async()=>{const j=await (await fetch(BASE+'/api/latency')).json();return j.auto.on&&j.auto.max_ms===120;}));
+   await p.click('#plmode [data-m=manual]');
+   ok('Latencia: volver a Manual restaura los controles manuales',await until(async()=>await p.evaluate(()=>!document.getElementById('plmanual').hidden&&document.getElementById('plauto').hidden)));
+   await fetch(BASE+'/api/playout',{method:'POST',body:JSON.stringify({ms:80})});await p.click('.tab[data-tab="spk"]');}
   ok('Calibrar no se subraya como enlace',await p.evaluate(()=>getComputedStyle(document.getElementById('lcal')).textDecorationLine)==='none');
 
   // ── Plano de la sala: un dibujo por altavoz (canal), con ESP, canal y estado; se mueven uno a uno ──

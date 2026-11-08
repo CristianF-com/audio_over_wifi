@@ -196,6 +196,56 @@ check("CONFIG con playout_delay_us=120000 enviado al ESP", got == 120000, got)
 c, b = http("GET", "/api/status"); check("status refleja 120 ms", json.loads(b)["playout_ms"] == 120)
 http("POST", "/api/playout", {"ms": 80}); ctrl.settimeout(2)
 
+# 8c) Latencia AUTO (el arnés corre con SONOS_AUTO_FAST=1: ventana 2 s, enfriamiento 0,6 s, limpio 3 s, bajar cada 1,5 s)
+lostc = [9, 8, 8]                                      # contadores acumulados que viene mandando el hilo de keepalive
+def bump(dl):
+    global rep
+    lostc[0] += dl
+    rep = struct.pack("<IBBxxqiiiiIIIfI", MAGIC, 4, 0, 1234, 321, 77, 960, -42, lostc[0], lostc[1], lostc[2], 12.5, 9)
+    ctrl.sendto(rep, (RPI_IP, 5005))
+def wait_playout(v, t=3.0):                              # el bucle de control se despierta con paquetes o cada 1 s: se espera con plazo
+    end = time.time() + t
+    while time.time() < end and lat()["playout_ms"] != v: time.sleep(0.05)
+    return lat()
+def lat():
+    c, b = http("GET", "/api/latency"); return json.loads(b)
+c, _ = http("POST", "/api/playout", {"auto": "quizá"}); check("auto con valor inválido -> 400", c == 400, c)
+c, _ = http("POST", "/api/playout", {"auto": True, "max_ms": 500}); check("auto max_ms fuera de rango -> 400", c == 400, c)
+a0 = lat()["auto"]; check("auto: desactivado por defecto", a0["on"] is False and a0["changes"] == 0, a0)
+c, _ = http("POST", "/api/playout", {"auto": True, "max_ms": 110}); check("auto: activar con tope 110 ms", c == 200, c)
+a0 = lat()["auto"]; check("auto: el mínimo es el margen que había (80) y el tope 110", (a0["on"], a0["floor_ms"], a0["max_ms"]) == (True, 80, 110), a0)
+time.sleep(0.5); check("auto: sin cortes el margen no se mueve", lat()["playout_ms"] == 80, lat())
+a0 = lat()["auto"]; check("auto: umbrales por defecto (cada subida 10 ms, baja tras 10 min limpios)", (a0["clean_min"], a0["step_ms"]) == (10, 10) and a0["raise_events"] in (4, 8), a0)
+for bad in ({"raise_events": 0}, {"raise_events": 101}, {"clean_min": 0}, {"clean_min": 121}, {"step_ms": 7}, {"step_ms": 45}, {"step_ms": "x"}):
+    c, _ = http("POST", "/api/playout", dict(bad, auto=True)); check(f"auto: umbral inválido {bad} -> 400", c == 400, c)
+c, _ = http("POST", "/api/playout", {"auto": True, "raise_events": 30, "clean_min": 20, "step_ms": 20}); a0 = lat()["auto"]
+check("auto: se pueden fijar los umbrales (30 cortes, 20 min, paso 20 ms)", c == 200 and (a0["raise_events"], a0["clean_min"], a0["step_ms"]) == (30, 20, 20), a0)
+bump(10); time.sleep(0.7)
+check("auto: con el umbral en 30, 10 cortes no hacen subir el margen", lat()["playout_ms"] == 80, lat())
+time.sleep(2.2)                                       # que caduque la ventana de eventos
+http("POST", "/api/playout", {"auto": True, "raise_events": 4, "clean_min": 10, "step_ms": 10})
+bump(10)
+end = time.time() + 2
+while time.time() < end and lat()["playout_ms"] != 90: time.sleep(0.02)
+l = lat(); check("auto: 10 cortes -> sube 10 ms (90)", (l["playout_ms"], l["auto"]["last_dir"], l["auto"]["changes"]) == (90, 1, 1), l)
+check("auto: el retardo total para el reproductor sigue al margen (90 + extra)", abs(l["total_ms"] - (90 + l["extra_ms"])) < 0.01, l)
+bump(10); time.sleep(0.2)
+check("auto: más cortes dentro del enfriamiento no vuelven a subir", lat()["playout_ms"] == 90, lat())
+bump(10); l = wait_playout(100)
+check("auto: pasado el enfriamiento sube otros 10 ms (100)", l["playout_ms"] == 100, l)
+bump(10); wait_playout(110); bump(10); time.sleep(1.8); bump(10); time.sleep(1.8)
+l = lat(); check("auto: no pasa del tope (110)", l["playout_ms"] == 110, l)
+c, b = http("GET", "/api/status"); check("status refleja el margen subido por Auto", json.loads(b)["playout_ms"] == 110)
+time.sleep(6.5); l = lat()
+check("auto: tras un rato limpio baja despacio hacia el mínimo (nunca por debajo de 80)", 80 <= l["playout_ms"] < 110 and l["auto"]["last_dir"] == -1, l)
+c, _ = http("POST", "/api/playout", {"ms": 100}); l = lat()
+check("auto: un ajuste manual pasa a ser el nuevo mínimo y el margen", (l["playout_ms"], l["auto"]["floor_ms"]) == (100, 100), l)
+c, _ = http("POST", "/api/playout", {"auto": False}); l = lat()
+check("auto: al desactivar vuelve el modo manual y el margen se queda donde estaba", (l["auto"]["on"], l["playout_ms"]) == (False, 100), l)
+bump(30); time.sleep(0.8)
+check("manual: con Auto apagado los cortes no tocan el margen", lat()["playout_ms"] == 100, lat())
+http("POST", "/api/playout", {"ms": 80}); ctrl.settimeout(2)
+
 # 9) CALIBRACIÓN extremo a extremo: sin nodos habilitados -> 409; luego chirps con temporización exacta
 c, b = http("POST", "/api/cal/start", {}); check("cal/start sin nodos habilitados -> 409", c == 409, c)
 http("POST", "/api/node", {"id": 0, "enabled": True, "ch_left": 0, "ch_right": 1, "volume_l": 255, "volume_r": 255})

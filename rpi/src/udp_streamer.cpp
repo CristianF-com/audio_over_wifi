@@ -36,8 +36,82 @@ UdpStreamer::UdpStreamer() {
         tx_[i].pkt.num_samples = AUDIO_PKT_SAMPLES;
         hist_[i].resize(TX_HISTORY_PACKETS);
     }
+    if (const char* f = getenv("SONOS_AUTO_FAST"); f && *f == '1') {      // solo pruebas: tiempos en décimas de segundo
+        auto_fast_ = true; auto_tick_us_ = 100000; auto_window_us_ = 2000000; auto_cool_us_ = 600000;
+        auto_raise_events_.store(4);
+    }
 }
 UdpStreamer::~UdpStreamer() { shutdown(); }
+
+// ─── Latencia AUTO ───────────────────────────────────────────────────────────
+UdpStreamer::AutoPlayout UdpStreamer::autoPlayout() const {
+    AutoPlayout a{};
+    a.on = auto_on_.load(); a.floor_us = auto_floor_us_.load(); a.max_us = auto_max_us_.load(); a.changes = auto_changes_.load();
+    uint64_t t = auto_last_change_us_.load();
+    a.last_change_ago_ms = t ? (int64_t)((mono_us() - t) / 1000) : -1;
+    a.last_dir = auto_last_dir_.load(); a.recent_events = auto_recent_.load();
+    a.raise_events = auto_raise_events_.load(); a.clean_min = auto_clean_min_.load(); a.step_us = auto_step_us_.load();
+    return a;
+}
+bool UdpStreamer::setAutoPlayout(bool on, int64_t max_us) {
+    if (max_us >= 0) {
+        if (max_us < PLAYOUT_MIN_US || max_us > PLAYOUT_MAX_US) return false;
+        auto_max_us_.store((uint32_t)max_us);
+    }
+    if (on && !auto_on_.load()) auto_floor_us_.store(playout_us_.load());       // el valor actual es el mínimo
+    if (on && auto_max_us_.load() < auto_floor_us_.load()) auto_max_us_.store(auto_floor_us_.load());
+    auto_on_.store(on);
+    { std::lock_guard<std::mutex> lk(auto_mtx_); auto_win_.clear(); }
+    { std::lock_guard<std::mutex> lk(nodes_mtx_); for (auto& n : nodes_) n.auto_events = 0; }
+    dirty_.store(true);
+    fprintf(stderr, "[Auto] latencia automática %s (mínimo %u ms, tope %u ms)\n", on ? "activada" : "desactivada", auto_floor_us_.load() / 1000, auto_max_us_.load() / 1000);
+    return true;
+}
+bool UdpStreamer::setPlayoutManual(uint32_t us) {
+    if (!setPlayoutUs(us)) return false;
+    if (auto_on_.load()) {
+        auto_floor_us_.store(us);
+        if (auto_max_us_.load() < us) auto_max_us_.store(us);
+        std::lock_guard<std::mutex> lk(auto_mtx_); auto_win_.clear();
+    }
+    return true;
+}
+bool UdpStreamer::setAutoThresholds(int raise_events, int clean_min, int step_ms) {
+    if ((raise_events != -1 && (raise_events < 1 || raise_events > 100)) || (clean_min != -1 && (clean_min < 1 || clean_min > 120)) ||
+        (step_ms != -1 && (step_ms < 5 || step_ms > 40 || step_ms % 5))) return false;
+    if (raise_events != -1) auto_raise_events_.store((uint32_t)raise_events);
+    if (clean_min != -1)    auto_clean_min_.store((uint32_t)clean_min);
+    if (step_ms != -1)      auto_step_us_.store((uint32_t)step_ms * 1000);
+    dirty_.store(true);
+    return true;
+}
+void UdpStreamer::autoTick() {
+    uint64_t now = mono_us();
+    if (now - auto_last_tick_ < auto_tick_us_) return;
+    auto_last_tick_ = now;
+    uint32_t ev = 0, up = 0, down = 0;
+    { std::lock_guard<std::mutex> lk(nodes_mtx_); for (auto& n : nodes_) { ev += n.auto_events; n.auto_events = 0; } }
+    uint32_t sum = 0;
+    {   std::lock_guard<std::mutex> lk(auto_mtx_);
+        if (!auto_on_.load()) { auto_win_.clear(); auto_recent_.store(0); return; }
+        if (ev) { auto_win_.push_back({now, ev}); auto_last_event_us_ = now; }
+        while (!auto_win_.empty() && now - auto_win_.front().first > auto_window_us_) auto_win_.pop_front();
+        for (auto& e : auto_win_) sum += e.second;
+        auto_recent_.store(sum);
+        uint32_t cur = playout_us_.load(), fl = auto_floor_us_.load(), mx = auto_max_us_.load();
+        uint64_t lc = auto_last_change_us_.load(), since = lc ? now - lc : UINT64_MAX;
+        if (sum >= auto_raise_events_.load() && cur < mx && since >= auto_cool_us_) { auto_win_.clear(); auto_recent_.store(0); up = std::min<uint32_t>(cur + auto_step_us_.load(), mx); }
+        else if (cur > fl && now - auto_last_event_us_ >= autoCleanUs() && since >= autoCleanUs() / 2) down = cur - 5000 < fl ? fl : cur - 5000;
+    }
+    uint32_t cur = playout_us_.load();
+    if (up) {
+        fprintf(stderr, "[Auto] %u cortes en la última ventana: margen %u -> %u ms\n", sum, cur / 1000, up / 1000);
+        if (setPlayoutUs(up)) { auto_last_change_us_.store(now); auto_last_dir_.store(1); auto_changes_.fetch_add(1); }
+    } else if (down) {
+        fprintf(stderr, "[Auto] sin cortes desde hace rato: margen %u -> %u ms\n", cur / 1000, down / 1000);
+        if (setPlayoutUs(down)) { auto_last_change_us_.store(now); auto_last_dir_.store(-1); auto_changes_.fetch_add(1); }
+    }
+}
 
 bool UdpStreamer::init() {
     int yes = 1;
@@ -124,6 +198,7 @@ void UdpStreamer::controlLoop() {
             }
         }
         markOffline();                                 // SIEMPRE, también tras timeout
+        autoTick();
         if (dirty_.load() && !cfg_path_.empty() && mono_us() - last_save_us_ > 1000000ULL) {
             dirty_.store(false); last_save_us_ = mono_us(); saveConfig();
         }
@@ -234,6 +309,7 @@ void UdpStreamer::handleReport(const uint8_t* b, int n, const sockaddr_in& src) 
         auto delta = [](uint32_t now, uint32_t prev) { return now >= prev ? now - prev : now; };
         uint32_t dl = nd.cnt_init ? delta(r.lost_packets, nd.cnt_lost) : 0, dt = nd.cnt_init ? delta(r.late_packets, nd.cnt_late) : 0,
                  du = nd.cnt_init ? delta(r.underruns, nd.cnt_under) : 0;
+        nd.auto_events += dl + dt + du;
         nd.cnt_init = true; nd.cnt_lost = r.lost_packets; nd.cnt_late = r.late_packets; nd.cnt_under = r.underruns;
         if (dl || dt || du) {
             uint64_t m = mono_us() / 60000000ULL + 1; int k = (int)(m % ESPNode::RECENT_MIN);
@@ -791,6 +867,8 @@ bool UdpStreamer::saveConfig() {
             master_vol_.load(), playout_us_.load(), layout_.load(), xover_hz_.load(), lipsync_extra_ms_.load(),
             xover_on_.load() ? 1 : 0, eq_on_.load() ? 1 : 0);
     fprintf(f, "dsp_night=%d\ndsp_lfe=%d\nlfe_db=%.1f\n", night_.load(), lfe_front_.load() ? 1 : 0, lfe_db_.load());
+    fprintf(f, "playout_auto=%d\nplayout_floor_us=%u\nplayout_max_us=%u\n", auto_on_.load() ? 1 : 0, auto_floor_us_.load(), auto_max_us_.load());
+    fprintf(f, "auto_raise_events=%u\nauto_clean_min=%u\nauto_step_ms=%u\n", auto_raise_events_.load(), auto_clean_min_.load(), auto_step_us_.load() / 1000);
     for (const auto& n : nodes)
         fprintf(f, "node%d.ch_left=%d\nnode%d.ch_right=%d\nnode%d.volume_l=%d\nnode%d.volume_r=%d\n"
                    "node%d.enabled=%d\nnode%d.mono=%d\nnode%d.latency_offset_us=%d\n",
@@ -832,6 +910,12 @@ bool UdpStreamer::loadConfig() {
         if (!strcmp(key, "lfe_db"))        { if (dv >= -12 && dv <= 10) { lfe_db_.store((float)dv); applied++; } continue; }
         if (!strcmp(key, "xover_hz"))      { if (dv >= XOVER_MIN_HZ && dv <= XOVER_MAX_HZ) { xover_hz_.store((float)dv); applied++; } continue; }
         if (!strcmp(key, "lipsync_extra_ms")) { if (dv >= -50 && dv <= 200 && dv == (int)dv) { lipsync_extra_ms_.store((int)dv); applied++; } continue; }
+        if (!strcmp(key, "auto_raise_events")) { if (dv >= 1 && dv <= 100 && dv == (int)dv) { auto_raise_events_.store((uint32_t)dv); applied++; } continue; }
+        if (!strcmp(key, "auto_clean_min")) { if (dv >= 1 && dv <= 120 && dv == (int)dv) { auto_clean_min_.store((uint32_t)dv); applied++; } continue; }
+        if (!strcmp(key, "auto_step_ms"))  { if (dv >= 5 && dv <= 40 && dv == (int)dv && (int)dv % 5 == 0) { auto_step_us_.store((uint32_t)dv * 1000); applied++; } continue; }
+        if (!strcmp(key, "playout_auto"))  { auto_on_.store(dv != 0); applied++; continue; }
+        if (!strcmp(key, "playout_floor_us")) { if (dv >= PLAYOUT_MIN_US && dv <= PLAYOUT_MAX_US) { auto_floor_us_.store((uint32_t)dv); applied++; } continue; }
+        if (!strcmp(key, "playout_max_us")) { if (dv >= PLAYOUT_MIN_US && dv <= PLAYOUT_MAX_US) { auto_max_us_.store((uint32_t)dv); applied++; } continue; }
         if (!strcmp(key, "playout_us"))    { if (dv >= PLAYOUT_MIN_US && dv <= PLAYOUT_MAX_US) { playout_us_.store((uint32_t)dv); applied++; } continue; }
         int id = -1; char field[32] = {0};
         if (sscanf(key, "node%d.%31s", &id, field) != 2 || id < 0 || id >= MAX_NODES) continue;
