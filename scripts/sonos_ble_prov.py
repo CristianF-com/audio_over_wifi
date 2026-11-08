@@ -190,8 +190,13 @@ async def ensure_paired(c, ag):
 def _with_pair_error(e, perr):
     return "%s (%s)" % (e, perr) if perr else str(e)
 
+_NOMBRES = {C_SSID: "SSID", C_PASS: "contraseña", C_ID: "ID", C_CMD: "comando", C_RPI: "IP de la Raspberry"}
+
 async def write(c, uuid, data):
-    await c.write_gatt_char(uuid, data, response=True)
+    try:
+        await c.write_gatt_char(uuid, data, response=True)
+    except Exception as e:                            # dice qué campo rechazó el ESP (p. ej. ATT 0x13 = valor no permitido)
+        raise RuntimeError("%s [al escribir %s]" % (e, _NOMBRES.get(uuid, uuid))) from e
 
 async def provision(req):
     bleak = import_bleak()

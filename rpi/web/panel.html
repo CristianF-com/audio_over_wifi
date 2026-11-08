@@ -18,6 +18,24 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 .mv svg{width:20px;height:20px;flex:none;color:var(--mut)}
 .mv .rng{flex:1}.mv b{min-width:42px;text-align:right;font-weight:600}
 .links{display:flex;gap:6px}
+#more{display:none;min-width:44px;min-height:44px;justify-content:center;padding:0 10px}#more svg{width:20px;height:20px}
+details.help{margin:8px 0}details.help>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;color:var(--mut);font-size:.9rem}
+details.help>summary:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+details.adv>.advbody{display:grid;gap:14px;padding-top:6px}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin:8px 0}
+.vcard{background:var(--raise);border:1px solid var(--line);border-radius:var(--r-card,0);padding:12px 14px;display:grid;gap:4px;text-align:left;color:var(--fg);font:inherit;min-height:44px;cursor:pointer}
+.vcard b{display:flex;align-items:center;gap:8px}.vcard .why{color:var(--mut);font-size:.88rem}
+.vcard.v-ok{border-left:4px solid var(--ok)}.vcard.v-warn{border-left:4px solid var(--warn)}.vcard.v-bad{border-left:4px solid var(--bad)}
+.vcard .vt{margin-left:auto;font-weight:600}
+.wiz{background:var(--panel);border:1px solid var(--line2);border-radius:var(--r-card,0);padding:16px;margin:0 0 14px;display:grid;gap:10px}
+.wiz h2{font-size:1.1rem}.wiz ol{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+.wiz li{display:flex;align-items:center;gap:10px;min-height:44px}.wiz li .n{flex:none;width:28px;height:28px;display:grid;place-items:center;border:1px solid var(--ctl);font-weight:600}
+.wiz li.done .n{background:var(--ac-bg);border-color:var(--ac)}.wiz li.done span.t{color:var(--mut);text-decoration:line-through}
+.wiz .acts{display:flex;gap:8px;flex-wrap:wrap}
+@media (min-width:1100px) and (min-height:620px){
+  body.has-dock main{padding-right:452px}
+  .drawer.on{box-shadow:none;top:64px}
+}
 .links .btn{display:inline-flex;align-items:center;gap:6px}.links .ic{display:none;width:20px;height:20px;flex:none}
 #st{min-width:0}#hs{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tabs{display:inline-flex;gap:4px;overflow-x:auto;margin:6px 0 20px;padding:4px;background:var(--code-bg);border:1px solid var(--line);border-radius:999px;scrollbar-width:none;max-width:100%}
@@ -198,7 +216,14 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   .top{position:static}                                /* la navegación ya va en la barra inferior: la cabecera no ocupa pantalla fija */
   .top .in{padding:8px 12px;gap:8px}
   .mv{order:5;flex:1 1 100%;margin-left:0}
-  .links{margin-left:auto}
+  #more{display:inline-flex;margin-left:auto}
+  #st{flex:1 1 0;min-width:0}#st #hs{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .top .in{flex-wrap:wrap}
+  .links .themebtn .tl{display:inline}
+  .brand{flex:none}
+  .links{display:none;position:absolute;right:12px;top:100%;z-index:45;flex-direction:column;align-items:stretch;background:var(--panel);border:1px solid var(--line2);padding:8px;min-width:200px;box-shadow:0 14px 34px -14px rgba(0,0,0,.6)}
+  .links.open{display:flex}.links .btn{justify-content:flex-start;min-height:44px}
+  .top .in{position:relative}
   .room{aspect-ratio:9/16;min-height:640px;--hw:60px;--ht:78px;--hb:70px}
   .spk{min-width:90px}.cab{width:40px;height:54px}.spk.sub .cab{width:48px;height:48px}.spk .ch{font-size:.92rem}.spk .cap{font-size:.66rem;padding:1px 4px}.spk .cal{font-size:.7rem;padding:1px 5px}
   .tiles,.cards{grid-template-columns:1fr}
@@ -220,8 +245,9 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   .brand{flex:none}
   .mv{order:0;flex:1 1 120px;min-width:96px;margin-left:auto}
   .links{margin-left:0;flex:none}
+  #more{display:none}
   .links .btn{min-width:44px;min-height:44px;justify-content:center;padding-left:10px;padding-right:10px}
-  .links .ic{display:block}.links .tl,.themebtn .tl{display:none}
+  .links .ic{display:block}.links .tl,.links .themebtn .tl,.themebtn .tl{display:none}
   main{padding:12px 12px calc(16px + env(safe-area-inset-bottom))}
   .toasts{bottom:calc(12px + env(safe-area-inset-bottom))}
   .room{aspect-ratio:16/9;min-height:300px}
@@ -269,7 +295,8 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
     <input class="rng" id="mvs" type="range" min="0" max="100" value="100" aria-label="Volumen maestro"><b id="mvd">100%</b>
   </div>
-  <div class="links"><button class="btn ghost sm themebtn" data-theme-btn type="button"></button><a class="btn ghost sm" id="lcal" href="#" aria-label="Calibrar" title="Calibrar"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h3l2-6 4 12 2-6h5"/></svg><span class="tl">Calibrar</span></a><button class="btn ghost sm" id="lble" aria-label="Añadir altavoces" title="Añadir altavoces"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="tl">Añadir altavoces</span></button></div>
+  <button class="btn ghost sm" id="more" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="links" aria-label="Más acciones" title="Más acciones"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
+  <div class="links" id="links"><button class="btn ghost sm themebtn" data-theme-btn type="button"></button><a class="btn ghost sm" id="lcal" href="#" aria-label="Calibrar" title="Calibrar"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h3l2-6 4 12 2-6h5"/></svg><span class="tl">Calibrar</span></a><button class="btn ghost sm" id="lble" aria-label="Añadir altavoces" title="Añadir altavoces"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="tl">Añadir altavoces</span></button></div>
 </div></div>
 
 <main>
@@ -277,10 +304,11 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   <button class="tab" role="tab" id="tab_spk" aria-controls="p_spk" data-tab="spk" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg><span>Altavoces</span></button>
   <button class="tab" role="tab" id="tab_snd" aria-controls="p_snd" data-tab="snd" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4v5M6 13v7M12 4v9M12 17v3M18 4v3M18 11v9"/><circle cx="6" cy="11" r="2"/><circle cx="12" cy="15" r="2"/><circle cx="18" cy="9" r="2"/></svg><span>Sonido</span></button>
   <button class="tab" role="tab" id="tab_lat" aria-controls="p_lat" data-tab="lat" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span>Latencia</span></button>
-  <button class="tab" role="tab" id="tab_log" aria-controls="p_log" data-tab="log" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9"/></svg><span>Registro</span></button>
+  <button class="tab" role="tab" id="tab_sys" aria-controls="p_sys" data-tab="sys" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg><span>Sistema</span></button>
 </div>
 
 <section class="pane" id="p_spk" role="tabpanel" aria-labelledby="tab_spk">
+  <div class="wiz" id="wiz" hidden></div>
   <div class="head"><h1>Tu sala</h1><span class="chip" id="onl">—</span>
 </div>
   <div class="procbar" id="procbar" hidden><span id="proctxt">Procesado activo</span>
@@ -288,7 +316,7 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   <div class="meters" id="meters" role="group" aria-label="Niveles de entrada por canal">
     <div class="mh"><b>Entrada</b><span class="hint" id="mtxt">Esperando datos…</span></div>
     <div class="mb" id="mb"></div>
-    <div class="ms">Cada cuadrado es un canal: vacío = sin cable ni señal (por debajo de −70 dBFS); verde fijo = cable conectado pero sin sonido (de −70 a −40); con sonido (por encima de −40) destella en rojo cada vez que el nivel sube unos 3 dB y se apaga al bajar. El número es su nivel en dBFS. El vúmetro de cada altavoz del plano marca de −60 a 0 dBFS: verde hasta −20, amarillo hasta −10 y rojo por encima; el segmento suelto es el pico reciente.</div>
+    <details class="help ms"><summary>¿Cómo leer los cuadrados?</summary><p>Cada cuadrado es un canal: vacío = sin cable ni señal (por debajo de −70 dBFS); verde fijo = cable conectado pero sin sonido (de −70 a −40); con sonido (por encima de −40) destella en rojo cada vez que el nivel sube unos 3 dB y se apaga al bajar. El número es su nivel en dBFS. El vúmetro de cada altavoz del plano marca de −60 a 0 dBFS: verde hasta −20, amarillo hasta −10 y rojo por encima; el segmento suelto es el pico reciente.</p></details>
   </div>
   <div class="roombar"><span class="hint" id="mhint">Toca un altavoz para ajustarlo. Los cambios se guardan solos.</span>
     <button class="btn ghost sm" id="mreset" hidden>Restablecer posiciones</button>
@@ -304,24 +332,23 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
       <button type="button" id="zin" aria-label="Acercar el plano">+</button>
     </div>
   </div>
-  <div class="legend"><span>Cada altavoz muestra su canal, el ESP que lo maneja, su estado y, debajo, su volumen y retardo de calibración</span><span>Los graves (subwoofer) se dibujan como caja cuadrada</span><span>Zoom: pellizca o usa + y −; con zoom, arrastra el fondo para moverte. Al acercar, los altavoces no crecen; al alejar, se achican para despejar el plano</span></div>
+  <details class="help legend"><summary>Ayuda del plano</summary><span>Cada altavoz muestra su canal, el ESP que lo maneja, su estado y, debajo, su volumen y retardo de calibración</span><span>Los graves (subwoofer) se dibujan como caja cuadrada</span><span>Zoom: pellizca o usa + y −; con zoom, arrastra el fondo para moverte. Al acercar, los altavoces no crecen; al alejar, se achican para despejar el plano</span></details>
   <div class="chips" id="chips"></div>
 </section>
 
 <section class="pane" id="p_snd" role="tabpanel" aria-labelledby="tab_snd" hidden>
   <div class="head"><h1>Sonido</h1></div>
   <div class="sbwrap"><div class="subtabs" id="snd_sub" role="tablist" aria-label="Apartados de Sonido">
-    <button class="sub" role="tab" id="sb_mode" aria-controls="sp_mode" data-sub="mode" aria-selected="true">Modo</button>
+    <button class="sub" role="tab" id="sb_pf" aria-controls="sp_pf" data-sub="pf" aria-selected="true">Perfiles</button>
+    <button class="sub" role="tab" id="sb_mode" aria-controls="sp_mode" data-sub="mode" aria-selected="false" tabindex="-1">Modo</button>
     <button class="sub" role="tab" id="sb_mix" aria-controls="sp_mix" data-sub="mix" aria-selected="false" tabindex="-1">Mezcla</button>
-    <button class="sub" role="tab" id="sb_pf" aria-controls="sp_pf" data-sub="pf" aria-selected="false" tabindex="-1">Perfiles</button>
-    <button class="sub" role="tab" id="sb_in" aria-controls="sp_in" data-sub="in" aria-selected="false" tabindex="-1">Entradas</button>
   </div><button class="sbm l" type="button" tabindex="-1" aria-hidden="true" data-dir="-1">‹</button><button class="sbm r" type="button" tabindex="-1" aria-hidden="true" data-dir="1">›</button></div>
 
-  <div class="subpane" id="sp_mode" role="tabpanel" aria-labelledby="sb_mode">
+  <div class="subpane" id="sp_mode" role="tabpanel" aria-labelledby="sb_mode" hidden>
     <div class="flow" id="flow"></div>
     <div class="seg block modeseg" id="modeseg" role="radiogroup" aria-label="Modo de audio">
-      <button id="t_pass" role="radio" aria-checked="false" aria-pressed="false"><b>Pass-through</b><span>Sin procesar</span></button>
-      <button id="t_proc" role="radio" aria-checked="false" aria-pressed="false"><b>Procesado</b><span>Crossover y EQ</span></button>
+      <button id="t_pass" role="radio" aria-checked="false" aria-pressed="false"><b>Directo</b><span>Sin procesar</span></button>
+      <button id="t_proc" role="radio" aria-checked="false" aria-pressed="false"><b>Procesado</b><span>Graves y ecualizador</span></button>
     </div>
     <p class="modedesc" id="modedesc"></p>
     <div class="cards" id="mode_pass">
@@ -362,22 +389,13 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
         </div>
     </div>
   </div>
-  <div class="subpane" id="sp_pf" role="tabpanel" aria-labelledby="sb_pf" hidden>
+  <div class="subpane" id="sp_pf" role="tabpanel" aria-labelledby="sb_pf">
     <div class="cards">
     <div class="card" id="c_pf">
           <div><b>Perfiles</b><span class="hint">Guardan volumen, procesado, modo noche, EQ, retardos y volumen de cada altavoz</span></div>
           <div id="pflist" class="pflist"></div>
           <div class="fld"><label for="pfname">Guardar el ajuste actual como</label>
             <div class="pfnew"><input class="txt" id="pfname" type="text" maxlength="24" placeholder="Cine, Música, Noche…" autocomplete="off"><button class="btn sm" id="pfsave" type="button">Guardar perfil</button></div></div>
-        </div>
-    </div>
-  </div>
-  <div class="subpane" id="sp_in" role="tabpanel" aria-labelledby="sb_in" hidden>
-    <div class="cards">
-    <div class="card" id="c_names">
-          <div><b>Nombres de las entradas</b><span class="hint">Los 10 canales de audio que llegan por la entrada. El nombre se ve en el plano, en los indicadores y al elegir qué canal toma cada altavoz (hasta 12 caracteres)</span></div>
-          <div class="nmgrid" id="nmgrid"></div>
-          <div class="nmbtns"><button class="btn sm" id="nmsave" type="button">Guardar nombres</button><button class="btn sm" id="nmreset" type="button">Restablecer</button></div>
         </div>
     </div>
   </div>
@@ -388,10 +406,10 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   <div class="cards">
     <div class="card">
       <div><div class="lbl">Retardo total del sistema</div><div class="big" id="bigtot">—<small>ms</small></div></div>
-      <div class="fld"><div class="top2"><label for="pls">Colchón de red</label><b id="pld">80 ms</b></div>
+      <div class="fld"><div class="top2"><label for="pls">Margen de seguridad de red</label><b id="pld">80 ms</b></div>
         <input class="rng" id="pls" type="range" min="40" max="200" step="5" value="80"></div>
       <div class="seg block" id="plseg"><button data-pl="40" aria-pressed="false">40 baja</button><button data-pl="60" aria-pressed="false">60</button><button data-pl="80" aria-pressed="false">80 normal</button><button data-pl="120" aria-pressed="false">120 segura</button></div>
-      <p>Menos colchón significa menos retardo y más riesgo de cortes. Si ves «tarde» o «perd» subir en la tabla, súbelo.</p>
+      <p>Menos margen significa menos retardo y más riesgo de cortes. Si un altavoz aparece como «Inestable» o «Con cortes» en Sistema, súbelo.</p>
     </div>
     <div class="card">
       <div><div class="lbl">Sincronizar con la imagen</div><div class="big" id="bigad">—<small>ms</small></div></div>
@@ -409,9 +427,33 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
       <p id="disth"></p>
     </div>
   </div>
-  <h2 style="margin:22px 0 10px">Estado de la red por altavoz</h2>
+
+</section>
+
+<section class="pane" id="p_sys" role="tabpanel" aria-labelledby="tab_sys" hidden>
+  <div class="head"><h1>Sistema</h1></div>
+  <div class="sbwrap"><div class="subtabs" id="sys_sub" role="tablist" aria-label="Apartados de Sistema">
+    <button class="sub" role="tab" id="sy_net" aria-controls="sp_net" data-sub="net" aria-selected="true">Red</button>
+    <button class="sub" role="tab" id="sy_in" aria-controls="sp_sin" data-sub="in" aria-selected="false" tabindex="-1">Entradas</button>
+    <button class="sub" role="tab" id="sy_fw" aria-controls="sp_fw" data-sub="fw" aria-selected="false" tabindex="-1">Firmware</button>
+    <button class="sub" role="tab" id="sy_log" aria-controls="sp_log" data-sub="log" aria-selected="false" tabindex="-1">Registro</button>
+  </div><button class="sbm l" type="button" tabindex="-1" aria-hidden="true" data-dir="-1">‹</button><button class="sbm r" type="button" tabindex="-1" aria-hidden="true" data-dir="1">›</button></div>
+  <div class="subpane" id="sp_net" role="tabpanel" aria-labelledby="sy_net">
+    <p class="hint" style="margin:0 0 12px">Cómo llega el audio a cada altavoz. Se valora con lo que ocurrió en el último minuto.</p>
+    <div class="vgrid" id="hverd"></div>
+    <details class="help" id="hdet"><summary>Ver todos los números</summary>
   <div class="tw"><table><thead><tr><th>Altavoz</th><th>RTT</th><th>Jitter</th><th>Perdidos</th><th>Recuperados</th><th>Tarde</th><th>Vacíos</th><th>Sync</th><th>Búfer</th><th>WiFi</th><th>Firmware</th></tr></thead><tbody id="health"></tbody></table></div>
-  <div class="cards" style="margin-top:14px">
+      <p class="hint" style="margin-top:8px">Perdidos: paquetes que no llegaron. Tarde: llegaron fuera de plazo y se descartaron. Vacíos: tramos sin audio. Búfer: cuánto margen tiene el altavoz.</p>
+    </details>
+  </div>
+  <div class="subpane" id="sp_sin" role="tabpanel" aria-labelledby="sy_in" hidden><div class="cards">
+    <div class="card" id="c_names">
+          <div><b>Nombres de las entradas</b><span class="hint">Los 10 canales de audio que llegan por la entrada. El nombre se ve en el plano, en los indicadores y al elegir qué canal toma cada altavoz (hasta 12 caracteres)</span></div>
+          <div class="nmgrid" id="nmgrid"></div>
+          <div class="nmbtns"><button class="btn sm" id="nmsave" type="button">Guardar nombres</button><button class="btn sm" id="nmreset" type="button">Restablecer</button></div>
+        </div>
+  </div></div>
+  <div class="subpane" id="sp_fw" role="tabpanel" aria-labelledby="sy_fw" hidden><div class="cards">
     <div class="card" id="c_fw">
       <div><b>Actualizar firmware por WiFi</b><span class="hint">Sube el archivo <code>receiver.bin</code> compilado y mándalo a cada altavoz sin cables</span></div>
       <p class="fwwarn" id="fwwarn">Función sin probar en hardware real. La primera vez que pongas este firmware, flashea el altavoz por cable: hace falta la tabla de particiones con dos copias. Después ya se actualiza por WiFi y, si el nuevo no arranca, vuelve solo al anterior.</p>
@@ -420,12 +462,11 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
       <p id="fwinfo">Todavía no hay ningún firmware cargado.</p>
       <div class="pflist" id="fwlist"></div>
     </div>
+  </div></div>
+  <div class="subpane" id="sp_log" role="tabpanel" aria-labelledby="sy_log" hidden>
+    <div class="head"><h2 style="margin:0">Registro</h2><button class="btn ghost sm" id="logclr">Limpiar</button></div>
+    <div class="log" id="lb" role="log"></div>
   </div>
-</section>
-
-<section class="pane" id="p_log" role="tabpanel" aria-labelledby="tab_log" hidden>
-  <div class="head"><h1>Registro</h1><button class="btn ghost sm" id="logclr">Limpiar</button></div>
-  <div class="log" id="lb" role="log"></div>
 </section>
 </main>
 
@@ -466,8 +507,8 @@ function setSw(el,on){el.setAttribute('aria-checked',on?'true':'false');}
 
 /* Pestañas */
 function showTab(t){document.querySelectorAll('.tab').forEach(b=>{const on=b.dataset.tab===t;b.setAttribute('aria-selected',on);b.tabIndex=on?0:-1;});
-  ['spk','snd','lat','log'].forEach(k=>$('p_'+k).hidden=(k!==t));
-  try{history.replaceState(null,'','#'+t);}catch(e){}if(t==='lat')updLat();if(t==='snd')document.querySelectorAll('.sbwrap').forEach(subHint);}
+  ['spk','snd','lat','sys'].forEach(k=>$('p_'+k).hidden=(k!==t));
+  try{history.replaceState(null,'','#'+t);}catch(e){}if(t==='lat')updLat();if(t==='snd'||t==='sys')document.querySelectorAll('.sbwrap').forEach(subHint);}
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 document.querySelector('.tabs').addEventListener('keydown',e=>{               // flechas, Inicio y Fin como en cualquier barra de pestañas
   if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(e.key))return;
@@ -475,13 +516,20 @@ document.querySelector('.tabs').addEventListener('keydown',e=>{               //
   i=e.key==='Home'?0:e.key==='End'?tabs.length-1:(i+(e.key==='ArrowRight'||e.key==='ArrowDown'?1:-1)+tabs.length)%tabs.length;
   e.preventDefault();tabs[i].focus();showTab(tabs[i].dataset.tab);});
 
+/* Menú «⋯» de la cabecera en móvil vertical */
+(function(){const b=$('more'),l=$('links');if(!b||!l)return;
+  const set=o=>{l.classList.toggle('open',o);b.setAttribute('aria-expanded',o);};
+  b.onclick=e=>{e.stopPropagation();set(!l.classList.contains('open'));};
+  document.addEventListener('click',e=>{if(!l.contains(e.target)&&e.target!==b)set(false);});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&l.classList.contains('open')){set(false);b.focus();}});})();
 /* Hojas (cajón del altavoz y Bluetooth): modales de verdad. El resto de la página queda inerte (teclado y lector de pantalla),
    el foco entra en la hoja y vuelve a donde estaba al cerrarla; en el móvil se cierran deslizando hacia abajo. */
 let lastFocus=null;
 const lockBehind=on=>[document.querySelector('.top'),document.querySelector('main')].forEach(e=>{if(e)e.inert=on;});
-function sheetOpen(el){if(!lastFocus)lastFocus=document.activeElement;
+const isDock=()=>window.matchMedia('(min-width:1100px) and (min-height:620px)').matches;
+function sheetOpen(el){if(el.id==='drawer'&&isDock()){el.inert=false;return;}if(!lastFocus)lastFocus=document.activeElement;
   el.inert=false;lockBehind(true);requestAnimationFrame(()=>{const f=el.querySelector('.x');if(f)f.focus();});}
-function sheetClose(el){el.inert=true;if(document.querySelector('.drawer.on'))return;lockBehind(false);
+function sheetClose(el){el.inert=true;if(el.id==='drawer'&&isDock())return;if(document.querySelector('.drawer.on'))return;lockBehind(false);
   const f=lastFocus;lastFocus=null;if(!f)return;
   const t=f.isConnected?f:(f.dataset&&f.dataset.id!==undefined?document.querySelector('.spk[data-id="'+f.dataset.id+'"]'):null);
   if(t&&t.focus)t.focus();}
@@ -539,6 +587,7 @@ function unitPos(u){
   return POS[u.ch]||[50,50];
 }
 const fmtMs=us=>{const v=Math.round((us||0)/100)/10;return(v<0?'−':'')+Math.abs(v).toFixed(1).replace('.',',')+' ms';};
+const spkName=n=>n.name||('ESP '+n.id);
 function nodeLabel(n){return n.mono||n.ch_left===n.ch_right?CH[n.ch_left]:CH[n.ch_left]+' + '+CH[n.ch_right];}
 /* Zoom del plano: se escala la distancia entre cosas (y los anillos de metros), nunca el tamaño de los altavoces ni de «Escucha».
    El punto fijo del zoom es quien escucha; las posiciones guardadas siguen en % de la sala a 100 %. */
@@ -645,14 +694,14 @@ function drawRoom(){
       if(!hasPos(n,u.side)){const k=Math.round(x)+','+Math.round(y);used[k]=(used[k]||0)+1;x+=(used[k]-1)*7;y+=(used[k]-1)*9;}
       const nm=CH[u.ch],sub=n.role===2,live=n.enabled&&n.online,state=!n.enabled?'Desactivado':n.online?'En línea':'Sin conexión';
       h+='<button class="spk'+(sub?' sub':'')+(live?'':' off')+'" data-id="'+n.id+'" data-side="'+u.side+'" aria-expanded="'+(openId===n.id)+'" data-x="'+x+'" data-y="'+y+'" '+
-        'aria-label="Altavoz '+nm+' ('+CHN[u.ch]+'), ESP '+n.id+', '+state.toLowerCase()+', volumen '+pct(u.side?n.volume_r:n.volume_l)+' %, retardo '+fmtMs(n.latency_offset_us)+(editRoom?'. Mover con las flechas del teclado':'. Pulsa para ajustarlo')+'">'+
+        'aria-label="Altavoz '+nm+' ('+CHN[u.ch]+'), '+spkName(n)+', '+state.toLowerCase()+', volumen '+pct(u.side?n.volume_r:n.volume_l)+' %, retardo '+fmtMs(n.latency_offset_us)+(editRoom?'. Mover con las flechas del teclado':'. Pulsa para ajustarlo')+'">'+
         '<span class="cab">'+spkSvg(sub)+'<i class="st'+(live?' on':'')+'"></i>'+vuHtml(u.ch)+'</span>'+
-        '<b class="ch">'+nm+'</b><span class="cap"><i class="dot '+(live?'ok':'bad')+'"></i>ESP '+n.id+' · '+state+'</span>'+
+        '<b class="ch">'+nm+'</b><span class="cap"><i class="dot '+(live?'ok':'bad')+'"></i>'+esc(spkName(n))+' · '+state+'</span>'+
         '<span class="cal" title="Volumen · retardo de este altavoz (los de la calibración)">'+pct(u.side?n.volume_r:n.volume_l)+'% <i>·</i> '+fmtMs(n.latency_offset_us)+'</span></button>';
     });
   });
   $('spks').innerHTML=h||'<div class="empty" style="position:absolute;inset:0;display:grid;place-items:center">Aún no hay altavoces. Enciende un ESP32 o añádelo con «Añadir altavoz».</div>';
-  $('chips').innerHTML=vis.map(n=>'<button data-id="'+n.id+'" aria-expanded="'+(openId===n.id)+'"><i class="dot '+(n.online?'ok':'bad')+'"></i>ESP '+n.id+' · '+nodeLabel(n)+(n.enabled?'':' · apagado')+'</button>').join('');
+  $('chips').innerHTML=vis.map(n=>'<button data-id="'+n.id+'" aria-expanded="'+(openId===n.id)+'"><i class="dot '+(n.online?'ok':'bad')+'"></i>'+esc(spkName(n))+' · '+nodeLabel(n)+(n.enabled?'':' · apagado')+'</button>').join('');
   placeAll();collectVus();
   if(fk){const f=unitEl(+fk[0],+fk[1]);if(f)f.focus({preventScroll:true});}
   document.querySelectorAll('#spks .spk,#chips button').forEach(b=>b.onclick=()=>{if(editRoom&&b.classList.contains('spk'))return;openDrawer(+b.dataset.id);});
@@ -712,16 +761,17 @@ $('spks').addEventListener('keydown',e=>{
 });
 
 /* Cajón */
-function openDrawer(id){closeBle();openId=id;sig='';buildDrawer();$('drawer').classList.add('on');$('scrim').classList.add('on');$('drawer').setAttribute('aria-hidden','false');sheetOpen($('drawer'));drawRoom();sig='x';loadNodes();}
-function closeDrawer(){const was=openId!==null;openId=null;$('drawer').classList.remove('on');if(!$('bdrawer').classList.contains('on'))$('scrim').classList.remove('on');$('drawer').setAttribute('aria-hidden','true');sig='';drawRoom();sheetClose($('drawer'));}
+function openDrawer(id){closeBle();openId=id;sig='';buildDrawer();$('drawer').classList.add('on');document.body.classList.toggle('has-dock',isDock());if(!isDock())$('scrim').classList.add('on');$('drawer').setAttribute('aria-hidden','false');sheetOpen($('drawer'));drawRoom();sig='x';loadNodes();}
+function closeDrawer(){const was=openId!==null;openId=null;document.body.classList.remove('has-dock');$('drawer').classList.remove('on');if(!$('bdrawer').classList.contains('on'))$('scrim').classList.remove('on');$('drawer').setAttribute('aria-hidden','true');sig='';drawRoom();sheetClose($('drawer'));}
 $('scrim').onclick=()=>{closeDrawer();closeBle();};$('dclose').onclick=closeDrawer;sheetDrag($('drawer'),closeDrawer);
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(openId!==null)closeDrawer();closeBle();}});
 function chOpts(sel){return CH.map((c,i)=>'<option value="'+i+'"'+(i===sel?' selected':'')+'>'+c+' · '+CHN[i]+'</option>').join('');}
 function buildDrawer(){
   const n=find(openId);if(!n)return;
-  $('dtitle').textContent='Altavoz #'+n.id;
+  $('dtitle').textContent=n.name?n.name+' (#'+n.id+')':'Altavoz #'+n.id;
   const eq=n.eq||[];
   $('dbody').innerHTML=
+   '<div class="fld wide"><label for="d_name">Nombre del altavoz</label><input class="txt" id="d_name" type="text" maxlength="12" autocomplete="off" placeholder="Ej.: Frontal, Sofá" value="'+esc(n.name||'')+'"></div>'+
    '<div class="sw"><div><b>Habilitado</b><span class="hint">Si lo apagas, no recibe audio.</span></div><button class="switch" id="d_en" role="switch" aria-checked="'+!!n.enabled+'" aria-label="Habilitado"></button></div>'+
    '<div class="fld"><label>Probar este altavoz</label><div class="toneb" id="d_tone">'+(n.mono?'<button class="btn ghost sm" data-side="2" type="button">Probar</button>':'<button class="btn ghost sm" data-side="0" type="button">Izquierdo</button><button class="btn ghost sm" data-side="1" type="button">Derecho</button><button class="btn ghost sm" data-side="2" type="button">Ambos</button>')+'</div><p class="hint" id="d_toneh" style="margin-top:6px">Suena 3 s a volumen bajo y calla el resto. Pulsa otra vez para pararlo.</p></div>'+
    '<div class="fld"><label>Salida</label><div class="seg block" id="d_md"><button data-v="0" aria-pressed="'+!n.mono+'">Estéreo</button><button data-v="1" aria-pressed="'+!!n.mono+'">Mono</button></div></div>'+
@@ -729,14 +779,15 @@ function buildDrawer(){
    '<div class="fld" id="d_crw"><label for="d_cr">Canal derecho</label><select class="sel" id="d_cr">'+chOpts(n.ch_right)+'</select></div></div>'+
    '<div class="fld"><div class="top2"><label for="d_vl" id="d_vll">'+(n.mono?'Volumen':'Volumen izquierdo')+'</label><b id="d_vld">'+pct(n.volume_l)+'%</b></div><input class="rng" id="d_vl" type="range" min="0" max="255" value="'+n.volume_l+'"></div>'+
    '<div class="fld" id="d_vrw"><div class="top2"><label for="d_vr">Volumen derecho</label><b id="d_vrd">'+pct(n.volume_r)+'%</b></div><input class="rng" id="d_vr" type="range" min="0" max="255" value="'+n.volume_r+'"></div>'+
+   '<details class="help adv wide" id="d_adv"><summary>Ajustes avanzados</summary><div class="advbody">'+
    '<div class="fld"><label>Función en los graves</label><div class="seg block" id="d_rl">'+ROLES.map((r,i)=>'<button data-v="'+i+'" aria-pressed="'+(n.role===i)+'">'+r+'</button>').join('')+'</div>'+
    '<p class="hint" style="margin-top:6px" id="d_rlh"></p></div>'+
    '<div class="fld"><label for="d_dist">Distancia a quien escucha (m, opcional)</label><input class="num" id="d_dist" type="number" min="0.2" max="30" step="0.1" value="'+(n.dist_m>0?n.dist_m:'')+'" placeholder="—"></div>'+
    '<div class="fld"><label for="d_lat">Retardo extra (ms; positivo lo retrasa)</label><input class="num" id="d_lat" type="number" min="-500" max="500" step="0.01" value="'+((n.latency_offset_us||0)/1000)+'"></div>'+
    '<hr class="sep"><div class="fld wide"><div class="top2"><b>Ecualizador</b><button class="btn ghost sm" id="d_eqz">Plano</button></div><p class="hint" id="d_eqh" style="margin:4px 0 8px"></p>'+
    EQF.map((f,i)=>'<div class="eqrow"><span>'+f+'</span><input class="rng mid" type="range" min="-12" max="12" step="0.5" id="d_eq'+i+'" value="'+(eq[i]||0)+'" aria-label="EQ '+f+'"><output id="d_eo'+i+'"></output></div>').join('')+'</div>'+
-   '<hr class="sep"><div class="hint" id="d_stats"></div><div class="savestate" id="d_ss"></div>'+
-   '<div class="fld" id="d_fgw"><button class="btn danger sm" id="d_fg" type="button">Quitar este ESP del panel</button><p class="hint" style="margin-top:6px">Solo si está apagado. Si vuelve a conectarse, aparece de nuevo con su configuración.</p></div>';
+   '<div class="fld wide" id="d_fgw"><button class="btn danger sm" id="d_fg" type="button">Quitar este ESP del panel</button><p class="hint" style="margin-top:6px">Solo si está apagado. Si vuelve a conectarse, aparece de nuevo con su configuración.</p></div></div></details>'+
+   '<div class="hint wide" id="d_stats"></div><div class="savestate wide" id="d_ss"></div>';
   wireDrawer();modeUI();rolHint();eqHint();document.querySelectorAll('#dbody .rng').forEach(fillRng);for(let i=0;i<6;i++)eqOut(i);updDrawerStats();
 }
 function eqOut(i){const v=+$('d_eq'+i).value;$('d_eo'+i).textContent=(v>0?'+':'')+v.toFixed(1).replace('.',',');}
@@ -759,6 +810,7 @@ async function doSave(){
   const eb={id};for(let i=0;i<6;i++)eb['eq'+i]=Math.max(-12,Math.min(12,+$('d_eq'+i).value||0));
   const lat=Math.round((+$('d_lat').value||0)*1000);
   {const dv=$('d_dist').value.trim();b.dist_m=dv===''?-1:Math.max(0.2,Math.min(30,+dv||0.2));}
+  b.name=($('d_name').value||'').trim();
   const r1=await J('/api/node',b),r2=await J('/api/eq',eb),r3=await J('/api/calibrate',{esp_id:id,latency_us:lat});
   if(r1.ok&&r2.ok&&r3.ok){const n=find(id);if(n){Object.assign(n,b);n.eq=[0,1,2,3,4,5].map(i=>eb['eq'+i]);n.latency_offset_us=lat;}
     if($('d_ss'))$('d_ss').textContent='Guardado';log('Altavoz #'+id+' actualizado');sig='';loadStatus();loadNodes();}
@@ -770,7 +822,7 @@ function wireDrawer(){
   $('d_md').querySelectorAll('button').forEach(b=>b.onclick=()=>{setSeg($('d_md'),'v',b.dataset.v);modeUI();q();});
   $('d_rl').querySelectorAll('button').forEach(b=>b.onclick=()=>{setSeg($('d_rl'),'v',b.dataset.v);rolHint();q();});
   ['d_cl','d_cr'].forEach(i=>$(i).onchange=q);
-  $('d_lat').onchange=q;$('d_dist').onchange=q;
+  $('d_lat').onchange=q;$('d_dist').onchange=q;$('d_name').oninput=q;
   $('d_tone').querySelectorAll('button').forEach(b=>b.onclick=()=>toneBtn(b));
   const fg=$('d_fg'),nn=find(openId);if(nn&&nn.online)fg.disabled=true;
   fg.onclick=async()=>{
@@ -935,8 +987,33 @@ const CHIPN=['','C5','ESP32','?'];
 const wifiTxt=n=>n.rssi_dbm?n.rssi_dbm+' dBm · '+(n.rssi_dbm>-60?'fuerte':n.rssi_dbm>-75?'media':'débil'):'WiFi sin dato';
 const fwTxt=n=>n.fw_version?'v'+n.fw_version+(CHIPN[n.chip]?' · '+CHIPN[n.chip]:''):'—';
 function cls(v,w,b){return v>=b?' class="bad"':v>=w?' class="warn"':'';}
-function drawHealth(){const vis=nodes.filter(isKnown);
-  $('health').innerHTML=vis.map(n=>'<tr><td><i class="dot '+(n.online?'ok':'bad')+'"></i> #'+n.id+' · '+nodeLabel(n)+'</td><td>'+(n.online?((n.rtt_us||0)/1000).toFixed(1)+' ms':'—')+'</td><td>'+(n.jitter_us||0)+' µs</td><td'+cls(n.lost_packets||0,1,50)+'>'+(n.lost_packets||0)+'</td><td>'+(n.recovered_packets||0)+'</td><td'+cls(n.late_packets||0,5,50)+'>'+(n.late_packets||0)+'</td><td'+cls(n.underruns||0,1,10)+'>'+(n.underruns||0)+'</td><td>'+((n.sync_err_us||0))+' µs</td><td>'+Math.round(n.fill_pct||0)+'%</td><td'+(n.online&&n.rssi_dbm?cls(-n.rssi_dbm,76,83):'')+'>'+(n.online?wifiTxt(n):'—')+'</td><td>'+fwTxt(n)+'</td></tr>').join('')||'<tr><td colspan="11" class="mut">Sin altavoces</td></tr>';}
+function verdict(n){
+  if(!n.enabled)return{k:'ok',t:'Apagado',why:'No recibe audio.'};
+  if(!n.online)return{k:'bad',t:'Sin conexión',why:'Revisa que tenga corriente y WiFi.'};
+  const lost=n.lost_packets||0,late=n.late_packets||0,un=n.underruns||0,weak=n.rssi_dbm&&n.rssi_dbm<=-83,mid=n.rssi_dbm&&n.rssi_dbm<=-76;
+  if(lost>=50||un>=10||weak)return{k:'bad',t:'Con cortes',why:weak?'Señal WiFi muy débil: acerca el altavoz o la antena al router.':'Pierde paquetes: revisa la señal WiFi y el canal.'};
+  if(lost>=1||late>=5||un>=1||mid)return{k:'warn',t:'Inestable',why:mid?'Señal WiFi justa.':'Algún corte aislado desde que arrancó.'};
+  return{k:'ok',t:'Bien',why:'Sin cortes ni retrasos.'};}
+function drawVerdicts(){const vis=nodes.filter(isKnown),el=$('hverd');if(!el)return;
+  el.innerHTML=vis.map(n=>{const v=verdict(n);return '<button class="vcard v-'+v.k+'" type="button" data-id="'+n.id+'"><b><i class="dot '+v.k+'"></i>'+esc(spkName(n))+'<span class="vt">'+v.t+'</span></b><span class="why">'+v.why+'</span></button>';}).join('')||'<p class="hint">Aún no hay altavoces.</p>';
+  el.querySelectorAll('.vcard').forEach(b=>b.onclick=()=>openDrawer(+b.dataset.id));}
+function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
+function lsSet(k,v){try{localStorage.setItem(k,v);}catch(e){}}
+function drawWizard(){const w=$('wiz');if(!w)return;const vis=nodes.filter(isKnown);
+  const steps=[
+   ['Conecta la entrada de audio','Enchufa la Traktor Audio 10 por USB a la Raspberry.',!!(st&&(st.capturing||st.running))],
+   ['Añade tus altavoces','Enciéndelos cerca de la Raspberry y búscalos por Bluetooth.',vis.length>0],
+   ['Colócalos en el plano','Arrastra cada altavoz a su sitio (desde «Mover altavoces»).',lsGet('sonos_placed')==='1'||vis.some(n=>n.pos_x>=0||n.pos2_x>=0)],
+   ['Calibra el retardo','Mide la distancia de cada altavoz para que todos suenen a la vez.',lsGet('sonos_cal')==='1'||vis.some(n=>n.latency_offset_us)]];
+  const left=steps.filter(x=>!x[2]).length;
+  if(lsGet('sonos_wiz')==='off'||left===0){w.hidden=true;return;}
+  w.hidden=false;
+  w.innerHTML='<h2>Primeros pasos</h2><ol>'+steps.map((x,i)=>'<li class="'+(x[2]?'done':'')+'"><span class="n" aria-hidden="true">'+(x[2]?'✓':i+1)+'</span><span><span class="t">'+x[0]+'</span><br><span class="hint">'+x[1]+'</span></span></li>').join('')+'</ol>'+
+   '<div class="acts"><button class="btn sm" id="wz_add" type="button">Añadir altavoces</button><a class="btn ghost sm" id="wz_cal" href="#">Calibrar</a><button class="btn ghost sm" id="wz_hide" type="button">Ocultar guía</button></div>';
+  $('wz_add').onclick=openBle;$('wz_hide').onclick=()=>{lsSet('sonos_wiz','off');w.hidden=true;};
+  $('wz_cal').href=$('lcal').href;$('wz_cal').onclick=()=>lsSet('sonos_cal','1');}
+function drawHealth(){const vis=nodes.filter(isKnown);drawVerdicts();drawWizard();
+  $('health').innerHTML=vis.map(n=>'<tr><td><i class="dot '+(n.online?'ok':'bad')+'"></i> '+esc(spkName(n))+' · '+nodeLabel(n)+'</td><td>'+(n.online?((n.rtt_us||0)/1000).toFixed(1)+' ms':'—')+'</td><td>'+(n.jitter_us||0)+' µs</td><td'+cls(n.lost_packets||0,1,50)+'>'+(n.lost_packets||0)+'</td><td>'+(n.recovered_packets||0)+'</td><td'+cls(n.late_packets||0,5,50)+'>'+(n.late_packets||0)+'</td><td'+cls(n.underruns||0,1,10)+'>'+(n.underruns||0)+'</td><td>'+((n.sync_err_us||0))+' µs</td><td>'+Math.round(n.fill_pct||0)+'%</td><td'+(n.online&&n.rssi_dbm?cls(-n.rssi_dbm,76,83):'')+'>'+(n.online?wifiTxt(n):'—')+'</td><td>'+fwTxt(n)+'</td></tr>').join('')||'<tr><td colspan="11" class="mut">Sin altavoces</td></tr>';}
 
 /* Añadir altavoces por Bluetooth desde la Raspberry */
 let bs={available:false,ssid:'',has_pass:false,rpi_ip:''},bdevs=[],bscan=false,bres={};
@@ -1074,9 +1151,9 @@ function lvLoop(){pollLevels().finally(()=>setTimeout(lvLoop,$('p_spk').hidden?1
 $('mvs').oninput=function(){$('mvd').textContent=this.value+'%';this.setAttribute('aria-valuetext',this.value+' %');fillRng(this);clearTimeout(window._mv);window._mv=setTimeout(()=>J('/api/volume',{volume:+this.value/100}),120);};
 $('logclr').onclick=()=>{$('lb').innerHTML='';};
 (function(){const b=location.protocol==='https:'?'':'https://'+location.hostname+':8443';
-  $('lcal').href=b+'/calibrate';$('lcal2').href=b+'/calibrate';window._bleHref=b+'/ble';})();
+  $('lcal').href=b+'/calibrate';if($('wz_cal'))$('wz_cal').href=b+'/calibrate';$('lcal2').href=b+'/calibrate';window._bleHref=b+'/ble';})();
 document.querySelectorAll('.rng').forEach(fillRng);
-const h0=(location.hash||'').slice(1);if(['spk','snd','lat','log'].includes(h0))showTab(h0);
+const h0=(location.hash||'').slice(1);if(['spk','snd','lat','sys'].includes(h0))showTab(h0);else if(h0==='log'){showTab('sys');}
 drawNamesForm(true);loadStatus().then(loadNodes);updLat();loadProfiles();loadFw();lvLoop();
 setInterval(loadStatus,5000);setInterval(loadNodes,2500);
 </script>

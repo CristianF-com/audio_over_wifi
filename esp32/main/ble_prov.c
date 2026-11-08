@@ -102,16 +102,16 @@ static int chr_access(uint16_t conn, uint16_t attr, struct ble_gatt_access_ctxt*
             memcpy(s_pass, buf, len); s_pass[len] = 0; s_has_pass = true;
             return 0;
         case CH_RPI:
-            if (len > 15 || !valid_ipv4((char*)buf)) return BLE_ATT_ERR_VALUE_NOT_ALLOWED;
+            if (len > 15 || !valid_ipv4((char*)buf)) { ESP_LOGW(TAG, "IP de la RPi rechazada (len=%u)", (unsigned)len); return BLE_ATT_ERR_VALUE_NOT_ALLOWED; }
             memcpy(s_rpi, buf, len); s_rpi[len] = 0;
             return 0;
         case CH_ID:
-            if (len != 1 || (buf[0] >= MAX_NODES && buf[0] != ESP_ID_AUTO)) return BLE_ATT_ERR_VALUE_NOT_ALLOWED;   /* 255 = ID automático (la RPi lo asigna por MAC) */
+            if (len != 1 || (buf[0] >= MAX_NODES && buf[0] != ESP_ID_AUTO)) { ESP_LOGW(TAG, "ID rechazado (len=%u, valor=%u)", (unsigned)len, len ? buf[0] : 0); return BLE_ATT_ERR_VALUE_NOT_ALLOWED; }   /* 255 = ID automático (la RPi lo asigna por MAC) */
             s_id = buf[0];
             return 0;
         case CH_CMD:
             if (!strcmp((char*)buf, "apply")) {
-                if (s_ssid[0] == 0) return BLE_ATT_ERR_VALUE_NOT_ALLOWED;
+                if (s_ssid[0] == 0) { ESP_LOGW(TAG, "«apply» sin SSID"); return BLE_ATT_ERR_VALUE_NOT_ALLOWED; }
                 if (s_ops->save(s_ssid, s_has_pass ? s_pass : NULL, s_id, s_rpi) != 0) return BLE_ATT_ERR_UNLIKELY;
                 ESP_LOGI(TAG, "Config guardada (ID=%u, SSID='%s'); reiniciando", s_id, s_ssid);
                 s_ops->reboot();
@@ -124,6 +124,7 @@ static int chr_access(uint16_t conn, uint16_t attr, struct ble_gatt_access_ctxt*
                 s_ops->reboot();
                 return 0;
             }
+            ESP_LOGW(TAG, "comando desconocido '%s'", (char*)buf);
             return BLE_ATT_ERR_VALUE_NOT_ALLOWED;
         default: break;
         }

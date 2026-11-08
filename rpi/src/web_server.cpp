@@ -529,6 +529,7 @@ std::string WebServer::getNodes() {
           << jnum("role",     n.role)     << ","
           << jbool("known",   n.known)    << ","
           << jstr("mac",     macStr(n.mac)) << ","
+          << jstr("name",    streamer_.nodeName(n.id)) << ","
           << jnum("pos_x",    std::round(n.pos_x * 100.0) / 100.0) << "," << jnum("pos_y", std::round(n.pos_y * 100.0) / 100.0) << ","
           << jnum("pos2_x", std::round(n.pos2_x * 100.0) / 100.0) << "," << jnum("pos2_y", std::round(n.pos2_y * 100.0) / 100.0) << ","
           << "\"eq\":[" ;
@@ -576,6 +577,10 @@ std::string WebServer::setNode(const std::string& b) {
             if (!streamer_.forgetNode((uint8_t)id)) return "{\"error\":\"ese ESP está en línea: apágalo antes de quitarlo\"}";
             return "{\"ok\":true}";
         }
+    }
+    if (b.find("\"name\"") != std::string::npos) {                        // nombre del altavoz (≤ 12 caracteres)
+        std::string err;
+        if (!streamer_.setNodeName((int)id, jsonGet(b, "name"), err)) return "{\"error\":\"" + jesc(err) + "\"}";
     }
     long role = cur.role;
     if (!(s = jsonGet(b, "role")).empty() && !parseInt(s, 0, 2, role)) return BAD;

@@ -433,7 +433,7 @@ static void control_task(void* pv)
 
     int64_t last_hello = -10000000, last_sync = 0, last_welcome = 0;
     int sync_sent = 0;
-    ESP_LOGI(TAG, "Control | ID=%d", g_receiver_id);
+    ESP_LOGI(TAG, "Control | ID=%d | firmware v%d", g_receiver_id, FW_VERSION);
 
     while (1) {
         int64_t now = esp_timer_get_time();

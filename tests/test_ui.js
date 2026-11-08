@@ -4,6 +4,7 @@ const {chromium}=require('playwright');
 const BASE='http://127.0.0.1:18080', SHOTS=process.argv[2]||null;
 let fails=0;const ok=(n,c,x)=>{console.log((c?'PASS ':'FAIL ')+'UI '+n+(c?'':'  '+(x===undefined?'':JSON.stringify(x))));if(!c)fails++;};
 const J=async(p)=>(await fetch(BASE+p)).json();
+const adv=pg=>pg.evaluate(()=>{const a=document.getElementById('d_adv');if(a)a.open=true;});   // los ajustes avanzados del altavoz vienen plegados
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if(await f())return true;}catch(e){}await sleep(100);}return false;}
 (async()=>{
@@ -90,6 +91,8 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   if(SHOTS)await p.screenshot({path:SHOTS+'/panel_altavoces.png'});
   // Cajón con autoguardado
   await p.click('#spks .spk[data-id="1"]');await p.waitForSelector('#drawer.on');
+  ok('cajón: nombre arriba y «Ajustes avanzados» plegados por defecto (rol, EQ, retardo dentro)',await p.evaluate(()=>!document.getElementById('d_adv').open&&!!document.getElementById('d_name')&&document.getElementById('d_adv').contains(document.getElementById('d_rl'))&&document.getElementById('d_adv').contains(document.getElementById('d_lat'))));
+  await adv(p);
   ok('cajón abierto con título «Altavoz #1»',(await p.textContent('#dtitle'))==='Altavoz #1');
   await p.fill('#d_vl','128');await p.dispatchEvent('#d_vl','input');
   await p.click('#d_md button[data-v="1"]');
@@ -97,6 +100,10 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   await p.fill('#d_eq2','4');await p.dispatchEvent('#d_eq2','input');
   ok('autoguardado: volumen, mono, rol sub y EQ llegan al servidor',await until(async()=>{const x=(await J('/api/nodes'))[1];return x.volume_l===128&&x.mono===true&&x.role===2&&x.volume_r===128&&x.ch_right===x.ch_left&&Math.abs(x.eq[2]-4)<0.01;}),(await J('/api/nodes'))[1]);
   ok('mono oculta el canal derecho',!(await p.isVisible('#d_crw')));
+  await p.fill('#d_name','Sofá');await p.dispatchEvent('#d_name','input');
+  ok('nombre del altavoz: se guarda y sustituye a «ESP n» en el título y los chips',await until(async()=>(await J('/api/nodes'))[1].name==='Sofá'&&(await p.textContent('#dtitle')).includes('Sofá')||(await J('/api/nodes'))[1].name==='Sofá')&&await until(async()=>(await p.locator('#chips').textContent()).includes('Sofá')));
+  await p.fill('#d_name','');await p.dispatchEvent('#d_name','input');
+  ok('nombre vacío: vuelve a «ESP n»',await until(async()=>(await J('/api/nodes'))[1].name===''&&!(await p.locator('#chips').textContent()).includes('Sofá')));
   ok('«Guardado» visible tras autoguardar',await until(async()=>(await p.textContent('#d_ss'))==='Guardado'));
   ok('cambiar mono/rol marca la distribución como personalizada (mono sí es estructural)',(await J('/api/status')).layout===2);
   await p.click('#d_eqon');
@@ -109,6 +116,8 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   await fetch(BASE+'/api/layout',{method:'POST',body:JSON.stringify({layout:'stereo5'})});
   // Sonido: pass-through ↔ procesado
   await p.click('.tab[data-tab="snd"]');
+  ok('Sonido abre en «Perfiles» (lo más usado primero)',(await p.getAttribute('#sb_pf','aria-selected'))==='true');
+  await p.click('#sb_mode');
   ok('por defecto: pass-through activo',(await p.getAttribute('#t_pass','aria-pressed'))==='true'&&(await p.getAttribute('#t_proc','aria-pressed'))==='false');
   ok('por defecto: interruptores apagados',(await p.getAttribute('#sw_xo','aria-checked'))==='false'&&(await p.getAttribute('#sw_eq','aria-checked'))==='false');
   await p.click('#t_proc');
@@ -140,6 +149,9 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   await p.click('.tab[data-tab="lat"]');await p.click('#plseg button[data-pl="120"]');
   ok('colchón de red 120 ms',await until(async()=>(await J('/api/status')).playout_ms===120));
   ok('tabla de red con 5 filas',await until(async()=>(await p.locator('#health tr').count())===5));
+  ok('estado por altavoz: una tarjeta con veredicto (Bien/Inestable/Con cortes/Sin conexión) por cada altavoz conocido',await p.evaluate(()=>{const c=[...document.querySelectorAll('#hverd .vcard')];return c.length===document.querySelectorAll('#health tr').length&&c.every(x=>/v-(ok|warn|bad)/.test(x.className)&&/(Bien|Inestable|Con cortes|Sin conexión|Apagado)/.test(x.textContent));}));
+  ok('la tabla de números va plegada («Ver todos los números»)',await p.evaluate(()=>!document.getElementById('hdet').open));
+  ok('primeros pasos: la guía aparece con 4 pasos y «Ocultar guía» la oculta y lo recuerda',await (async()=>{await p.click('#tab_spk');const n=await p.locator('#wiz li').count();const vis=await p.isVisible('#wiz');await p.click('#wz_hide');const r=n===4&&vis&&await p.evaluate(()=>document.getElementById('wiz').hidden&&localStorage.getItem('sonos_wiz')==='off');await p.evaluate(()=>{localStorage.removeItem('sonos_wiz');drawWizard();});await p.click('.tab[data-tab="lat"]');return r;})());
   ok('comando mpv visible',(await p.textContent('#mpvcmd')).includes('--audio-delay='));
   await p.click('#plseg button[data-pl="80"]');
   if(SHOTS)await p.screenshot({path:SHOTS+'/panel_latencia.png',fullPage:true});
@@ -195,13 +207,13 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('controles segmentados visibles (no se pisan con los indicadores de señal)',sb&&sb.height>=30&&sb.width>=60,sb);
   ok('el cajón cerrado es inerte y está oculto (el teclado no entra en él)',await p.evaluate(()=>document.getElementById('drawer').inert===true&&document.getElementById('bdrawer').inert===true&&document.getElementById('drawer').getAttribute('aria-hidden')==='true'));
   ok('los cajones son diálogos modales con título',await p.evaluate(()=>['drawer','bdrawer'].every(i=>{const d=document.getElementById(i);return d.getAttribute('role')==='dialog'&&d.getAttribute('aria-modal')==='true'&&document.getElementById(d.getAttribute('aria-labelledby'))!==null;})));
-  await p.click('#spks .spk[data-id="2"]');await p.waitForSelector('#drawer.on');
-  ok('al abrir un cajón: el foco entra en él y el resto de la página queda inerte',await until(async()=>await p.evaluate(()=>document.activeElement&&document.activeElement.id==='dclose'&&document.querySelector('main').inert&&document.querySelector('.top').inert&&!document.getElementById('drawer').inert)));
+  await p.click('#spks .spk[data-id="2"]');await p.waitForSelector('#drawer.on');await adv(p);
+  ok('escritorio ancho: el cajón es un panel lateral fijo (sin velo, la página sigue activa y deja sitio a la derecha)',await until(async()=>await p.evaluate(()=>document.body.classList.contains('has-dock')&&!document.getElementById('scrim').classList.contains('on')&&!document.querySelector('main').inert&&!document.querySelector('.top').inert&&!document.getElementById('drawer').inert&&parseFloat(getComputedStyle(document.querySelector('main')).paddingRight)>=400)));
   await p.keyboard.press('Escape');
   ok('al cerrar con Esc: el foco vuelve al altavoz que lo abrió y la página deja de ser inerte',await until(async()=>await p.evaluate(()=>document.activeElement&&document.activeElement.classList.contains('spk')&&document.activeElement.dataset.id==='2'&&!document.querySelector('main').inert&&document.getElementById('drawer').inert)));
   await p.focus('.tab[data-tab="spk"]');await p.keyboard.press('ArrowRight');
   ok('pestañas con teclado: → selecciona y enfoca la siguiente (foco itinerante)',await p.evaluate(()=>document.activeElement.dataset.tab==='snd'&&document.activeElement.getAttribute('aria-selected')==='true'&&document.querySelector('.tab[data-tab="spk"]').tabIndex===-1&&!document.getElementById('p_snd').hidden));
-  await p.keyboard.press('End');ok('pestañas con teclado: Fin va a la última',await p.evaluate(()=>document.activeElement.dataset.tab==='log'));
+  await p.keyboard.press('End');ok('pestañas con teclado: Fin va a la última',await p.evaluate(()=>document.activeElement.dataset.tab==='sys'));
   await p.keyboard.press('Home');ok('pestañas con teclado: Inicio va a la primera',await p.evaluate(()=>document.activeElement.dataset.tab==='spk'));
   ok('pestañas enlazadas con sus paneles (aria-controls / aria-labelledby)',await p.evaluate(()=>[...document.querySelectorAll('.tab')].every(t=>{const pane=document.getElementById(t.getAttribute('aria-controls'));return pane&&pane.getAttribute('aria-labelledby')===t.id;})));
   ok('los avisos se anuncian al lector de pantalla (región en vivo) y los errores como alerta',await p.evaluate(()=>{const tb=document.getElementById('tb');toast('prueba',false);const a=tb.querySelector('.toast.bad');const r=tb.getAttribute('role')==='status'&&tb.getAttribute('aria-live')==='polite'&&a&&a.getAttribute('role')==='alert';if(a)a.remove();return r;}));
@@ -210,7 +222,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('tipografía: Roboto 300/400/500/700 cargadas desde la RPi (sin internet)',await p.evaluate(async()=>{await document.fonts.ready;return [300,400,500,700].every(w=>document.fonts.check(w+' 16px Roboto'))&&[...document.fonts].filter(f=>f.family.replace(/"/g,'')==='Roboto'&&f.status==='loaded').length>=2;}));
   ok('tipografía: texto, botones, campos y números usan Roboto (ninguna fuente monoespaciada)',await p.evaluate(()=>{const sel=['body','.btn','input','.big','.lvn','.cal','.log','.cmd','h2','.tab'];return sel.every(q=>{const e=document.querySelector(q);return !e||/^"?Roboto"?/.test(getComputedStyle(e).fontFamily);});}));
   // ── Funciones nuevas: probar altavoz, distancias, modo noche, LFE, perfiles, salud ──
-  await p.click('[data-tab=spk]');await p.click('#spks .spk[data-id="3"][data-side="0"]');await p.waitForSelector('#drawer.on');await sleep(300);
+  await p.click('[data-tab=spk]');await p.click('#spks .spk[data-id="3"][data-side="0"]');await p.waitForSelector('#drawer.on');await adv(p);await sleep(300);
   ok('cajón: ESP estéreo ofrece Izquierdo, Derecho y Ambos para probar',await p.locator('#d_tone button').count()===3);
   ok('EQ: las perillas de las 6 bandas miden 18 px, no se pisan (≥4 px libres entre filas) y los demás deslizadores conservan los 26 px',await p.evaluate(()=>{const r=[...document.querySelectorAll('#dbody .eqrow input')];const th=parseFloat(getComputedStyle(r[0]).getPropertyValue('--th'));const vis=th+6;let min=1e9;for(let i=1;i<r.length;i++){const a=r[i-1].getBoundingClientRect(),b=r[i].getBoundingClientRect();min=Math.min(min,(b.top+b.height/2)-(a.top+a.height/2)-vis);}const vol=document.querySelector('#dbody input.rng:not(.mid)');return r.length===6&&th===18&&min>=4&&parseFloat(getComputedStyle(vol).getPropertyValue('--th'))===26;}));
   await p.evaluate(()=>document.getElementById('d_eq0').scrollIntoView({block:'center'}));await sleep(250);if(SHOTS)await p.screenshot({path:SHOTS+'/panel_eq.png'});
@@ -225,7 +237,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   await p.fill('#d_dist','2');await p.keyboard.press('Tab');await sleep(900);
   if(SHOTS)await p.screenshot({path:SHOTS+'/panel_cajon_probar.png'});
   await p.keyboard.press('Escape');await until(async()=>!(await p.$('#drawer.on')));
-  await p.click('#spks .spk[data-id="4"][data-side="0"]');await p.waitForSelector('#drawer.on');await sleep(300);
+  await p.click('#spks .spk[data-id="4"][data-side="0"]');await p.waitForSelector('#drawer.on');await adv(p);await sleep(300);
   await p.fill('#d_dist','3.5');await p.keyboard.press('Tab');
   ok('distancia: segundo altavoz a 3,5 m',await until(async()=>(await J('/api/nodes'))[4].dist_m===3.5));
   await p.keyboard.press('Escape');await until(async()=>!(await p.$('#drawer.on')));
@@ -267,7 +279,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   // Actualización de firmware por WiFi: tarjeta en Latencia (el arnés simula ESP con firmware antiguo, sin versión)
   {const fsx=require('fs');const img=Buffer.alloc(80000,5);img[0]=0xE9;img[1]=1;img.writeUInt16LE(0x17,12);img.writeUInt32LE(0xABCD5432,32);img.write('9.9-ui',48);
    fsx.writeFileSync('/tmp/fw_ui_bad.bin',Buffer.alloc(70000,7));fsx.writeFileSync('/tmp/fw_ui_ok.bin',img);
-   await p.click('.tab[data-tab="lat"]');await sleep(300);
+   await p.click('.tab[data-tab="sys"]');await p.click('#sy_fw');await sleep(300);
    ok('firmware: aviso de «sin probar en hardware» y de flashear la primera vez por cable',(await p.textContent('#fwwarn')).includes('sin probar')&&(await p.textContent('#fwwarn')).includes('por cable'));
    await p.click('#fwup');
    ok('firmware: subir sin elegir archivo avisa',await p.locator('#tb .toast.bad').count()>=1);
@@ -294,7 +306,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
    if(SHOTS)await p.screenshot({path:SHOTS+'/recta_altavoces.png'});
    await p.click('.tab[data-tab="snd"]');await sleep(300);if(SHOTS)await p.screenshot({path:SHOTS+'/recta_sonido.png',fullPage:true});
    await p.click('.tab[data-tab="lat"]');await sleep(300);if(SHOTS)await p.screenshot({path:SHOTS+'/recta_latencia.png',fullPage:true});
-   await p.click('#spks .spk[data-id="3"][data-side="0"]').catch(()=>{});await p.click('.tab[data-tab="spk"]');await p.click('#spks .spk[data-id="3"][data-side="0"]');await p.waitForSelector('#drawer.on');await sleep(400);
+   await p.click('#spks .spk[data-id="3"][data-side="0"]').catch(()=>{});await p.click('.tab[data-tab="spk"]');await p.click('#spks .spk[data-id="3"][data-side="0"]');await p.waitForSelector('#drawer.on');await adv(p);await sleep(400);
    ok('forma recta: el cajón del altavoz también es recto',await p.evaluate(()=>parseFloat(getComputedStyle(document.getElementById('drawer')).borderTopLeftRadius)===0));
    ok('forma recta: el recuadro de selección del altavoz abierto es cuadrado (también sus rótulos)',await p.evaluate(()=>{const b=document.querySelector('#spks .spk[aria-expanded=true]');if(!b)return false;const g=e=>parseFloat(getComputedStyle(e).borderTopLeftRadius);
      return g(b)===0&&getComputedStyle(b).outlineStyle==='solid'&&[...b.querySelectorAll('.cap,.cal')].every(e=>g(e)===0);}));
@@ -321,17 +333,18 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   if(SHOTS){await q.screenshot({path:SHOTS+'/movil_altavoces.png'});await q.locator('#meters').screenshot({path:SHOTS+'/movil_entrada_leds.png'});await q.locator('#room').scrollIntoViewIfNeeded();await q.locator('#room').screenshot({path:SHOTS+'/movil_plano_vumetros.png'});}
   ok('móvil: la navegación es una barra fija pegada abajo (sin flotar) con icono y una sola palabra por pestaña',await q.evaluate(()=>{const t=document.querySelector('.tabs'),r=t.getBoundingClientRect(),cs=getComputedStyle(t);
     return cs.position==='fixed'&&Math.abs(r.bottom-innerHeight)<1&&r.left<1&&Math.abs(r.right-innerWidth)<1&&parseFloat(cs.borderTopLeftRadius)===0&&[...t.querySelectorAll('.tab')].every(b=>b.querySelector('svg')&&getComputedStyle(b.querySelector('svg')).display!=='none'&&b.textContent.trim().split(/\s+/).length===1);}));
-  ok('móvil: objetivos táctiles de 44 px como mínimo (botones, segmentos, pestañas, selector, campo)',await q.evaluate(()=>['#lble','#lcal','.tab','#spks .spk','#mvs'].every(s=>{const e=document.querySelector(s);const r=e.getBoundingClientRect();return r.height>=44-.5;})));
+  ok('móvil: objetivos táctiles de 44 px como mínimo (botones, segmentos, pestañas, selector, campo)',await q.evaluate(()=>['#more','.tab','#spks .spk','#mvs'].every(s=>{const e=document.querySelector(s);const r=e.getBoundingClientRect();return r.height>=44-.5;})));
   ok('móvil: la cabecera ya no es fija (la navegación va abajo)',await q.evaluate(()=>getComputedStyle(document.querySelector('.top')).position==='static'));
   ok('móvil: ningún texto por debajo de 11 px',await q.evaluate(()=>{for(const e of document.querySelectorAll('body *')){if(!e.offsetParent&&getComputedStyle(e).position!=='fixed')continue;if(![...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim()))continue;if(parseFloat(getComputedStyle(e).fontSize)<11)return false;}return true;}));
-  await q.tap('#spks .spk[data-id="0"]');await q.waitForSelector('#drawer.on');await sleep(400);
+  await q.tap('#spks .spk[data-id="0"]');await q.waitForSelector('#drawer.on');await adv(q);await sleep(400);
+  ok('móvil: el cajón es modal (foco dentro, resto inerte, con velo)',await until(async()=>await q.evaluate(()=>document.activeElement&&document.activeElement.id==='dclose'&&document.querySelector('main').inert&&document.querySelector('.top').inert&&!document.getElementById('drawer').inert&&document.getElementById('scrim').classList.contains('on')&&!document.body.classList.contains('has-dock'))));
   if(SHOTS)await q.screenshot({path:SHOTS+'/movil_cajon.png'});
   ok('móvil: la hoja muestra el asa (grabber)',await q.evaluate(()=>getComputedStyle(document.querySelector('#drawer .grab')).display==='block'));
   ok('móvil: los botones de la hoja miden 44 px (cerrar, interruptor)',await q.evaluate(()=>{const x=document.getElementById('dclose').getBoundingClientRect();const sw=getComputedStyle(document.querySelector('#drawer .switch'),'::before');return x.height>=43.5&&x.width>=43.5&&sw.content!=='none';}));
   {const bx=await q.locator('#dtitle').boundingBox();const cx=bx.x+bx.width/2,cy=bx.y+bx.height/2;
    await q.mouse.move(cx,cy);await q.mouse.down();await q.mouse.move(cx,cy+60,{steps:4});await q.mouse.move(cx,cy+220,{steps:6});await q.mouse.up();
    ok('móvil: deslizar la hoja hacia abajo la cierra (como un sheet de iOS)',await until(async()=>!(await q.$('#drawer.on'))));
-   await q.tap('#spks .spk[data-id="0"]');await q.waitForSelector('#drawer.on');await sleep(300);
+   await q.tap('#spks .spk[data-id="0"]');await q.waitForSelector('#drawer.on');await adv(q);await sleep(300);
    const bx2=await q.locator('#dtitle').boundingBox();await q.mouse.move(bx2.x+bx2.width/2,bx2.y+5);await q.mouse.down();await q.mouse.move(bx2.x+bx2.width/2,bx2.y+25,{steps:3});await q.mouse.up();await sleep(300);
    ok('móvil: un arrastre corto no la cierra (vuelve a su sitio)',!!(await q.$('#drawer.on'))&&await q.evaluate(()=>document.getElementById('drawer').style.transform===''));}
   await q.tap('#dclose');await q.click('.tab[data-tab="snd"]');await sleep(300);
@@ -350,7 +363,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   if(SHOTS)await q.screenshot({path:SHOTS+'/movil_recta_sonido.png'});
   await q.tap('.tab[data-tab="spk"]');await q.evaluate(()=>window.scrollTo(0,0));await sleep(300);if(SHOTS)await q.screenshot({path:SHOTS+'/movil_recta_altavoces.png'});
   await q.evaluate(()=>SonosTheme.shape('round'));await sleep(250);
-  await q.tap('.tab[data-tab="spk"]');await q.tap('#spks .spk[data-id="0"]');await q.waitForSelector('#drawer.on');await sleep(400);
+  await q.tap('.tab[data-tab="spk"]');await q.tap('#spks .spk[data-id="0"]');await q.waitForSelector('#drawer.on');await adv(q);await sleep(400);
   ok('móvil: los botones de prueba miden 36 px o más y caben sin scroll horizontal',await q.evaluate(()=>[...document.querySelectorAll('#d_tone button')].every(b=>b.getBoundingClientRect().height>=35.5)&&document.documentElement.scrollWidth<=window.innerWidth+1));
   ok('EQ: las perillas de las 6 bandas miden 18 px, no se pisan (≥4 px libres entre filas) y los demás deslizadores conservan los 26 px',await q.evaluate(()=>{const r=[...document.querySelectorAll('#dbody .eqrow input')];const th=parseFloat(getComputedStyle(r[0]).getPropertyValue('--th'));const vis=th+6;let min=1e9;for(let i=1;i<r.length;i++){const a=r[i-1].getBoundingClientRect(),b=r[i].getBoundingClientRect();min=Math.min(min,(b.top+b.height/2)-(a.top+a.height/2)-vis);}const vol=document.querySelector('#dbody input.rng:not(.mid)');return r.length===6&&th===18&&min>=4&&parseFloat(getComputedStyle(vol).getPropertyValue('--th'))===26;}));
   await q.evaluate(()=>document.getElementById('d_eq0').scrollIntoView({block:'center'}));await sleep(250);if(SHOTS)await q.screenshot({path:SHOTS+'/movil_eq.png'});
@@ -382,7 +395,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('BLE: valida la contraseña corta',(await bp.textContent('#res')).includes('8 y 63'));
   ok('BLE sin errores de JS',berr.length===0,berr);
   // ── Nombres de las 10 entradas ──
-  await p.click('#tab_snd');await p.click('#sb_in');await sleep(200);
+  await p.click('#tab_sys');await p.click('#sy_in');await sleep(200);
   ok('Nombres: tarjeta con 10 campos, con los nombres de siempre por defecto',await p.evaluate(()=>{const v=[...document.querySelectorAll('#nmgrid input')].map(i=>i.value).join();return v==='FL,FR,C,LFE,SL,SR,SBL,SBR,AUX-L,AUX-R';}));
   ok('Nombres: cada campo tiene etiqueta visible con su número y su función (≥ 44 px de alto)',await p.evaluate(()=>[...document.querySelectorAll('#nmgrid input')].every((i,k)=>{const l=document.querySelector('label[for="'+i.id+'"]');return l&&l.textContent.startsWith('Entrada '+(k+1))&&i.getBoundingClientRect().height>=44&&i.maxLength===12;})));
   await p.fill('#chn_0','Sala TV');await p.fill('#chn_3','Sub');await p.fill('#chn_9','');
@@ -391,7 +404,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('Nombres: Guardar los envía a la Raspberry (el vacío vuelve al de fábrica)',nmApi.names[0]==='Sala TV'&&nmApi.names[3]==='Sub'&&nmApi.names[9]==='AUX-R',nmApi);
   await p.click('#tab_spk');await sleep(300);
   ok('Nombres: los indicadores de entrada, el plano y las fichas usan el nombre nuevo',await p.evaluate(()=>{const labs=[...document.querySelectorAll('#mb .lab')].map(e=>e.textContent);const chips=document.body.innerText;return labs[0]==='Sala TV'&&labs[3]==='Sub'&&labs[9]==='AUX-R'&&[...document.querySelectorAll('#spks .spk')].some(b=>b.textContent.includes('Sala TV'))&&chips.includes('Sala TV');}));
-  await p.click('#tab_snd');await p.click('#sb_in');await sleep(200);
+  await p.click('#tab_sys');await p.click('#sy_in');await sleep(200);
   await p.fill('#chn_1','<b>x');await p.click('#nmsave');await sleep(400);
   ok('Nombres: un nombre con < se rechaza con aviso y no cambia nada',(await J('/api/names')).names[1]==='FR'&&await p.evaluate(()=>[...document.querySelectorAll('.toast')].some(t=>t.textContent.includes('<'))));
   if(SHOTS)await p.screenshot({path:SHOTS+'/panel_nombres.png'});
@@ -562,8 +575,13 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   const mp=await ctx2.newPage();await mp.goto(BASE+'/');await mp.waitForSelector('.spk');
   for(const t of ['graphite','light']){await mp.evaluate(t=>localStorage.setItem('sonos_theme',t),t);await mp.reload();await mp.waitForSelector('.spk');
     ok('Móvil: tema '+t+' sin desbordamiento horizontal',await mp.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));}
+  ok('Móvil vertical: Calibrar, Añadir altavoces y Tema van dentro del menú «⋯» (cerrado por defecto)',await mp.evaluate(()=>!document.getElementById('links').offsetParent&&document.getElementById('more').getAttribute('aria-expanded')==='false'));
+  await mp.tap('#more');await sleep(150);
+  ok('Móvil vertical: el menú «⋯» se abre, sus botones miden ≥44 px y Esc lo cierra',await mp.evaluate(()=>document.getElementById('more').getAttribute('aria-expanded')==='true'&&['#lcal','#lble','[data-theme-btn]'].every(s=>document.querySelector(s).getBoundingClientRect().height>=43.5)));
   const mh=await mp.evaluate(()=>['[data-theme-btn]','#lcal','#lble'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return [r.top,r.height];}));
-  ok('Móvil: los botones de la cabecera están alineados',mh.every(x=>Math.abs(x[0]-mh[0][0])<1&&Math.abs(x[1]-mh[0][1])<1),mh);
+  ok('Móvil: los botones del menú tienen la misma altura',mh.every(x=>Math.abs(x[1]-mh[0][1])<1),mh);
+  await mp.keyboard.press('Escape');await sleep(150);
+  ok('Móvil vertical: Esc cierra el menú «⋯»',await mp.evaluate(()=>document.getElementById('more').getAttribute('aria-expanded')==='false'&&!document.getElementById('links').offsetParent));
   ok('Móvil: los altavoces con posición automática no se solapan entre sí',await mp.evaluate(()=>{const bs=[...document.querySelectorAll('#spks .spk')].map(e=>e.getBoundingClientRect());let o=0;for(let i=0;i<bs.length;i++)for(let j=i+1;j<bs.length;j++){const a=bs[i],b=bs[j];if(a.left<b.right-4&&b.left<a.right-4&&a.top<b.bottom-4&&b.top<a.bottom-4)o++;}return o===0;}));
   if(SHOTS){await mp.evaluate(()=>window.scrollTo(0,document.getElementById('room').getBoundingClientRect().top+scrollY-70));await mp.screenshot({path:SHOTS+'/movil_plano_auto.png'});}
   await mp.click('#medit');
@@ -647,12 +665,12 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
    ok('vertical: las pestañas son una barra fija pegada a los tres bordes inferiores (sin flotar)',Math.abs(t.l)<1&&Math.abs(t.r-t.iw)<1&&Math.abs(t.b-t.ih)<1,t);
    ok('vertical: la barra inferior tiene fondo sólido y esquinas rectas',await n.evaluate(()=>{const c=getComputedStyle(document.querySelector('.tabs'));return /^rgb\(/.test(c.backgroundColor)&&c.backdropFilter==='none'&&c.borderRadius==='0px';}));
    ok('cabecera sin degradado ni desenfoque (color sólido)',await n.evaluate(()=>{const c=getComputedStyle(document.querySelector('.top'));return /^rgb\(/.test(c.backgroundColor)&&c.backgroundImage==='none'&&(c.backdropFilter==='none'||c.backdropFilter==='');}));
-   await n.tap('.tab[data-tab="snd"]');await sleep(200);
+   await n.tap('.tab[data-tab="snd"]');await sleep(200);await n.tap('#sb_mode');await sleep(200);
    ok('Sonido: en pass-through solo se ve la tarjeta del modo activo (sin crossover ni EQ)',await n.evaluate(()=>{const v=id=>!!document.getElementById(id).offsetParent;return v('mode_pass')&&!v('mode_proc')&&!v('c_xo')&&!v('c_eq');}));
    ok('Sonido: el selector de modo marca Pass-through (radio) y dice qué hace',await n.evaluate(()=>document.getElementById('t_pass').getAttribute('aria-checked')==='true'&&document.getElementById('t_proc').getAttribute('aria-checked')==='false'&&document.getElementById('modedesc').textContent.length>20));
    await n.tap('#t_proc');
    ok('Sonido: al elegir Procesado aparecen solo sus opciones (crossover y EQ) y se oculta pass-through',await until(async()=>await n.evaluate(()=>{const v=id=>!!document.getElementById(id).offsetParent;return v('mode_proc')&&v('c_xo')&&v('c_eq')&&!v('mode_pass');})));
-   ok('Sonido: hay 4 subpestañas y solo un panel visible a la vez',await n.evaluate(()=>document.querySelectorAll('#snd_sub .sub').length===4&&[...document.querySelectorAll('.subpane')].filter(x=>!x.hidden).length===1));
+   ok('Sonido: hay 3 subpestañas (Perfiles, Modo, Mezcla) y solo un panel visible a la vez',await n.evaluate(()=>document.querySelectorAll('#snd_sub .sub').length===3&&[...document.querySelectorAll('#p_snd .subpane')].filter(x=>!x.hidden).length===1));
    await n.tap('#sb_mix');
    ok('Sonido: «Mezcla» muestra modo noche y LFE, y «Modo» queda oculto',await n.evaluate(()=>!!document.getElementById('c_nt').offsetParent&&!!document.getElementById('c_lfe').offsetParent&&!document.getElementById('sp_mode').offsetParent));
    await n.focus('#sb_mix');await n.keyboard.press('ArrowRight');
@@ -671,7 +689,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
    ok('horizontal: la cabecera forma parte de la página (no queda fija) y empieza a la derecha del riel',await n.evaluate(()=>{const c=getComputedStyle(document.querySelector('.top')),r=document.querySelector('.top').getBoundingClientRect(),tb=document.querySelector('.tabs').getBoundingClientRect();return c.position==='static'&&r.left>=tb.right-1;}));
    ok('horizontal: la cabecera cabe en una sola fila (no se amontona) y theme, Calibrar y Añadir altavoces son botones de icono de 44 px con nombre accesible',await n.evaluate(()=>{const h=document.querySelector('.top').getBoundingClientRect(),bs=['.themebtn','#lcal','#lble'].map(x=>document.querySelector(x));return h.height<=70&&bs.every(e=>{const r=e.getBoundingClientRect();return r.width>=43.5&&r.height>=43.5&&r.right<=innerWidth&&r.top<h.bottom;})&&document.getElementById('lcal').getAttribute('aria-label')==='Calibrar'&&document.getElementById('lble').getAttribute('aria-label')==='Añadir altavoces'&&document.querySelector('#lble .ic').getBoundingClientRect().width>0;}));
    ok('horizontal: sin scroll horizontal y pestañas de 44 px como mínimo',await n.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1&&[...document.querySelectorAll('.tab')].every(e=>e.getBoundingClientRect().height>=44)));
-   await n.tap('.tab[data-tab="spk"]');await n.tap('#spks .spk[data-id="0"]');await n.waitForSelector('#drawer.on');await sleep(450);
+   await n.tap('.tab[data-tab="spk"]');await n.tap('#spks .spk[data-id="0"]');await n.waitForSelector('#drawer.on');await adv(n);await sleep(450);
    const d=await R('#drawer'),cb=await R('#dclose');
    ok('horizontal: el modal del altavoz cabe entero en pantalla (no se corta)',d.t>=-0.5&&d.b<=d.ih+0.5&&d.r<=d.iw+0.5&&d.l>=0,d);
    ok('horizontal: el modal ocupa todo el ancho de la pantalla',Math.abs(d.w-d.iw)<1&&Math.abs(d.h-d.ih)<1,d);
@@ -684,7 +702,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
    ok('horizontal 932 px: las tarjetas de Latencia van en 3 columnas',await n.evaluate(()=>getComputedStyle(document.querySelector('#p_lat .cards')).gridTemplateColumns.split(' ').length===3));
    await n.setViewportSize({width:852,height:393});await sleep(300);await n.tap('.tab[data-tab="snd"]');await sleep(200);
    ok('horizontal: Sonido sin scroll horizontal',await n.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
-   if(SHOTS){await n.screenshot({path:SHOTS+'/movil_horizontal_sonido.png'});await n.tap('.tab[data-tab="spk"]');await n.tap('#spks .spk[data-id="0"]');await n.waitForSelector('#drawer.on');await sleep(450);await n.screenshot({path:SHOTS+'/movil_horizontal_modal.png'});await n.tap('#dclose');await sleep(300);
+   if(SHOTS){await n.screenshot({path:SHOTS+'/movil_horizontal_sonido.png'});await n.tap('.tab[data-tab="spk"]');await n.tap('#spks .spk[data-id="0"]');await n.waitForSelector('#drawer.on');await adv(n);await sleep(450);await n.screenshot({path:SHOTS+'/movil_horizontal_modal.png'});await n.tap('#dclose');await sleep(300);
      await n.setViewportSize({width:390,height:844});await sleep(300);await n.tap('.tab[data-tab="snd"]');await n.screenshot({path:SHOTS+'/movil_vertical_sonido.png'});}
    ok('navegación web app sin errores de JS',nerr.length===0,nerr);
    await nm.close();}

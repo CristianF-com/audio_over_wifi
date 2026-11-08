@@ -184,6 +184,10 @@ public:
     std::vector<std::string> channelNames() const;
     bool setChannelNames(const std::vector<std::string>& names, std::string& err);   // vacío = nombre por defecto
     bool loadChannelNames();
+    // ── Nombre de cada altavoz (p. ej. «Frontal»); fichero aparte <config>.spknames; vacío = sin nombre ──
+    std::string nodeName(int id) const;
+    bool setNodeName(int id, const std::string& name, std::string& err);
+    bool loadSpkNames();
 
     // ── Actualización de firmware por WiFi (OTA): envía la orden al ESP y deja de mandarle audio ──
     bool sendOta(uint8_t id, uint16_t http_port, uint32_t size, uint64_t token);
@@ -244,6 +248,8 @@ private:
     mutable std::mutex    names_mtx_;
     std::string           ch_names_[MAX_NODES];            // nombre elegido por el usuario; vacío = el de fábrica
     bool saveChannelNames();
+    std::string           spk_names_[MAX_NODES];
+    bool saveSpkNames();
     mutable std::mutex    prof_mtx_;
     std::vector<Profile>  profiles_;
     bool saveProfiles();

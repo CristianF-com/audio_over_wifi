@@ -95,6 +95,7 @@ c, _ = http("POST", "/api/node", {"id": 0, "ch_left": 99});           check("ch_
 c, _ = http("POST", "/api/node", b'{"id":"abc"}');                    check("id=abc -> 400 (sin crash)", c == 400, c)
 c, _ = http("POST", "/api/node", {"ch_left": 1});                     check("sin id -> 400", c == 400, c)
 c, _ = http("POST", "/api/node", {"id": 10});                          check("id=10 -> 400 (máx. 10 nodos: 0..9)", c == 400, c)
+c, _ = http("POST", "/api/node", {"id": 0, "name": ""});               check("nombre vacío -> 200 (borra)", c == 200, c)
 c, _ = http("POST", "/api/volume", b'{"volume":"x"}');                check("volume inválido -> 400", c == 400, c)
 c, _ = http("POST", "/api/calibrate", {"esp_id": 0, "latency_ms": 9999}); check("latencia fuera de rango -> 400", c == 400, c)
 c, _ = http("GET", "/nope");                                          check("ruta desconocida -> 404", c == 404, c)
@@ -113,11 +114,13 @@ c, b = http("GET", "/ble");       check("página /ble servida completa", c == 20
 http("POST", "/api/volume", {"volume": 0.5}); time.sleep(0.1)
 pk = grab(0.3); s = struct.unpack("<240h", pk[-1][20:])
 check("volumen maestro 0.5 aplicado", abs(s[0] - 8192) <= 1, s[0])
-cfgpk = None; end = time.time() + 5
-while time.time() < end and cfgpk is None:
+cfgpk = None; end = time.time() + 6
+while time.time() < end:
     try:
         d, _ = ctrl.recvfrom(256)
-        if len(d) == 16 and d[4] == 5: cfgpk = d
+        if len(d) == 16 and d[4] == 5:
+            cfgpk = d
+            if (d[6], d[7], d[8], d[9]) == (2, 1, 128, 255): break   # espera a la reconfiguración del arnés (a los 3 s)
     except socket.timeout: pass
 check("CONFIG recibido (16 B) en puerto 5005 del ESP", cfgpk is not None)
 if cfgpk:
@@ -127,6 +130,10 @@ if cfgpk:
 pk = grab(0.3); s = struct.unpack("<240h", pk[-1][20:])
 exp_l = round(8192 * (128 / 255) * 0.5)
 check("nuevo mapeo: L=ch2*(128/255)*0.5, R=ch1*1.0*0.5", abs(s[0] - exp_l) <= 1 and abs(s[1] - (-8192)) <= 1, (s[0], s[1], exp_l))
+c, _ = http("POST", "/api/node", {"id": 0, "name": "Sofá"});          check("nombre del altavoz -> 200", c == 200, c)
+c, b = http("GET", "/api/nodes"); n0 = [n for n in json.loads(b) if n["id"] == 0][0] if c == 200 else {}
+check("/api/nodes devuelve el nombre", n0.get("name") == "Sofá", n0.get("name"))
+c, _ = http("POST", "/api/node", {"id": 0, "name": "a<b"});            check("nombre con < -> 400", c == 400, c)
 
 # 7) disable -> deja de enviar audio
 http("POST", "/api/node", {"id": 0, "enabled": False}); time.sleep(0.3)

@@ -796,7 +796,7 @@ bool UdpStreamer::saveConfig() {
 bool UdpStreamer::loadConfig() {
     if (cfg_path_.empty()) return false;
     FILE* f = fopen(cfg_path_.c_str(), "r");
-    if (!f) { loadChannelNames(); return false; }                   // primera ejecución: normal (los nombres de las entradas van aparte)
+    if (!f) { loadChannelNames(); loadSpkNames(); return false; }                   // primera ejecución: normal (los nombres de las entradas van aparte)
     char line[160]; int applied = 0;
     std::lock_guard<std::mutex> lk(nodes_mtx_);
     while (fgets(line, sizeof(line), f)) {
@@ -842,6 +842,7 @@ bool UdpStreamer::loadConfig() {
     fprintf(stderr, "[Config] %s cargado (%d valores)\n", cfg_path_.c_str(), applied);
     loadProfiles();
     loadChannelNames();
+    loadSpkNames();
     return true;
 }
 
@@ -990,6 +991,52 @@ bool UdpStreamer::loadChannelNames() {
     fclose(f);
     std::lock_guard<std::mutex> lk(names_mtx_);
     for (int i = 0; i < 10; i++) ch_names_[i] = v[i];
+    return true;
+}
+// ── Nombres de altavoces: «spkN=nombre» (solo los puestos por el usuario) ──
+std::string UdpStreamer::nodeName(int id) const {
+    if (id < 0 || id >= MAX_NODES) return "";
+    std::lock_guard<std::mutex> lk(names_mtx_);
+    return spk_names_[id];
+}
+bool UdpStreamer::setNodeName(int id, const std::string& name, std::string& err) {
+    if (id < 0 || id >= MAX_NODES) { err = "ID fuera de rango"; return false; }
+    std::string clean;
+    if (!cleanChannelName(name, clean, err)) return false;
+    if (clean.find('\\') != std::string::npos) { err = "el nombre no puede llevar \\"; return false; }
+    { std::lock_guard<std::mutex> lk(names_mtx_); spk_names_[id] = clean; }
+    if (!saveSpkNames()) { err = "no se pudo guardar en la Raspberry"; return false; }
+    return true;
+}
+bool UdpStreamer::saveSpkNames() {
+    if (cfg_path_.empty()) return true;
+    const std::string path = cfg_path_ + ".spknames", tmp = path + ".tmp";
+    FILE* f = fopen(tmp.c_str(), "w");
+    if (!f) return false;
+    {
+        std::lock_guard<std::mutex> lk(names_mtx_);
+        for (int i = 0; i < MAX_NODES; i++) if (!spk_names_[i].empty()) fprintf(f, "spk%d=%s\n", i, spk_names_[i].c_str());
+    }
+    const bool ok = (fflush(f) == 0) & (ferror(f) == 0);
+    fclose(f);
+    return ok && rename(tmp.c_str(), path.c_str()) == 0;
+}
+bool UdpStreamer::loadSpkNames() {
+    if (cfg_path_.empty()) return false;
+    FILE* f = fopen((cfg_path_ + ".spknames").c_str(), "r");
+    if (!f) return false;
+    std::string v[MAX_NODES];
+    char line[128];
+    while (fgets(line, sizeof(line), f)) {
+        unsigned i = 0; int n = 0;
+        if (sscanf(line, "spk%u=%n", &i, &n) < 1 || n == 0 || i >= (unsigned)MAX_NODES) continue;
+        std::string val = line + n, clean, err;
+        while (!val.empty() && (val.back() == '\n' || val.back() == '\r')) val.pop_back();
+        if (cleanChannelName(val, clean, err)) v[i] = clean;
+    }
+    fclose(f);
+    std::lock_guard<std::mutex> lk(names_mtx_);
+    for (int i = 0; i < MAX_NODES; i++) spk_names_[i] = v[i];
     return true;
 }
 bool UdpStreamer::saveProfiles() {
