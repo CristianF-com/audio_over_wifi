@@ -51,7 +51,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
     document.getElementById('lp3').dataset.st='cable';const cab=g('lp3').backgroundColor,cabAnim=g('lp3').animationName;document.getElementById('lp3').dataset.st='off';
     document.getElementById('lp0').classList.add('on');const red=g('lp0').backgroundColor,sh=g('lp0').boxShadow,fl=g('lp0').filter;document.getElementById('lp0').classList.remove('on');
     return {sh,fl,red,offBg:off.backgroundColor,cab,anim:on.animationName,cabAnim,animOff:off.animationName,w:off.width,h:off.height};});
-  ok('vúmetros: sin señal = vacío; cable conectado = verde fijo; destello = rojo liso, sin brillo ni sombra; ninguno usa animación continua',lp.red==='rgb(255, 69, 58)'&&lp.cab==='rgb(48, 209, 88)'&&lp.offBg!==lp.cab&&lp.offBg!==lp.red&&lp.sh==='none'&&lp.fl==='none'&&lp.anim==='none'&&lp.cabAnim==='none'&&lp.animOff==='none'&&lp.w===lp.h,lp);
+  ok('vúmetros: sin señal = vacío; cable conectado = verde fijo; destello = rojo liso, sin brillo ni sombra; ninguno usa animación continua',lp.red==='rgb(255, 90, 80)'&&lp.cab==='rgb(52, 199, 89)'&&lp.offBg!==lp.cab&&lp.offBg!==lp.red&&lp.sh==='none'&&lp.fl==='none'&&lp.anim==='none'&&lp.cabAnim==='none'&&lp.animOff==='none'&&lp.w===lp.h,lp);
   // Lógica de umbrales: −70..−40 cable fijo; −40..0 destella al subir ~3 dB sobre el último valle; al bajar se apaga y vuelve a destellar
   const seq=await p.evaluate(()=>{const s={ref:-90,until:0,tm:0},r=[];const st=(db,t)=>{const z=lampStep(s,db,t);r.push([db,z,t<s.until]);};
     [-95,-60,-45,-39,-39,-37,-36,-30,-33,-36,-31,-90,-39,-60].forEach((db,i)=>st(db,i*1000));return r;});
@@ -74,7 +74,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
       col:[...v.children].filter((x,i)=>[0,8,11].includes(i)).map(x=>getComputedStyle(x).backgroundColor),bg:getComputedStyle(v.children[0]).backgroundImage};});
   ok('plano: vúmetro de 12 LED: 8 verdes (hasta −20 dB), 2 amarillos (hasta −10 dB), 2 rojos',cs.cls==='g'.repeat(8)+'y'.repeat(2)+'r'.repeat(2),cs.cls);
   if(SHOTS){await p.locator('#meters').screenshot({path:SHOTS+'/entrada_leds.png'});await p.locator('#room').screenshot({path:SHOTS+'/plano_vumetros.png'});}
-  ok('plano: colores estándar verde/amarillo/rojo y planos (sin degradado)',cs.col.join('|')==='rgb(48, 209, 88)|rgb(255, 214, 10)|rgb(255, 69, 58)'&&cs.bg==='none',cs);
+  ok('plano: colores estándar verde/amarillo/rojo y planos (sin degradado)',cs.col.join('|')==='rgb(52, 199, 89)|rgb(255, 214, 10)|rgb(255, 90, 80)'&&cs.bg==='none',cs);
   ok('vúmetros: texto de pico ≈ −6 dBFS',(await p.textContent('#mtxt')).includes('−')===false&&(await p.textContent('#mtxt')).includes('-6'),await p.textContent('#mtxt'));
   const fake=async(o)=>{await p.route('**/api/levels',r=>r.fulfill({contentType:'application/json',body:JSON.stringify(Object.assign({capturing:true,signal:true,signal_age_ms:10,pps:900,sending:true,nodes_online:5,db:[-6,-6,-12,-90,-12,-90,-90,-90,-90,-90]},o))}));};
   await fake({capturing:false,signal:false,sending:false,db:[-90,-90,-90,-90,-90,-90,-90,-90,-90,-90]});
@@ -189,7 +189,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('panel sin errores de JS',errs.length===0,errs);
   // ── PWA ──
   const mf=await fetch(BASE+'/manifest.webmanifest');const mj=await mf.json();
-  ok('PWA: manifiesto válido (nombre, standalone, inicio, colores, 3 iconos, atajos)',mj.name==='AStream'&&mj.display==='standalone'&&mj.start_url==='/'&&mj.theme_color==='#000000'&&mj.background_color==='#000000'&&mj.lang==='es'&&mj.icons.length>=3&&mj.icons.some(i=>i.purpose==='maskable')&&mj.shortcuts.length>=2,mj);
+  ok('PWA: manifiesto válido (nombre, standalone, inicio, colores, 3 iconos, atajos)',mj.name==='AStream'&&mj.display==='standalone'&&mj.start_url==='/'&&mj.theme_color==='#1c1c1e'&&mj.background_color==='#1c1c1e'&&mj.lang==='es'&&mj.icons.length>=3&&mj.icons.some(i=>i.purpose==='maskable')&&mj.shortcuts.length>=2,mj);
   const pngSize=async u=>{const b=Buffer.from(await (await fetch(BASE+u)).arrayBuffer());return b.readUInt32BE(0)===0x89504e47?[b.readUInt32BE(16),b.readUInt32BE(20),b[25]]:null;};
   ok('PWA: iconos PNG con el tamaño declarado y sin canal alfa (opacos, como pide Apple)',JSON.stringify(await pngSize('/icons/icon-180.png'))==='[180,180,2]'&&JSON.stringify(await pngSize('/icons/icon-192.png'))==='[192,192,2]'&&JSON.stringify(await pngSize('/icons/icon-512.png'))==='[512,512,2]'&&JSON.stringify(await pngSize('/icons/icon-maskable-512.png'))==='[512,512,2]');
   const sw=await (await fetch(BASE+'/sw.js')).text();
@@ -320,7 +320,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
    ok('forma recta: el cajón del altavoz también es recto',await p.evaluate(()=>parseFloat(getComputedStyle(document.getElementById('drawer')).borderTopLeftRadius)===0));
    ok('forma recta: el recuadro de selección del altavoz abierto es cuadrado (también sus rótulos)',await p.evaluate(()=>{const b=document.querySelector('#spks .spk[aria-expanded=true]');if(!b)return false;const g=e=>parseFloat(getComputedStyle(e).borderTopLeftRadius);
      return g(b)===0&&getComputedStyle(b).outlineStyle==='solid'&&[...b.querySelectorAll('.cap,.cal')].every(e=>g(e)===0);}));
-   ok('plano: fondo sólido (sin degradé) y negro en el tema oscuro',await p.evaluate(()=>{const r=getComputedStyle(document.getElementById('room'));return r.backgroundImage==='none'&&r.backgroundColor==='rgb(0, 0, 0)';}));
+   ok('plano: fondo sólido (sin degradé) y del color del fondo en el tema por defecto (Grafito)',await p.evaluate(()=>{const r=getComputedStyle(document.getElementById('room'));return r.backgroundImage==='none'&&r.backgroundColor==='rgb(43, 43, 45)';}));
    if(SHOTS)await p.screenshot({path:SHOTS+'/recta_cajon.png'});
    await p.keyboard.press('Escape');await until(async()=>!(await p.$('#drawer.on')));
    await p.evaluate(()=>SonosTheme.shape('round'));await sleep(250);
@@ -329,7 +329,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
    ok('forma redonda: al volver, los botones vuelven a ser píldoras (999 px)',await p.evaluate(()=>parseFloat(getComputedStyle(document.querySelector('.btn')).borderTopLeftRadius)>=100));
    await p.goto(BASE+'/?forma=recta');await p.waitForSelector('#spks .spk',{state:'attached'});
    {const fc=await b.newContext({viewport:{width:1280,height:860}});const fp=await fc.newPage();await fp.goto(BASE+'/');await fp.waitForSelector('#spks .spk',{state:'attached'});
-    ok('forma: por defecto es recta (sin radios en botones y tarjetas) en el tema oscuro',await fp.evaluate(()=>document.documentElement.getAttribute('data-shape')==='square'&&[...document.querySelectorAll('.btn,.card')].filter(e=>e.offsetParent).every(e=>parseFloat(getComputedStyle(e).borderTopLeftRadius)===0)));
+    ok('forma: por defecto es recta (sin radios en botones y tarjetas) en el tema por defecto',await fp.evaluate(()=>document.documentElement.getAttribute('data-shape')==='square'&&[...document.querySelectorAll('.btn,.card')].filter(e=>e.offsetParent).every(e=>parseFloat(getComputedStyle(e).borderTopLeftRadius)===0)));
     for(const t of ['graphite','light']){await fp.evaluate(t=>SonosTheme.set(t),t);await sleep(150);ok('forma: recta por defecto también en el tema '+t,await fp.evaluate(()=>[...document.querySelectorAll('.btn,.card')].filter(e=>e.offsetParent).every(e=>parseFloat(getComputedStyle(e).borderTopLeftRadius)===0)));
      ok('plano: fondo sólido (color liso, sin degradé) en el tema '+t,await fp.evaluate(()=>{const r=getComputedStyle(document.getElementById('room'));return r.backgroundImage==='none'&&r.backgroundColor===getComputedStyle(document.documentElement).getPropertyValue('--room-bg').trim().replace(/^#(..)(..)(..)$/,(m,x,y,z)=>'rgb('+[x,y,z].map(h=>parseInt(h,16)).join(', ')+')');}));}
     await fc.close();}
@@ -343,7 +343,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   if(SHOTS){await q.screenshot({path:SHOTS+'/movil_altavoces.png'});await q.locator('#meters').screenshot({path:SHOTS+'/movil_entrada_leds.png'});await q.locator('#room').scrollIntoViewIfNeeded();await q.locator('#room').screenshot({path:SHOTS+'/movil_plano_vumetros.png'});}
   ok('móvil: la navegación es una barra fija pegada abajo (sin flotar) con icono y una sola palabra por pestaña',await q.evaluate(()=>{const t=document.querySelector('.tabs'),r=t.getBoundingClientRect(),cs=getComputedStyle(t);
     return cs.position==='fixed'&&Math.abs(r.bottom-innerHeight)<1&&r.left<1&&Math.abs(r.right-innerWidth)<1&&parseFloat(cs.borderTopLeftRadius)===0&&[...t.querySelectorAll('.tab')].every(b=>b.querySelector('svg')&&getComputedStyle(b.querySelector('svg')).display!=='none'&&b.textContent.trim().split(/\s+/).length===1);}));
-  ok('móvil: objetivos táctiles de 44 px como mínimo (botones, segmentos, pestañas, selector, campo)',await q.evaluate(()=>['#more','.tab','#spks .spk','#mvs'].every(s=>{const e=document.querySelector(s);const r=e.getBoundingClientRect();return r.height>=44-.5;})));
+  ok('móvil: objetivos táctiles de 44 px como mínimo (botones, segmentos, pestañas, selector, campo)',await q.evaluate(()=>['#lble','#lcal','#medit','.tab','#spks .spk','#mvs'].every(s=>{const e=document.querySelector(s);const r=e.getBoundingClientRect();return r.height>=44-.5;})));
   ok('móvil: la cabecera ya no es fija (la navegación va abajo)',await q.evaluate(()=>getComputedStyle(document.querySelector('.top')).position==='static'));
   ok('móvil: ningún texto por debajo de 11 px',await q.evaluate(()=>{for(const e of document.querySelectorAll('body *')){if(!e.offsetParent&&getComputedStyle(e).position!=='fixed')continue;if(![...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim()))continue;if(parseFloat(getComputedStyle(e).fontSize)<11)return false;}return true;}));
   await q.tap('#spks .spk[data-id="0"]');await q.waitForSelector('#drawer.on');await adv(q);await sleep(400);
@@ -432,12 +432,29 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   const setTheme=async t=>{await p.evaluate(t=>localStorage.setItem('sonos_theme',t),t);await p.reload();await p.waitForSelector('.spk');return colors();};
   await p.evaluate(()=>localStorage.removeItem('sonos_theme'));await p.reload();await p.waitForSelector('.spk');
   let c=await colors();
-  ok('Tema: por defecto oscuro (fondo negro, theme-color #000000)',c.theme==='dark'&&c.bg==='rgb(0, 0, 0)'&&c.meta==='#000000'&&c.cs==='dark',c);
-  ok('Tema: el botón existe y dice Oscuro',(await p.textContent('[data-theme-btn]')).includes('Oscuro'));
-  const names=[];for(let i=0;i<4;i++){await p.click('[data-theme-btn]');names.push((await p.textContent('[data-theme-btn]')).trim());}
-  ok('Tema: el botón rota Grafito → Claro → Automático → Oscuro',JSON.stringify(names)==='["Grafito","Claro","Automático","Oscuro"]',names);
+  ok('Tema: por defecto Grafito (gris, no negro; theme-color #1c1c1e)',c.theme==='graphite'&&c.bg==='rgb(28, 28, 30)'&&c.meta==='#1c1c1e'&&c.cs==='dark',c);
+  await p.click('.tab[data-tab="sys"]');await p.click('#sy_ui');
+  ok('Interfaz (Sistema): el tema por defecto está marcado (Grafito) y la cabecera ya no tiene botón de tema',await p.evaluate(()=>document.querySelector('#ui_theme [data-v=graphite]').getAttribute('aria-pressed')==='true'&&!document.querySelector('.top [data-theme-btn]')));
+  const thSeq=[];for(const v of ['dark','light','auto','graphite']){await p.click('#ui_theme [data-v='+v+']');thSeq.push(await p.evaluate(()=>[localStorage.getItem('sonos_theme'),document.querySelector('#ui_theme [aria-pressed=true]').dataset.v].join('/')));}
+  ok('Interfaz: Grafito, Oscuro, Claro y Auto se eligen con un toque, se marcan y se guardan en este navegador',JSON.stringify(thSeq)==='["dark/dark","light/light","auto/auto","graphite/graphite"]',thSeq);
+  await p.click('#ui_shape [data-v=round]');
+  ok('Interfaz: «Curvos» cambia la forma al instante y se guarda (sonos_shape)',await p.evaluate(()=>document.documentElement.dataset.shape==='round'&&localStorage.getItem('sonos_shape')==='round'&&document.querySelector('#ui_shape [data-v=round]').getAttribute('aria-pressed')==='true'));
+  await p.click('#ui_shape [data-v=square]');
+  ok('Interfaz: «Rectos» vuelve a bordes rectos',await p.evaluate(()=>document.documentElement.dataset.shape==='square'&&localStorage.getItem('sonos_shape')==='square'));
+  const szs={};for(const v of ['s','m','l']){await p.click('#ui_size [data-v='+v+']');szs[v]=await p.evaluate(()=>[parseFloat(getComputedStyle(document.documentElement).fontSize),document.documentElement.dataset.size,localStorage.getItem('sonos_size'),document.documentElement.scrollWidth<=innerWidth+1]);}
+  ok('Interfaz: el tamaño del texto (pequeño < normal < grande) cambia la letra, se guarda y no desborda',szs.s[0]<szs.m[0]&&szs.m[0]<szs.l[0]&&szs.l[1]==='l'&&szs.l[2]==='l'&&szs.s[3]&&szs.m[3]&&szs.l[3],szs);
+  await p.click('#ui_size [data-v=m]');
+  const wz=await p.evaluate(()=>{const b=document.getElementById('ui_wiz');return b.getAttribute('aria-checked');});
+  await p.click('#ui_wiz');
+  ok('Interfaz: el interruptor «Guía de primeros pasos» se apaga y lo recuerda (sonos_wiz=off)',wz==='true'&&await p.evaluate(()=>document.getElementById('ui_wiz').getAttribute('aria-checked')==='false'&&localStorage.getItem('sonos_wiz')==='off'));
+  await p.click('#ui_theme [data-v=light]');await p.click('#ui_shape [data-v=round]');await p.click('#ui_size [data-v=l]');
+  await p.click('#ui_reset');
+  ok('Interfaz: «Restablecer apariencia» vuelve a Grafito, rectos, texto normal y guía activa',await p.evaluate(()=>document.documentElement.dataset.theme==='graphite'&&document.documentElement.dataset.shape==='square'&&document.documentElement.dataset.size==='m'&&localStorage.getItem('sonos_theme')===null&&localStorage.getItem('sonos_wiz')===null&&document.getElementById('ui_wiz').getAttribute('aria-checked')==='true'));
+  await p.click('#ui_theme [data-v=dark]');await p.click('#ui_shape [data-v=round]');await p.click('.tab[data-tab="spk"]');await p.reload();await p.waitForSelector('.spk');
+  ok('Interfaz: tema y forma elegidos persisten al recargar',await p.evaluate(()=>document.documentElement.dataset.theme==='dark'&&document.documentElement.dataset.shape==='round'));
+  await p.evaluate(()=>SonosTheme.reset());await p.reload();await p.waitForSelector('.spk');
   const noPurple=x=>['ac','bad','ok','warn'].every(k=>{const h=x[k].replace('#','');const r=parseInt(h.substr(0,2),16),g=parseInt(h.substr(2,2),16),b=parseInt(h.substr(4,2),16);return !(b>r&&r>g&&b>150&&r>100);});
-  for(const [t,meta,cs] of [['graphite','#1c1c1e','dark'],['light','#d5d9e0','light']]){
+  for(const [t,meta,cs] of [['graphite','#1c1c1e','dark'],['dark','#000000','dark'],['light','#d5d9e0','light']]){
     c=await setTheme(t);
     ok('Tema '+t+': data-theme, theme-color y color-scheme correctos',c.theme===t&&c.meta===meta&&c.cs===cs,c);
     ok('Tema '+t+': texto/fondo y texto atenuado ≥ 4,5:1',cr(c.fg,c.bg)>=4.5&&cr(c.mut,c.bg)>=4.5,[cr(c.fg,c.bg),cr(c.mut,c.bg)]);
@@ -459,17 +476,17 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   c=await setTheme('graphite');
   ok('Tema Grafito: gris, no negro puro (fondo entre 0,008 y 0,05 de luminancia)',lum(c.bg)>0.008&&lum(c.bg)<0.05,lum(c.bg));
   await p.emulateMedia({colorScheme:'dark'});c=await setTheme('auto');
-  ok('Tema Automático: sigue al sistema (aquí oscuro)',(await p.textContent('[data-theme-btn]')).includes('Automático')&&c.theme==='dark',c);
+  ok('Tema Automático: sigue al sistema (aquí oscuro -> Grafito)',(await p.evaluate(()=>SonosTheme.get()))==='auto'&&c.theme==='graphite',c);
   await p.emulateMedia({colorScheme:'light'});await sleep(200);c=await colors();
   ok('Tema Automático: cambia a claro cuando el sistema pasa a claro',c.theme==='light',c);
   await p.emulateMedia({colorScheme:'dark'});await sleep(200);c=await colors();
-  ok('Tema Automático: vuelve a oscuro',c.theme==='dark',c);
+  ok('Tema Automático: vuelve a Grafito',c.theme==='graphite',c);
   for(const u of ['/calibrate','/ble']){await p.evaluate(()=>localStorage.setItem('sonos_theme','graphite'));const q=await ctx.newPage();await q.goto(BASE+u);ok('Tema Grafito compartido en '+u,await q.evaluate(()=>document.documentElement.dataset.theme)==='graphite'&&await q.locator('[data-theme-btn]').count()===1);await q.close();}
   // botones de cabecera: todos con la misma altura y alineados (antes «Calibrar» era un enlace desplazado)
   await p.evaluate(()=>localStorage.removeItem('sonos_theme'));await p.reload();await p.waitForSelector('.spk');
-  const hb=await p.evaluate(()=>['[data-theme-btn]','#lcal','#lble'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return [r.top,r.height];}));
-  ok('Cabecera: Calibrar, Añadir altavoces y Tema son botones alineados (misma altura y borde superior)',hb.every(x=>Math.abs(x[0]-hb[0][0])<1&&Math.abs(x[1]-hb[0][1])<1),hb);
-  ok('Cabecera: «Calibrar» no se subraya como enlace',await p.evaluate(()=>getComputedStyle(document.getElementById('lcal')).textDecorationLine)==='none');
+  const hb=await p.evaluate(()=>['#lble','#lcal','#medit'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return [r.top,r.height];}));
+  ok('Plano: Añadir altavoces (+), Calibrar y Editar plano están juntos, alineados y con la misma altura',hb.every(x=>Math.abs(x[0]-hb[0][0])<1&&Math.abs(x[1]-hb[0][1])<1),hb);
+  ok('Calibrar no se subraya como enlace',await p.evaluate(()=>getComputedStyle(document.getElementById('lcal')).textDecorationLine)==='none');
 
   // ── Plano de la sala: un dibujo por altavoz (canal), con ESP, canal y estado; se mueven uno a uno ──
   const spkPos=async(id,side)=>p.evaluate(([i,sd])=>{const e=document.querySelector('#spks .spk[data-id="'+i+'"][data-side="'+sd+'"]'),r=document.getElementById('room').getBoundingClientRect(),b=e.getBoundingClientRect();return [(b.left+b.width/2-r.left)/r.width*100,(b.top+b.height/2-r.top)/r.height*100];},[id,side]);
@@ -498,7 +515,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('Plano: fuera del modo mover, tocar un altavoz abre el cajón de su ESP',await (async()=>{await p.click(U(0,1));const o=await p.evaluate(()=>document.getElementById('drawer').classList.contains('on'));await p.click('#drawer .x');return o;})());
   const before0=await spkPos(0,0),before1=await spkPos(0,1);const vol00=(await J('/api/nodes'))[0].volume_l;
   await p.click('#medit');
-  ok('Plano: «Mover altavoces» activa el modo (aria-pressed, botón Listo, restablecer visible)',await p.getAttribute('#medit','aria-pressed')==='true'&&(await p.textContent('#medit'))==='Listo'&&await p.isVisible('#mreset'));
+  ok('Plano: «Editar plano» activa el modo (aria-pressed, botón Listo, restablecer visible)',await p.getAttribute('#medit','aria-pressed')==='true'&&(await p.textContent('#medit'))==='Listo'&&await p.isVisible('#mreset'));
   await p.click(U(0,1),{force:true});
   ok('Plano: en modo mover, tocar no abre el cajón',!(await p.evaluate(()=>document.getElementById('drawer').classList.contains('on'))));
   const rb=await p.locator('#room').boundingBox();
@@ -585,13 +602,10 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   const mp=await ctx2.newPage();await mp.goto(BASE+'/');await mp.waitForSelector('.spk');
   for(const t of ['graphite','light']){await mp.evaluate(t=>localStorage.setItem('sonos_theme',t),t);await mp.reload();await mp.waitForSelector('.spk');
     ok('Móvil: tema '+t+' sin desbordamiento horizontal',await mp.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));}
-  ok('Móvil vertical: Calibrar, Añadir altavoces y Tema van dentro del menú «⋯» (cerrado por defecto)',await mp.evaluate(()=>!document.getElementById('links').offsetParent&&document.getElementById('more').getAttribute('aria-expanded')==='false'));
-  await mp.tap('#more');await sleep(150);
-  ok('Móvil vertical: el menú «⋯» se abre, sus botones miden ≥44 px y Esc lo cierra',await mp.evaluate(()=>document.getElementById('more').getAttribute('aria-expanded')==='true'&&['#lcal','#lble','[data-theme-btn]'].every(s=>document.querySelector(s).getBoundingClientRect().height>=43.5)));
-  const mh=await mp.evaluate(()=>['[data-theme-btn]','#lcal','#lble'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return [r.top,r.height];}));
-  ok('Móvil: los botones del menú tienen la misma altura',mh.every(x=>Math.abs(x[1]-mh[0][1])<1),mh);
-  await mp.keyboard.press('Escape');await sleep(150);
-  ok('Móvil vertical: Esc cierra el menú «⋯»',await mp.evaluate(()=>document.getElementById('more').getAttribute('aria-expanded')==='false'&&!document.getElementById('links').offsetParent));
+  ok('Móvil vertical: la cabecera es una fila (marca, estado y volumen) sin menú «⋯», sin botón de tema y sin Calibrar ni Añadir altavoces',await mp.evaluate(()=>!document.getElementById('more')&&!document.querySelector('.top [data-theme-btn]')&&!document.querySelector('.top #lcal')&&!document.querySelector('.top #lble')));
+  const mh=await mp.evaluate(()=>['#lble','#lcal','#medit'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return [r.top,r.height,r.right,r.width];}));
+  ok('Móvil vertical: +, Calibrar y Editar plano están junto al plano, miden ≥44 px y caben en pantalla',mh.every(x=>x[1]>=43.5&&x[2]<=390&&x[3]>0),mh);
+  ok('Móvil vertical: «Añadir altavoces» es solo el signo + (con nombre accesible) y el texto de ayuda va debajo de los botones',await mp.evaluate(()=>{const b=document.getElementById('lble'),h=document.getElementById('mhint'),m=document.getElementById('medit').getBoundingClientRect(),hr=h.getBoundingClientRect(),br=b.getBoundingClientRect();return b.textContent.trim()===''&&b.getAttribute('aria-label')==='Añadir altavoces'&&br.width>=43.5&&br.width<=48&&hr.top>=Math.max(m.bottom,br.bottom)-1&&document.getElementById('medit').textContent==='Editar plano';}));
   ok('Móvil: los altavoces con posición automática no se solapan entre sí',await mp.evaluate(()=>{const bs=[...document.querySelectorAll('#spks .spk')].map(e=>e.getBoundingClientRect());let o=0;for(let i=0;i<bs.length;i++)for(let j=i+1;j<bs.length;j++){const a=bs[i],b=bs[j];if(a.left<b.right-4&&b.left<a.right-4&&a.top<b.bottom-4&&b.top<a.bottom-4)o++;}return o===0;}));
   if(SHOTS){await mp.evaluate(()=>window.scrollTo(0,document.getElementById('room').getBoundingClientRect().top+scrollY-70));await mp.screenshot({path:SHOTS+'/movil_plano_auto.png'});}
   await mp.click('#medit');
@@ -697,7 +711,10 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
    t=await R('.tabs');
    ok('horizontal: las pestañas pasan a un riel fijo a la izquierda, a todo el alto',t.l<1&&t.w>=70&&t.w<=130&&Math.abs(t.h-t.ih)<2,t);
    ok('horizontal: la cabecera forma parte de la página (no queda fija) y empieza a la derecha del riel',await n.evaluate(()=>{const c=getComputedStyle(document.querySelector('.top')),r=document.querySelector('.top').getBoundingClientRect(),tb=document.querySelector('.tabs').getBoundingClientRect();return c.position==='static'&&r.left>=tb.right-1;}));
-   ok('horizontal: la cabecera cabe en una sola fila (no se amontona) y theme, Calibrar y Añadir altavoces son botones de icono de 44 px con nombre accesible',await n.evaluate(()=>{const h=document.querySelector('.top').getBoundingClientRect(),bs=['.themebtn','#lcal','#lble'].map(x=>document.querySelector(x));return h.height<=70&&bs.every(e=>{const r=e.getBoundingClientRect();return r.width>=43.5&&r.height>=43.5&&r.right<=innerWidth&&r.top<h.bottom;})&&document.getElementById('lcal').getAttribute('aria-label')==='Calibrar'&&document.getElementById('lble').getAttribute('aria-label')==='Añadir altavoces'&&document.querySelector('#lble .ic').getBoundingClientRect().width>0;}));
+   await n.tap('.tab[data-tab="spk"]');await sleep(250);
+   await n.tap('.tab[data-tab="spk"]');await sleep(250);
+   const hz=await n.evaluate(()=>{const h=document.querySelector('.top').getBoundingClientRect(),tb=['#lble','#lcal','#medit'].map(x=>document.querySelector(x).getBoundingClientRect()),hh=document.getElementById('mhint').getBoundingClientRect();return {h:h.height,tb:tb.map(r=>[r.width,r.height,r.right,r.bottom]),hintTop:hh.top,iw:innerWidth,inTop:!!document.querySelector('.top #lcal')||!!document.querySelector('.top #lble')||!!document.querySelector('.top [data-theme-btn]')};});
+   ok('horizontal: la cabecera cabe en una sola fila (no se amontona) y +, Calibrar y Editar plano están junto al plano con la ayuda debajo',hz.h<=70&&!hz.inTop&&hz.tb.every(r=>r[1]>=43.5&&r[0]>0&&r[2]<=hz.iw)&&hz.hintTop>=Math.max(...hz.tb.map(r=>r[3]))-1,JSON.stringify(hz));
    ok('horizontal: sin scroll horizontal y pestañas de 44 px como mínimo',await n.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1&&[...document.querySelectorAll('.tab')].every(e=>e.getBoundingClientRect().height>=44)));
    await n.tap('.tab[data-tab="spk"]');await n.tap('#spks .spk[data-id="0"]');await n.waitForSelector('#drawer.on');await adv(n);await sleep(450);
    const d=await R('#drawer'),cb=await R('#dclose');

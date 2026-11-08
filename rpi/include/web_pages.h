@@ -8,17 +8,17 @@
 static const char PAGE_PANEL[] = R"HTML(<!DOCTYPE html>
 <html lang="es"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#000000"><meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#1c1c1e"><meta name="color-scheme" content="dark light">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="AStream"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
 <script>if('serviceWorker' in navigator&&window.isSecureContext)addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});</script>
-<script>/* Tema de la interfaz: «dark» (por defecto), «graphite», «light» o «auto» (sigue al sistema; resuelve a dark o light). Se guarda en localStorage (por navegador).
-   Se ejecuta en el <head> (antes de pintar) para que no haya destello; los botones [data-theme-btn] rotan Oscuro → Grafito → Claro → Automático. */
+<script>/* Tema de la interfaz: «graphite» (por defecto), «dark» (negro), «light» o «auto» (sigue al sistema; resuelve a graphite o light). Se guarda en localStorage (por navegador).
+   Se ejecuta en el <head> (antes de pintar) para que no haya destello; los botones [data-theme-btn] rotan Grafito → Oscuro → Claro → Automático. */
 (function () {
-  var KEY = 'sonos_theme', SKEY = 'sonos_shape', ORDER = ['dark', 'graphite', 'light', 'auto'], NAME = { dark: 'Oscuro', graphite: 'Grafito', light: 'Claro', auto: 'Automático' };
+  var KEY = 'sonos_theme', SKEY = 'sonos_shape', ZKEY = 'sonos_size', ORDER = ['graphite', 'dark', 'light', 'auto'], NAME = { dark: 'Oscuro', graphite: 'Grafito', light: 'Claro', auto: 'Automático' };
   var META = { dark: '#000000', graphite: '#1c1c1e', light: '#d5d9e0' };
   var ICON = {
     dark: '<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>',
@@ -27,14 +27,18 @@ static const char PAGE_PANEL[] = R"HTML(<!DOCTYPE html>
     auto: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor"/>'
   };
   var mq = window.matchMedia ? matchMedia('(prefers-color-scheme: light)') : null;
-  function pref() { var p = 'dark'; try { p = localStorage.getItem(KEY) || 'dark'; } catch (e) {} return ORDER.indexOf(p) < 0 ? 'dark' : p; }
+  function pref() { var p = 'graphite'; try { p = localStorage.getItem(KEY) || 'graphite'; } catch (e) {} return ORDER.indexOf(p) < 0 ? 'graphite' : p; }
   // Forma: «square» (por defecto: todos los radios a 0 salvo los altavoces del radar) o «round» (píldoras). ?forma=recta / ?forma=redonda la fija y se guarda.
   function shape() { var v = 'square'; try { v = localStorage.getItem(SKEY) || 'square'; } catch (e) {} return v === 'round' ? 'round' : 'square'; }
   function setShape(v) { try { localStorage.setItem(SKEY, v === 'square' ? 'square' : 'round'); } catch (e) {} apply(); }
   try { var q = /[?&]forma=(recta|redonda)/.exec(location.search); if (q) setShape(q[1] === 'recta' ? 'square' : 'round'); } catch (e) {}
+  // Tamaño del texto: «s» (pequeño), «m» (por defecto) o «l» (grande). Se guarda en este navegador.
+  function size() { var v = 'm'; try { v = localStorage.getItem(ZKEY) || 'm'; } catch (e) {} return v === 's' || v === 'l' ? v : 'm'; }
+  function setSize(v) { try { localStorage.setItem(ZKEY, v === 's' || v === 'l' ? v : 'm'); } catch (e) {} apply(); }
   function apply() {
     document.documentElement.setAttribute('data-shape', shape());
-    var p = pref(), t = p === 'auto' ? (mq && mq.matches ? 'light' : 'dark') : p;
+    document.documentElement.setAttribute('data-size', size());
+    var p = pref(), t = p === 'auto' ? (mq && mq.matches ? 'light' : 'graphite') : p;
     document.documentElement.setAttribute('data-theme', t);
     var m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', META[t]);
     var bs = document.querySelectorAll('[data-theme-btn]');
@@ -47,10 +51,11 @@ static const char PAGE_PANEL[] = R"HTML(<!DOCTYPE html>
   }
   function set(p) { try { localStorage.setItem(KEY, p); } catch (e) {} apply(); }
   function next() { set(ORDER[(ORDER.indexOf(pref()) + 1) % ORDER.length]); }
-  window.SonosTheme = { get: pref, set: set, next: next, apply: apply, shape: setShape, getShape: shape };
+  window.SonosTheme = { get: pref, set: set, next: next, apply: apply, shape: setShape, getShape: shape, size: setSize, getSize: size,
+    reset: function () { try { localStorage.removeItem(KEY); localStorage.removeItem(SKEY); localStorage.removeItem(ZKEY); } catch (e) {} apply(); } };
   apply();
   if (mq && mq.addEventListener) mq.addEventListener('change', apply);
-  addEventListener('storage', function (e) { if (e.key === KEY) apply(); });
+  addEventListener('storage', function (e) { if (e.key === KEY || e.key === SKEY || e.key === ZKEY) apply(); });
   document.addEventListener('DOMContentLoaded', function () {
     var bs = document.querySelectorAll('[data-theme-btn]');
     for (var i = 0; i < bs.length; i++) bs[i].addEventListener('click', next);
@@ -100,7 +105,7 @@ html[data-theme=light]{
   color-scheme:light;
 }
 *{box-sizing:border-box;margin:0}
-html{font-size:106.25%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
+html{font-size:106.25%}html[data-size=s]{font-size:96%}html[data-size=l]{font-size:120%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
 body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
   font-variant-numeric:tabular-nums;min-height:100vh;-webkit-text-size-adjust:100%;
   padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
@@ -223,7 +228,6 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 .mv svg{width:20px;height:20px;flex:none;color:var(--mut)}
 .mv .rng{flex:1}.mv b{min-width:42px;text-align:right;font-weight:600}
 .links{display:flex;gap:6px}
-#more{display:none;min-width:44px;min-height:44px;justify-content:center;padding:0 10px}#more svg{width:20px;height:20px}
 details.help{margin:8px 0}details.help>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;color:var(--mut);font-size:.9rem}
 details.help>summary:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 details.adv>.advbody{display:grid;gap:14px;padding-top:6px}
@@ -258,7 +262,8 @@ details.adv>.advbody{display:grid;gap:14px;padding-top:6px}
 
 /* Plano de sala: cada canal es un altavoz dibujado; se coloca donde está en la sala */
 .roombar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
-.roombar .hint{margin-right:auto;min-width:200px;flex:1}
+.roombar .hint{order:9;flex:1 1 100%;margin:0}
+#lble{min-width:44px;padding-left:0;padding-right:0;justify-content:center}
 .room{--hw:64px;--ht:80px;--hb:72px;user-select:none;-webkit-user-select:none;position:relative;width:100%;aspect-ratio:16/9;min-height:360px;border:1px solid var(--line);border-radius:var(--r-sheet);overflow:hidden;background:var(--room-bg)}
 .room>*{z-index:1}
 .room{touch-action:pan-y}                       /* la página sigue deslizándose; el pellizco lo gestiona el plano */
@@ -424,14 +429,10 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   .top{position:static}                                /* la navegación ya va en la barra inferior: la cabecera no ocupa pantalla fija */
   .top .in{padding:8px 12px;gap:8px}
   .mv{order:5;flex:1 1 100%;margin-left:0}
-  #more{display:inline-flex;margin-left:auto}
   #st{flex:1 1 0;min-width:0}#st #hs{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .top .in{flex-wrap:wrap}
-  .links .themebtn .tl{display:inline}
   .brand{flex:none}
-  .links{display:none;position:absolute;right:12px;top:100%;z-index:45;flex-direction:column;align-items:stretch;background:var(--panel);border:1px solid var(--line2);padding:8px;min-width:200px;box-shadow:0 14px 34px -14px rgba(0,0,0,.6)}
-  .links.open{display:flex}.links .btn{justify-content:flex-start;min-height:44px}
-  .top .in{position:relative}
+  .links{margin-left:auto}
   .room{aspect-ratio:9/16;min-height:640px;--hw:60px;--ht:78px;--hb:70px}
   .spk{min-width:90px}.cab{width:40px;height:54px}.spk.sub .cab{width:48px;height:48px}.spk .ch{font-size:.92rem}.spk .cap{font-size:.66rem;padding:1px 4px}.spk .cal{font-size:.7rem;padding:1px 5px}
   .tiles,.cards{grid-template-columns:1fr}
@@ -453,7 +454,6 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   .brand{flex:none}
   .mv{order:0;flex:1 1 120px;min-width:96px;margin-left:auto}
   .links{margin-left:0;flex:none}
-  #more{display:none}
   .links .btn{min-width:44px;min-height:44px;justify-content:center;padding-left:10px;padding-right:10px}
   .links .ic{display:block}.links .tl,.links .themebtn .tl,.themebtn .tl{display:none}
   main{padding:12px 12px calc(16px + env(safe-area-inset-bottom))}
@@ -503,8 +503,6 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
     <input class="rng" id="mvs" type="range" min="0" max="100" value="100" aria-label="Volumen maestro"><b id="mvd">100%</b>
   </div>
-  <button class="btn ghost sm" id="more" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="links" aria-label="Más acciones" title="Más acciones"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
-  <div class="links" id="links"><button class="btn ghost sm themebtn" data-theme-btn type="button"></button><a class="btn ghost sm" id="lcal" href="#" aria-label="Calibrar" title="Calibrar"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h3l2-6 4 12 2-6h5"/></svg><span class="tl">Calibrar</span></a><button class="btn ghost sm" id="lble" aria-label="Añadir altavoces" title="Añadir altavoces"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="tl">Añadir altavoces</span></button></div>
 </div></div>
 
 <main>
@@ -526,9 +524,12 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
     <div class="mb" id="mb"></div>
     <details class="help ms"><summary>¿Cómo leer los cuadrados?</summary><p>Cada cuadrado es un canal: vacío = sin cable ni señal (por debajo de −70 dBFS); verde fijo = cable conectado pero sin sonido (de −70 a −40); con sonido (por encima de −40) destella en rojo cada vez que el nivel sube unos 3 dB y se apaga al bajar. El número es su nivel en dBFS. El vúmetro de cada altavoz del plano marca de −60 a 0 dBFS: verde hasta −20, amarillo hasta −10 y rojo por encima; el segmento suelto es el pico reciente.</p></details>
   </div>
-  <div class="roombar"><span class="hint" id="mhint">Toca un altavoz para ajustarlo. Los cambios se guardan solos.</span>
+  <div class="roombar">
+    <button class="btn ghost sm" id="lble" type="button" aria-label="Añadir altavoces" title="Añadir altavoces"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+    <a class="btn ghost sm" id="lcal" href="#">Calibrar</a>
+    <button class="btn ghost sm" id="medit" aria-pressed="false" aria-describedby="mhint">Editar plano</button>
     <button class="btn ghost sm" id="mreset" hidden>Restablecer posiciones</button>
-    <button class="btn ghost sm" id="medit" aria-pressed="false" aria-describedby="mhint">Mover altavoces</button></div>
+    <span class="hint" id="mhint">Toca un altavoz para ajustarlo. Los cambios se guardan solos.</span></div>
   <div class="room" id="room" aria-label="Plano de la sala con los altavoces">
     <svg class="radar" id="radar" aria-hidden="true"></svg>
     <div class="screen" title="Pantalla">Pantalla</div><span class="rl back">Atrás</span>
@@ -645,6 +646,7 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
     <button class="sub" role="tab" id="sy_in" aria-controls="sp_sin" data-sub="in" aria-selected="false" tabindex="-1">Entradas</button>
     <button class="sub" role="tab" id="sy_fw" aria-controls="sp_fw" data-sub="fw" aria-selected="false" tabindex="-1">Firmware</button>
     <button class="sub" role="tab" id="sy_rpi" aria-controls="sp_rpi" data-sub="rpi" aria-selected="false" tabindex="-1">Raspberry</button>
+    <button class="sub" role="tab" id="sy_ui" aria-controls="sp_ui" data-sub="ui" aria-selected="false" tabindex="-1">Interfaz</button>
     <button class="sub" role="tab" id="sy_log" aria-controls="sp_log" data-sub="log" aria-selected="false" tabindex="-1">Registro</button>
   </div><button class="sbm l" type="button" tabindex="-1" aria-hidden="true" data-dir="-1">‹</button><button class="sbm r" type="button" tabindex="-1" aria-hidden="true" data-dir="1">›</button></div>
   <div class="subpane" id="sp_net" role="tabpanel" aria-labelledby="sy_net">
@@ -693,6 +695,37 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
       <button class="btn sm" id="upd_btn" type="button">Actualizar servidor</button>
       <p class="hint" id="upd_msg" aria-live="polite" style="margin-top:8px"></p>
       <div class="log" id="upd_log" role="log" hidden></div>
+    </div>
+  </div></div>
+  <div class="subpane" id="sp_ui" role="tabpanel" aria-labelledby="sy_ui" hidden><div class="cards">
+    <div class="card" id="c_ui">
+      <h2>Apariencia</h2>
+      <p class="hint">Se guarda en este navegador: otro móvil u ordenador puede tener su propio aspecto.</p>
+      <div class="fld"><label id="ui_th_l">Tema</label>
+        <div class="seg block" id="ui_theme" role="radiogroup" aria-labelledby="ui_th_l">
+          <button type="button" role="radio" data-v="graphite" aria-checked="false" aria-pressed="false">Grafito</button>
+          <button type="button" role="radio" data-v="dark" aria-checked="false" aria-pressed="false">Oscuro</button>
+          <button type="button" role="radio" data-v="light" aria-checked="false" aria-pressed="false">Claro</button>
+          <button type="button" role="radio" data-v="auto" aria-checked="false" aria-pressed="false">Auto</button>
+        </div><p class="hint" id="ui_th_h"></p></div>
+      <div class="fld"><label id="ui_sh_l">Bordes</label>
+        <div class="seg block" id="ui_shape" role="radiogroup" aria-labelledby="ui_sh_l">
+          <button type="button" role="radio" data-v="square" aria-checked="false" aria-pressed="false">Rectos</button>
+          <button type="button" role="radio" data-v="round" aria-checked="false" aria-pressed="false">Curvos</button>
+        </div></div>
+      <div class="fld"><label id="ui_sz_l">Tamaño del texto</label>
+        <div class="seg block" id="ui_size" role="radiogroup" aria-labelledby="ui_sz_l">
+          <button type="button" role="radio" data-v="s" aria-checked="false" aria-pressed="false">Pequeño</button>
+          <button type="button" role="radio" data-v="m" aria-checked="false" aria-pressed="false">Normal</button>
+          <button type="button" role="radio" data-v="l" aria-checked="false" aria-pressed="false">Grande</button>
+        </div></div>
+    </div>
+    <div class="card" id="c_ui2">
+      <h2>Ayudas</h2>
+      <div class="sw"><div><b>Guía de primeros pasos</b><div class="hint">Muestra los 4 pasos en Altavoces hasta completarlos.</div></div>
+        <button class="switch" id="ui_wiz" type="button" role="switch" aria-checked="true" aria-label="Guía de primeros pasos"></button></div>
+      <button class="btn ghost sm" id="ui_reset" type="button" style="margin-top:12px">Restablecer apariencia</button>
+      <p class="hint" id="ui_rs" aria-live="polite"></p>
     </div>
   </div></div>
   <div class="subpane" id="sp_log" role="tabpanel" aria-labelledby="sy_log" hidden>
@@ -748,12 +781,16 @@ document.querySelector('.tabs').addEventListener('keydown',e=>{               //
   i=e.key==='Home'?0:e.key==='End'?tabs.length-1:(i+(e.key==='ArrowRight'||e.key==='ArrowDown'?1:-1)+tabs.length)%tabs.length;
   e.preventDefault();tabs[i].focus();showTab(tabs[i].dataset.tab);});
 
-/* Menú «⋯» de la cabecera en móvil vertical */
-(function(){const b=$('more'),l=$('links');if(!b||!l)return;
-  const set=o=>{l.classList.toggle('open',o);b.setAttribute('aria-expanded',o);};
-  b.onclick=e=>{e.stopPropagation();set(!l.classList.contains('open'));};
-  document.addEventListener('click',e=>{if(!l.contains(e.target)&&e.target!==b)set(false);});
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&l.classList.contains('open')){set(false);b.focus();}});})();
+/* Pestaña «Interfaz»: tema, bordes y tamaño del texto (se guardan en este navegador) */
+function uiSync(){const T=window.SonosTheme;if(!T)return;
+  const mark=(id,v)=>$(id).querySelectorAll('button').forEach(b=>{const on=b.dataset.v===v;b.setAttribute('aria-pressed',on);b.setAttribute('aria-checked',on);});
+  mark('ui_theme',T.get());mark('ui_shape',T.getShape());mark('ui_size',T.getSize());
+  $('ui_th_h').textContent=T.get()==='auto'?'Sigue al sistema: Claro de día y Grafito de noche.':'';
+  $('ui_wiz').setAttribute('aria-checked',lsGet('sonos_wiz')!=='off');}
+[['ui_theme','set'],['ui_shape','shape'],['ui_size','size']].forEach(([id,fn])=>$(id).querySelectorAll('button').forEach(b=>b.onclick=()=>{window.SonosTheme[fn](b.dataset.v);uiSync();$('ui_rs').textContent='';}));
+$('ui_wiz').onclick=()=>{const on=lsGet('sonos_wiz')==='off';if(on){try{localStorage.removeItem('sonos_wiz');}catch(e){}}else lsSet('sonos_wiz','off');drawWizard();uiSync();};
+$('ui_reset').onclick=()=>{window.SonosTheme.reset();try{localStorage.removeItem('sonos_wiz');}catch(e){}drawWizard();uiSync();$('ui_rs').textContent='Apariencia restablecida: Grafito, bordes rectos y texto normal.';};
+uiSync();addEventListener('storage',uiSync);
 /* Hojas (cajón del altavoz y Bluetooth): modales de verdad. El resto de la página queda inerte (teclado y lector de pantalla),
    el foco entra en la hoja y vuelve a donde estaba al cerrarla; en el móvil se cierran deslizando hacia abajo. */
 let lastFocus=null;
@@ -939,7 +976,7 @@ function drawRoom(){
   document.querySelectorAll('#spks .spk,#chips button').forEach(b=>b.onclick=()=>{if(editRoom&&b.classList.contains('spk'))return;openDrawer(+b.dataset.id);});
 }
 
-/* Colocar los altavoces en el plano: modo «Mover altavoces». Cada altavoz (canal) se guarda por separado en la Raspberry. */
+/* Colocar los altavoces en el plano: modo «Editar plano». Cada altavoz (canal) se guarda por separado en la Raspberry. */
 const clampN=(v,a,b)=>Math.max(a,Math.min(b,v));
 const r1=v=>Math.round(v*10)/10;
 const posBody=(n,side,x,y)=>side?{id:n.id,pos2_x:r1(x),pos2_y:r1(y)}:{id:n.id,pos_x:r1(x),pos_y:r1(y)};
@@ -951,7 +988,7 @@ async function savePos(n,side){
 }
 const unitEl=(id,side)=>document.querySelector('#spks .spk[data-id="'+id+'"][data-side="'+side+'"]');
 function setEdit(on){
-  editRoom=on;$('room').classList.toggle('edit',on);$('medit').setAttribute('aria-pressed',on);$('medit').textContent=on?'Listo':'Mover altavoces';
+  editRoom=on;$('room').classList.toggle('edit',on);$('medit').setAttribute('aria-pressed',on);$('medit').textContent=on?'Listo':'Editar plano';
   $('mreset').hidden=!on;
   $('mhint').textContent=on?'Arrastra cada altavoz a su lugar en la sala, o usa las flechas del teclado. Se guarda solo.':'Toca un altavoz para ajustarlo. Los cambios se guardan solos.';
   if(on&&$('drawer').classList.contains('on'))closeDrawer();
@@ -1235,7 +1272,7 @@ function drawWizard(){const w=$('wiz');if(!w)return;const vis=nodes.filter(isKno
   const steps=[
    ['Conecta la entrada de audio','Enchufa la Traktor Audio 10 por USB a la Raspberry.',!!(st&&(st.capturing||st.running))],
    ['Añade tus altavoces','Enciéndelos cerca de la Raspberry y búscalos por Bluetooth.',vis.length>0],
-   ['Colócalos en el plano','Arrastra cada altavoz a su sitio (desde «Mover altavoces»).',lsGet('sonos_placed')==='1'||vis.some(n=>n.pos_x>=0||n.pos2_x>=0)],
+   ['Colócalos en el plano','Arrastra cada altavoz a su sitio (con «Editar plano»).',lsGet('sonos_placed')==='1'||vis.some(n=>n.pos_x>=0||n.pos2_x>=0)],
    ['Calibra el retardo','Mide la distancia de cada altavoz para que todos suenen a la vez.',lsGet('sonos_cal')==='1'||vis.some(n=>n.latency_offset_us)]];
   const left=steps.filter(x=>!x[2]).length;
   if(lsGet('sonos_wiz')==='off'||left===0){w.hidden=true;return;}
@@ -1438,17 +1475,17 @@ setInterval(loadStatus,5000);setInterval(loadNodes,2500);
 static const char PAGE_CAL[] = R"HTML(<!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#000000"><meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#1c1c1e"><meta name="color-scheme" content="dark light">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="AStream"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
 <script>if('serviceWorker' in navigator&&window.isSecureContext)addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});</script>
-<script>/* Tema de la interfaz: «dark» (por defecto), «graphite», «light» o «auto» (sigue al sistema; resuelve a dark o light). Se guarda en localStorage (por navegador).
-   Se ejecuta en el <head> (antes de pintar) para que no haya destello; los botones [data-theme-btn] rotan Oscuro → Grafito → Claro → Automático. */
+<script>/* Tema de la interfaz: «graphite» (por defecto), «dark» (negro), «light» o «auto» (sigue al sistema; resuelve a graphite o light). Se guarda en localStorage (por navegador).
+   Se ejecuta en el <head> (antes de pintar) para que no haya destello; los botones [data-theme-btn] rotan Grafito → Oscuro → Claro → Automático. */
 (function () {
-  var KEY = 'sonos_theme', SKEY = 'sonos_shape', ORDER = ['dark', 'graphite', 'light', 'auto'], NAME = { dark: 'Oscuro', graphite: 'Grafito', light: 'Claro', auto: 'Automático' };
+  var KEY = 'sonos_theme', SKEY = 'sonos_shape', ZKEY = 'sonos_size', ORDER = ['graphite', 'dark', 'light', 'auto'], NAME = { dark: 'Oscuro', graphite: 'Grafito', light: 'Claro', auto: 'Automático' };
   var META = { dark: '#000000', graphite: '#1c1c1e', light: '#d5d9e0' };
   var ICON = {
     dark: '<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>',
@@ -1457,14 +1494,18 @@ static const char PAGE_CAL[] = R"HTML(<!DOCTYPE html>
     auto: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor"/>'
   };
   var mq = window.matchMedia ? matchMedia('(prefers-color-scheme: light)') : null;
-  function pref() { var p = 'dark'; try { p = localStorage.getItem(KEY) || 'dark'; } catch (e) {} return ORDER.indexOf(p) < 0 ? 'dark' : p; }
+  function pref() { var p = 'graphite'; try { p = localStorage.getItem(KEY) || 'graphite'; } catch (e) {} return ORDER.indexOf(p) < 0 ? 'graphite' : p; }
   // Forma: «square» (por defecto: todos los radios a 0 salvo los altavoces del radar) o «round» (píldoras). ?forma=recta / ?forma=redonda la fija y se guarda.
   function shape() { var v = 'square'; try { v = localStorage.getItem(SKEY) || 'square'; } catch (e) {} return v === 'round' ? 'round' : 'square'; }
   function setShape(v) { try { localStorage.setItem(SKEY, v === 'square' ? 'square' : 'round'); } catch (e) {} apply(); }
   try { var q = /[?&]forma=(recta|redonda)/.exec(location.search); if (q) setShape(q[1] === 'recta' ? 'square' : 'round'); } catch (e) {}
+  // Tamaño del texto: «s» (pequeño), «m» (por defecto) o «l» (grande). Se guarda en este navegador.
+  function size() { var v = 'm'; try { v = localStorage.getItem(ZKEY) || 'm'; } catch (e) {} return v === 's' || v === 'l' ? v : 'm'; }
+  function setSize(v) { try { localStorage.setItem(ZKEY, v === 's' || v === 'l' ? v : 'm'); } catch (e) {} apply(); }
   function apply() {
     document.documentElement.setAttribute('data-shape', shape());
-    var p = pref(), t = p === 'auto' ? (mq && mq.matches ? 'light' : 'dark') : p;
+    document.documentElement.setAttribute('data-size', size());
+    var p = pref(), t = p === 'auto' ? (mq && mq.matches ? 'light' : 'graphite') : p;
     document.documentElement.setAttribute('data-theme', t);
     var m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', META[t]);
     var bs = document.querySelectorAll('[data-theme-btn]');
@@ -1477,10 +1518,11 @@ static const char PAGE_CAL[] = R"HTML(<!DOCTYPE html>
   }
   function set(p) { try { localStorage.setItem(KEY, p); } catch (e) {} apply(); }
   function next() { set(ORDER[(ORDER.indexOf(pref()) + 1) % ORDER.length]); }
-  window.SonosTheme = { get: pref, set: set, next: next, apply: apply, shape: setShape, getShape: shape };
+  window.SonosTheme = { get: pref, set: set, next: next, apply: apply, shape: setShape, getShape: shape, size: setSize, getSize: size,
+    reset: function () { try { localStorage.removeItem(KEY); localStorage.removeItem(SKEY); localStorage.removeItem(ZKEY); } catch (e) {} apply(); } };
   apply();
   if (mq && mq.addEventListener) mq.addEventListener('change', apply);
-  addEventListener('storage', function (e) { if (e.key === KEY) apply(); });
+  addEventListener('storage', function (e) { if (e.key === KEY || e.key === SKEY || e.key === ZKEY) apply(); });
   document.addEventListener('DOMContentLoaded', function () {
     var bs = document.querySelectorAll('[data-theme-btn]');
     for (var i = 0; i < bs.length; i++) bs[i].addEventListener('click', next);
@@ -1530,7 +1572,7 @@ html[data-theme=light]{
   color-scheme:light;
 }
 *{box-sizing:border-box;margin:0}
-html{font-size:106.25%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
+html{font-size:106.25%}html[data-size=s]{font-size:96%}html[data-size=l]{font-size:120%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
 body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
   font-variant-numeric:tabular-nums;min-height:100vh;-webkit-text-size-adjust:100%;
   padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
@@ -1950,17 +1992,17 @@ view(1);
 static const char PAGE_BLE[] = R"HTML(<!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#000000"><meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#1c1c1e"><meta name="color-scheme" content="dark light">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="AStream"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
 <script>if('serviceWorker' in navigator&&window.isSecureContext)addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});</script>
-<script>/* Tema de la interfaz: «dark» (por defecto), «graphite», «light» o «auto» (sigue al sistema; resuelve a dark o light). Se guarda en localStorage (por navegador).
-   Se ejecuta en el <head> (antes de pintar) para que no haya destello; los botones [data-theme-btn] rotan Oscuro → Grafito → Claro → Automático. */
+<script>/* Tema de la interfaz: «graphite» (por defecto), «dark» (negro), «light» o «auto» (sigue al sistema; resuelve a graphite o light). Se guarda en localStorage (por navegador).
+   Se ejecuta en el <head> (antes de pintar) para que no haya destello; los botones [data-theme-btn] rotan Grafito → Oscuro → Claro → Automático. */
 (function () {
-  var KEY = 'sonos_theme', SKEY = 'sonos_shape', ORDER = ['dark', 'graphite', 'light', 'auto'], NAME = { dark: 'Oscuro', graphite: 'Grafito', light: 'Claro', auto: 'Automático' };
+  var KEY = 'sonos_theme', SKEY = 'sonos_shape', ZKEY = 'sonos_size', ORDER = ['graphite', 'dark', 'light', 'auto'], NAME = { dark: 'Oscuro', graphite: 'Grafito', light: 'Claro', auto: 'Automático' };
   var META = { dark: '#000000', graphite: '#1c1c1e', light: '#d5d9e0' };
   var ICON = {
     dark: '<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>',
@@ -1969,14 +2011,18 @@ static const char PAGE_BLE[] = R"HTML(<!DOCTYPE html>
     auto: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor"/>'
   };
   var mq = window.matchMedia ? matchMedia('(prefers-color-scheme: light)') : null;
-  function pref() { var p = 'dark'; try { p = localStorage.getItem(KEY) || 'dark'; } catch (e) {} return ORDER.indexOf(p) < 0 ? 'dark' : p; }
+  function pref() { var p = 'graphite'; try { p = localStorage.getItem(KEY) || 'graphite'; } catch (e) {} return ORDER.indexOf(p) < 0 ? 'graphite' : p; }
   // Forma: «square» (por defecto: todos los radios a 0 salvo los altavoces del radar) o «round» (píldoras). ?forma=recta / ?forma=redonda la fija y se guarda.
   function shape() { var v = 'square'; try { v = localStorage.getItem(SKEY) || 'square'; } catch (e) {} return v === 'round' ? 'round' : 'square'; }
   function setShape(v) { try { localStorage.setItem(SKEY, v === 'square' ? 'square' : 'round'); } catch (e) {} apply(); }
   try { var q = /[?&]forma=(recta|redonda)/.exec(location.search); if (q) setShape(q[1] === 'recta' ? 'square' : 'round'); } catch (e) {}
+  // Tamaño del texto: «s» (pequeño), «m» (por defecto) o «l» (grande). Se guarda en este navegador.
+  function size() { var v = 'm'; try { v = localStorage.getItem(ZKEY) || 'm'; } catch (e) {} return v === 's' || v === 'l' ? v : 'm'; }
+  function setSize(v) { try { localStorage.setItem(ZKEY, v === 's' || v === 'l' ? v : 'm'); } catch (e) {} apply(); }
   function apply() {
     document.documentElement.setAttribute('data-shape', shape());
-    var p = pref(), t = p === 'auto' ? (mq && mq.matches ? 'light' : 'dark') : p;
+    document.documentElement.setAttribute('data-size', size());
+    var p = pref(), t = p === 'auto' ? (mq && mq.matches ? 'light' : 'graphite') : p;
     document.documentElement.setAttribute('data-theme', t);
     var m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', META[t]);
     var bs = document.querySelectorAll('[data-theme-btn]');
@@ -1989,10 +2035,11 @@ static const char PAGE_BLE[] = R"HTML(<!DOCTYPE html>
   }
   function set(p) { try { localStorage.setItem(KEY, p); } catch (e) {} apply(); }
   function next() { set(ORDER[(ORDER.indexOf(pref()) + 1) % ORDER.length]); }
-  window.SonosTheme = { get: pref, set: set, next: next, apply: apply, shape: setShape, getShape: shape };
+  window.SonosTheme = { get: pref, set: set, next: next, apply: apply, shape: setShape, getShape: shape, size: setSize, getSize: size,
+    reset: function () { try { localStorage.removeItem(KEY); localStorage.removeItem(SKEY); localStorage.removeItem(ZKEY); } catch (e) {} apply(); } };
   apply();
   if (mq && mq.addEventListener) mq.addEventListener('change', apply);
-  addEventListener('storage', function (e) { if (e.key === KEY) apply(); });
+  addEventListener('storage', function (e) { if (e.key === KEY || e.key === SKEY || e.key === ZKEY) apply(); });
   document.addEventListener('DOMContentLoaded', function () {
     var bs = document.querySelectorAll('[data-theme-btn]');
     for (var i = 0; i < bs.length; i++) bs[i].addEventListener('click', next);
@@ -2042,7 +2089,7 @@ html[data-theme=light]{
   color-scheme:light;
 }
 *{box-sizing:border-box;margin:0}
-html{font-size:106.25%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
+html{font-size:106.25%}html[data-size=s]{font-size:96%}html[data-size=l]{font-size:120%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
 body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
   font-variant-numeric:tabular-nums;min-height:100vh;-webkit-text-size-adjust:100%;
   padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
@@ -2299,8 +2346,8 @@ static const char PWA_MANIFEST[] = R"HTML({
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#1c1c1e",
+  "theme_color": "#1c1c1e",
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
@@ -2315,8 +2362,8 @@ static const char PWA_MANIFEST[] = R"HTML({
 static const char PWA_SW[] = R"HTML(/* Service worker de AStream. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * ad987c8d41 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-ad987c8d41';
+ * 748d7e1c90 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-748d7e1c90';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png', '/fonts/roboto-400.woff2', '/fonts/roboto-500.woff2'];
 
 self.addEventListener('install', e => {
