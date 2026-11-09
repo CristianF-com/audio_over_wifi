@@ -51,7 +51,7 @@
 #define AUDIO_PKT_SAMPLES   (FRAMES_PER_PACKET * 2)   /* L,R intercalados */
 
 #define PLAYOUT_DELAY_US    80000         /* latencia por defecto captura -> altavoz   */
-#define PLAYOUT_MIN_US      40000         /* rango ajustable en caliente (web UI)      */
+#define PLAYOUT_MIN_US      20000         /* rango ajustable en caliente (web UI); 20 ms exige ESP con cola DMA de 4 (FW ≥ 8) */
 #define PLAYOUT_MAX_US      200000
 #define RX_QUEUE_PACKETS    96            /* cola ESP: 240 ms >= PLAYOUT_MAX_US        */
 

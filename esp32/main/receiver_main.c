@@ -83,14 +83,14 @@ static const char* TAG = "RECV";
 #ifndef CONFIG_SONOS_BLE_WINDOW_S
   #define CONFIG_SONOS_BLE_WINDOW_S 300
 #endif
-#define FW_VERSION          7   /* 7: ID automático por MAC (HELLO con ESP_ID_AUTO, WELCOME_F_ASSIGNED). 6: OTA por WiFi, versión/chip en el HELLO y RSSI en el REPORT (protocolo sin cambios: v5) */
+#define FW_VERSION          8   /* 8: cola DMA de 4 bloques y playout mínimo de 20 ms. 7: ID automático por MAC (HELLO con ESP_ID_AUTO, WELCOME_F_ASSIGNED). 6: OTA por WiFi, versión/chip en el HELLO y RSSI en el REPORT (protocolo sin cambios: v5) */
 #if CONFIG_IDF_TARGET_ESP32C5
 #define FW_CHIP_ID          FW_CHIP_C5
 #else
 #define FW_CHIP_ID          FW_CHIP_ESP32
 #endif
 
-#define I2S_DMA_DESC        6
+#define I2S_DMA_DESC        4   /* cola I2S de 4 bloques de 2,5 ms (antes 6): ≈ 8,75 ms de latencia de salida en vez de ≈ 13,75 ms */
 #define I2S_DMA_FRAMES      FRAMES_PER_PACKET
 /* Latencia estimada write()->altavoz en régimen (cola DMA casi llena). Modo común. */
 #define DMA_LAT_US  ((int64_t)(I2S_DMA_DESC * I2S_DMA_FRAMES - I2S_DMA_FRAMES / 2) \

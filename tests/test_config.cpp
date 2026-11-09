@@ -136,9 +136,9 @@ int main() {
     }
     {   // rangos de setPlayoutUs
         UdpStreamer d;
-        CHECK("setPlayoutUs(39 ms) rechazado", !d.setPlayoutUs(39000));
+        CHECK("setPlayoutUs(19 ms) rechazado", !d.setPlayoutUs(19000));
         CHECK("setPlayoutUs(201 ms) rechazado", !d.setPlayoutUs(201000));
-        CHECK("setPlayoutUs(40 ms) y (200 ms) aceptados", d.setPlayoutUs(40000) && d.setPlayoutUs(200000));
+        CHECK("setPlayoutUs(20 ms) y (200 ms) aceptados, 19 ms y 201 ms rechazados", d.setPlayoutUs(20000) && d.setPlayoutUs(200000) && !d.setPlayoutUs(19000) && !d.setPlayoutUs(201000));
     }
     remove(path);
     printf("RESULTADO CONFIG: %s\n", fails ? "HAY FALLOS" : "TODO OK");

@@ -72,7 +72,7 @@ Constantes clave (`protocol.h`): `FRAMES_PER_PACKET=120`, `PLAYOUT_DELAY_US=8000
 * **ESP `i2s_task`**: `err = master_now + DMA_LAT_US − (ts + playout)` (+ = tarde).
   `err>5 ms` descarta paquete · `err<−5 ms` escribe silencio · en medio: IIR (1/8) y 1 frame descartado/repetido cada 4 chunks si `|err_f|>100 µs` (máx ≈2083 ppm).
   Resultado simulado: error estable ±100 µs por nodo (≤~200 µs entre nodos), sin descartes duros.
-* `DMA_LAT_US` = (6·120 − 60) fr ≈ 13.75 ms es una **estimación común a todos los nodos** (no afecta a la sincronía mutua); calibrar con micrófono vía "Ajuste de latencia".
+* `DMA_LAT_US` = (4·120 − 60) fr ≈ 8.75 ms (cola I2S de 4 bloques desde FW v8; antes 6 → 13.75 ms) es una **estimación común a todos los nodos** (no afecta a la sincronía mutua); calibrar con micrófono vía "Ajuste de latencia".
 
 ## 5. Específico XIAO ESP32-C5
 * 1 solo núcleo → `xTaskCreate` (prioridades: ctrl 12, rx 14, i2s 15, report 5; WiFi 23, tcpip 18). **Nada de `PinnedToCore(...,1)`**.
