@@ -1036,6 +1036,7 @@ $('distapply').onclick=async()=>{const pl=distPlan();if(!pl)return;let ok=true;
 
 /* Actualización de firmware (OTA) */
 let fw={loaded:false,size:0,chip:0,version:''};
+let otaArm=null,otaArmT=0;   // altavoz cuyo «Actualizar» espera la segunda pulsación
 async function loadFw(){try{fw=await (await fetch('/api/firmware')).json();}catch(e){}drawFw();}
 function drawFw(){
   $('fwinfo').textContent=fw.loaded?'Cargado: versión '+(fw.version||'?')+' · '+Math.round(fw.size/1024)+' KB · '+(CHIPN[fw.chip]?'para '+CHIPN[fw.chip]:'chip sin identificar')+'.':'Todavía no hay ningún firmware cargado.';
@@ -1044,10 +1045,12 @@ function drawFw(){
     const cant=!n.fw_version?'Firmware antiguo: primero por cable':n.ota_busy?'Actualizando…':'';
     const dis=!fw.loaded||n.ota_busy||!n.fw_version||(fw.chip>0&&n.chip>0&&fw.chip!==n.chip);
     return '<div class="pfrow"><b>#'+n.id+' · '+nodeLabel(n)+'</b><span class="hint">'+fwTxt(n)+'</span>'+(cant?'<span class="chip'+(n.ota_busy?' ac':'')+'">'+cant+'</span>':'')+
-      (n.ota_busy?'<button class="btn danger sm" data-ocancel="'+n.id+'" type="button">Cancelar</button>':'<button class="btn ghost sm" data-ota="'+n.id+'" type="button"'+(dis?' disabled':'')+' aria-label="Actualizar el firmware del altavoz '+n.id+'">Actualizar</button>')+'</div>';}).join(''):'<p>No hay altavoces en línea.</p>';
+      (n.ota_busy?'<button class="btn danger sm" data-ocancel="'+n.id+'" type="button">Cancelar</button>':'<button class="btn ghost sm" data-ota="'+n.id+'" type="button"'+(dis?' disabled':'')+' aria-label="'+(otaArm===n.id?'Confirmar: actualizar el firmware del altavoz ':'Actualizar el firmware del altavoz ')+n.id+'">'+(otaArm===n.id?'¿Seguro? No lo apagues':'Actualizar')+'</button>')+'</div>';}).join(''):'<p>No hay altavoces en línea.</p>';
   $('fwlist').querySelectorAll('[data-ota]').forEach(b=>b.onclick=async()=>{
-    if(!b.dataset.arm){b.dataset.arm='1';b.textContent='¿Seguro? No lo apagues';setTimeout(()=>{delete b.dataset.arm;if(b.isConnected)b.textContent='Actualizar';},4000);return;}
-    const r=await J('/api/ota',{id:+b.dataset.ota});if(r.ok){toast('Actualizando el altavoz #'+b.dataset.ota+'. No lo apagues.');log('OTA enviada al altavoz #'+b.dataset.ota);loadNodes();}else toast(r.error||'No se pudo iniciar la actualización.',false);});
+    const id=+b.dataset.ota;
+    if(otaArm!==id){otaArm=id;clearTimeout(otaArmT);otaArmT=setTimeout(()=>{otaArm=null;drawFw();},8000);drawFw();return;}   // el estado vive fuera del botón: drawFw() se repite en cada refresco y lo recrearía
+    otaArm=null;clearTimeout(otaArmT);drawFw();
+    const r=await J('/api/ota',{id});if(r.ok){toast('Actualizando el altavoz #'+b.dataset.ota+'. No lo apagues.');log('OTA enviada al altavoz #'+b.dataset.ota);loadNodes();}else toast(r.error||'No se pudo iniciar la actualización.',false);});
   $('fwlist').querySelectorAll('[data-ocancel]').forEach(b=>b.onclick=async()=>{await J('/api/ota/cancel',{id:+b.dataset.ocancel});toast('Actualización cancelada en el panel');loadNodes();});
 }
 $('fwup').onclick=async()=>{const f=$('fwfile').files[0];if(!f){toast('Elige primero el archivo receiver.bin.',false);return;}

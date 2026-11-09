@@ -333,6 +333,13 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
    await p.evaluate(()=>document.querySelectorAll('#tb .toast').forEach(t=>t.remove()));
    await p.setInputFiles('#fwfile','/tmp/fw_ui_ok.bin');await p.click('#fwup');
    ok('firmware: un .bin válido se carga y se muestra versión, tamaño y chip',await until(async()=>{const t=await p.textContent('#fwinfo');return t.includes('9.9-ui')&&t.includes('78 KB')&&t.includes('C5');}),await p.textContent('#fwinfo'));
+   {await p.evaluate(()=>{const n0=Object.assign({},nodes[0],{online:true,enabled:true,known:true,fw_version:7,ota_busy:false,chip:0});nodes=[n0];fw={loaded:true,size:1000,chip:0,version:'8'};drawFw();});
+    await p.click('#fwlist [data-ota]');
+    await p.evaluate(()=>{drawFw();drawFw();});await sleep(300);
+    ok('firmware: «Actualizar» pide confirmación («¿Seguro?») y la conserva aunque el panel se redibuje con los refrescos',await p.evaluate(()=>/Seguro/.test(document.querySelector('#fwlist [data-ota]').textContent)));
+    await p.evaluate(()=>{otaArm=null;drawFw();});
+    ok('firmware: sin confirmar, el botón vuelve a «Actualizar»',await p.evaluate(()=>document.querySelector('#fwlist [data-ota]').textContent==='Actualizar'));
+    await p.evaluate(()=>{loadNodes();loadFw();});await until(async()=>await p.evaluate(()=>document.querySelectorAll('#fwlist [data-ota]').length===5&&[...document.querySelectorAll('#fwlist [data-ota]')].every(b=>b.disabled)));}
    ok('firmware: los ESP sin versión no se pueden actualizar por WiFi (botón desactivado y motivo visible)',await p.evaluate(()=>{const b=[...document.querySelectorAll('#fwlist [data-ota]')];return b.length===5&&b.every(x=>x.disabled)&&document.getElementById('fwlist').textContent.includes('primero por cable');}));
    if(SHOTS)await p.screenshot({path:SHOTS+'/panel_firmware.png',fullPage:true});}
   ok('nuevas funciones: sin errores de JS',errs.length===0,errs);
