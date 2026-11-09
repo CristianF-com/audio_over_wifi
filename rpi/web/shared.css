@@ -41,7 +41,11 @@ html[data-theme=light]{
 /* Zonas seguras laterales: en el navegador (pestaña de Safari/Chrome) el propio navegador ya aparta la página de la isla/muesca
    y env() puede devolver un valor que no hace falta (hueco de ~47 px); solo en app instalada/pantalla completa se aplican (a la izquierda restando 15 px: el margen de la isla es más ancho que lo que tapa). */
 :root{--sal:0px;--sar:0px}
-@media (display-mode:standalone),(display-mode:fullscreen){:root{--sal:max(0px,calc(env(safe-area-inset-left) - 15px));--sar:env(safe-area-inset-right)}}
+@media (display-mode:standalone),(display-mode:fullscreen){
+  :root{--sal:max(0px,calc(env(safe-area-inset-left) - 15px));--sar:env(safe-area-inset-right)}
+  html.notch-l{--sar:min(env(safe-area-inset-right),14px)}   /* muesca a la izquierda: a la derecha solo las esquinas */
+  html.notch-r{--sal:min(env(safe-area-inset-left),14px)}    /* muesca a la derecha: a la izquierda solo las esquinas */
+}
 *{box-sizing:border-box;margin:0}
 html{font-size:106.25%}html[data-size=s]{font-size:96%}html[data-size=l]{font-size:120%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
 body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
@@ -112,6 +116,9 @@ label,.lbl{display:block;color:var(--mut);font-size:.74rem;font-weight:600;lette
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mut);flex:none}
 .dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
 
+/* franja fija arriba del color de la cabecera: Safari de iOS 26 toma su color para la barra de estado y no dibuja el degradado/desenfoque
+   (solución tomada de la app interval-hiit) */
+#topcap{position:fixed;top:0;left:0;right:0;height:max(8px,env(safe-area-inset-top));background:var(--top-solid);z-index:31;pointer-events:none}
 .top{position:sticky;top:0;z-index:30;background:var(--top-solid);border-bottom:1px solid var(--line);
   padding-top:env(safe-area-inset-top)}               /* en la app instalada (barra de estado translúcida) el contenido no queda bajo la muesca */
 .top .in{max-width:1180px;margin:auto;display:flex;align-items:center;gap:18px;padding:10px 18px;flex-wrap:wrap}

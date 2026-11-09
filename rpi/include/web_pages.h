@@ -10,7 +10,7 @@ static const char PAGE_PANEL[] = R"HTML(<!DOCTYPE html>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1c1c1e"><meta name="color-scheme" content="dark light">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="AStream"><meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="AStream"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
@@ -61,6 +61,20 @@ static const char PAGE_PANEL[] = R"HTML(<!DOCTYPE html>
     for (var i = 0; i < bs.length; i++) bs[i].addEventListener('click', next);
     apply();
   });
+})();
+
+/* Lado de la muesca en horizontal (como en interval-hiit): html.notch-l si está a la izquierda, html.notch-r si está a la derecha;
+   el otro lado solo necesita un margen chico para las esquinas redondeadas. */
+(function () {
+  var r = document.documentElement;
+  function f() {
+    var o = window.orientation, a = window.screen && screen.orientation && screen.orientation.angle;
+    if (o == null && a != null) o = a === 270 ? -90 : a;
+    r.classList.toggle('notch-l', o === 90);
+    r.classList.toggle('notch-r', o === -90 || o === 270);
+  }
+  f(); addEventListener('orientationchange', f); addEventListener('resize', f);
+  try { screen.orientation.addEventListener('change', f); } catch (e) {}
 })();</script>
 <title>AStream</title>
 <style>
@@ -107,7 +121,11 @@ html[data-theme=light]{
 /* Zonas seguras laterales: en el navegador (pestaña de Safari/Chrome) el propio navegador ya aparta la página de la isla/muesca
    y env() puede devolver un valor que no hace falta (hueco de ~47 px); solo en app instalada/pantalla completa se aplican (a la izquierda restando 15 px: el margen de la isla es más ancho que lo que tapa). */
 :root{--sal:0px;--sar:0px}
-@media (display-mode:standalone),(display-mode:fullscreen){:root{--sal:max(0px,calc(env(safe-area-inset-left) - 15px));--sar:env(safe-area-inset-right)}}
+@media (display-mode:standalone),(display-mode:fullscreen){
+  :root{--sal:max(0px,calc(env(safe-area-inset-left) - 15px));--sar:env(safe-area-inset-right)}
+  html.notch-l{--sar:min(env(safe-area-inset-right),14px)}   /* muesca a la izquierda: a la derecha solo las esquinas */
+  html.notch-r{--sal:min(env(safe-area-inset-left),14px)}    /* muesca a la derecha: a la izquierda solo las esquinas */
+}
 *{box-sizing:border-box;margin:0}
 html{font-size:106.25%}html[data-size=s]{font-size:96%}html[data-size=l]{font-size:120%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
 body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
@@ -178,6 +196,9 @@ label,.lbl{display:block;color:var(--mut);font-size:.74rem;font-weight:600;lette
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mut);flex:none}
 .dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
 
+/* franja fija arriba del color de la cabecera: Safari de iOS 26 toma su color para la barra de estado y no dibuja el degradado/desenfoque
+   (solución tomada de la app interval-hiit) */
+#topcap{position:fixed;top:0;left:0;right:0;height:max(8px,env(safe-area-inset-top));background:var(--top-solid);z-index:31;pointer-events:none}
 .top{position:sticky;top:0;z-index:30;background:var(--top-solid);border-bottom:1px solid var(--line);
   padding-top:env(safe-area-inset-top)}               /* en la app instalada (barra de estado translúcida) el contenido no queda bajo la muesca */
 .top .in{max-width:1180px;margin:auto;display:flex;align-items:center;gap:18px;padding:10px 18px;flex-wrap:wrap}
@@ -465,12 +486,13 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
 /* Móvil en horizontal: la navegación pasa a un riel a la izquierda y la cabecera forma parte de la página */
 @media (orientation:landscape) and (max-height:500px){
   body{padding-left:calc(68px + var(--sal))}
-  .tabs{position:fixed;display:flex;flex-direction:column;justify-content:flex-start;top:0;bottom:0;left:0;right:auto;width:calc(68px + var(--sal));margin:0;gap:4px;overflow-x:hidden;overflow-y:auto;
+  .tabs{position:fixed;display:flex;flex-direction:column;justify-content:center;top:0;bottom:0;left:0;right:auto;width:calc(68px + var(--sal));margin:0;gap:4px;overflow-x:hidden;overflow-y:auto;
     border:0;border-right:1px solid var(--line2);border-radius:0;background:var(--top-solid);z-index:35;
     padding:calc(8px + env(safe-area-inset-top)) 4px calc(8px + env(safe-area-inset-bottom)) calc(4px + var(--sal))}
   .tab{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:100%;min-height:56px;padding:6px 2px;font-size:.72rem;border-radius:8px}
   .tab svg{display:block}
   .top{position:static}
+  #topcap{display:none}                               /* sin barra de estado en horizontal */
   /* cabecera en una sola fila: iconos en lugar de textos para que no se amontone */
   .top .in{flex-wrap:nowrap;gap:10px;padding:6px 12px}
   .brand{flex:none}
@@ -482,8 +504,8 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   .toasts{bottom:calc(12px + env(safe-area-inset-bottom))}
   .room{aspect-ratio:16/9;min-height:300px}
   /* los modales ocupan todo el alto, sin pasar bajo la muesca ni el indicador de inicio */
-  .drawer{top:0;bottom:0;left:0;right:0;width:100%;max-height:none;height:100vh;height:100dvh;border-radius:0;border:0;
-    padding:env(safe-area-inset-top) var(--sar) env(safe-area-inset-bottom) var(--sal);transform:translateX(calc(100% + 40px));box-shadow:-20px 0 50px -24px rgba(0,0,0,.6)}
+  .drawer{top:auto;bottom:0;left:calc(68px + var(--sal));right:0;width:auto;height:auto;max-height:calc(100dvh - 8px - env(safe-area-inset-top));border-radius:var(--r-sheet) var(--r-sheet) 0 0;border:1px solid var(--line2);border-bottom:0;
+    padding:0 var(--sar) env(safe-area-inset-bottom) 0;transform:translateY(calc(100% + 40px));box-shadow:0 -20px 50px -24px rgba(0,0,0,.6)}
   .drawer.on{transform:none}
   .grab{display:none}
   .drawer header{padding:10px 14px}
@@ -517,7 +539,7 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
 @media (pointer:coarse){.x{width:44px;height:44px}.chips button{min-height:44px}}   /* aquí, después de las reglas base de estos componentes */
 
 </style>
-</head><body>
+</head><body><div id="topcap" aria-hidden="true"></div>
 <div class="top"><div class="in">
   <a class="brand" href="/"><svg class="logo" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 13h2M8 8v10M13 4v18M18 8v10M23 13h-2"/></svg>AStream</a>
   <span class="chip" id="st"><i class="dot" id="dot"></i><span id="hs">Conectando…</span></span>
@@ -1711,7 +1733,7 @@ static const char PAGE_CAL[] = R"HTML(<!DOCTYPE html>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1c1c1e"><meta name="color-scheme" content="dark light">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="AStream"><meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="AStream"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
@@ -1762,6 +1784,20 @@ static const char PAGE_CAL[] = R"HTML(<!DOCTYPE html>
     for (var i = 0; i < bs.length; i++) bs[i].addEventListener('click', next);
     apply();
   });
+})();
+
+/* Lado de la muesca en horizontal (como en interval-hiit): html.notch-l si está a la izquierda, html.notch-r si está a la derecha;
+   el otro lado solo necesita un margen chico para las esquinas redondeadas. */
+(function () {
+  var r = document.documentElement;
+  function f() {
+    var o = window.orientation, a = window.screen && screen.orientation && screen.orientation.angle;
+    if (o == null && a != null) o = a === 270 ? -90 : a;
+    r.classList.toggle('notch-l', o === 90);
+    r.classList.toggle('notch-r', o === -90 || o === 270);
+  }
+  f(); addEventListener('orientationchange', f); addEventListener('resize', f);
+  try { screen.orientation.addEventListener('change', f); } catch (e) {}
 })();</script>
 <title>AStream — Calibración</title>
 <style>
@@ -1808,7 +1844,11 @@ html[data-theme=light]{
 /* Zonas seguras laterales: en el navegador (pestaña de Safari/Chrome) el propio navegador ya aparta la página de la isla/muesca
    y env() puede devolver un valor que no hace falta (hueco de ~47 px); solo en app instalada/pantalla completa se aplican (a la izquierda restando 15 px: el margen de la isla es más ancho que lo que tapa). */
 :root{--sal:0px;--sar:0px}
-@media (display-mode:standalone),(display-mode:fullscreen){:root{--sal:max(0px,calc(env(safe-area-inset-left) - 15px));--sar:env(safe-area-inset-right)}}
+@media (display-mode:standalone),(display-mode:fullscreen){
+  :root{--sal:max(0px,calc(env(safe-area-inset-left) - 15px));--sar:env(safe-area-inset-right)}
+  html.notch-l{--sar:min(env(safe-area-inset-right),14px)}   /* muesca a la izquierda: a la derecha solo las esquinas */
+  html.notch-r{--sal:min(env(safe-area-inset-left),14px)}    /* muesca a la derecha: a la izquierda solo las esquinas */
+}
 *{box-sizing:border-box;margin:0}
 html{font-size:106.25%}html[data-size=s]{font-size:96%}html[data-size=l]{font-size:120%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
 body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
@@ -1879,6 +1919,9 @@ label,.lbl{display:block;color:var(--mut);font-size:.74rem;font-weight:600;lette
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mut);flex:none}
 .dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
 
+/* franja fija arriba del color de la cabecera: Safari de iOS 26 toma su color para la barra de estado y no dibuja el degradado/desenfoque
+   (solución tomada de la app interval-hiit) */
+#topcap{position:fixed;top:0;left:0;right:0;height:max(8px,env(safe-area-inset-top));background:var(--top-solid);z-index:31;pointer-events:none}
 .top{position:sticky;top:0;z-index:30;background:var(--top-solid);border-bottom:1px solid var(--line);
   padding-top:env(safe-area-inset-top)}               /* en la app instalada (barra de estado translúcida) el contenido no queda bajo la muesca */
 .top .in{max-width:1180px;margin:auto;display:flex;align-items:center;gap:18px;padding:10px 18px;flex-wrap:wrap}
@@ -1966,7 +2009,7 @@ input[type=checkbox]:checked::after{content:"";width:5px;height:10px;border:soli
 .applybox{display:flex;flex-direction:column;gap:12px}
 .log{font:.82rem/1.6 var(--font);color:var(--mut);white-space:pre-wrap;max-height:150px;overflow:auto}
 @media (max-width:560px){.opts{grid-template-columns:1fr}.mets{grid-template-columns:1fr 1fr}.steps span em{display:none}}
-</style></head><body>
+</style></head><body><div id="topcap" aria-hidden="true"></div>
 <div class="top"><div class="in">
   <a class="brand" href="/"><svg class="logo" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 13h2M8 8v10M13 4v18M18 8v10M23 13h-2"/></svg>AStream</a>
   <span style="margin-left:auto;display:flex;gap:6px"><button class="btn ghost sm themebtn" data-theme-btn type="button"></button><a class="btn ghost sm" href="/">Volver al panel</a></span>
@@ -2236,7 +2279,7 @@ static const char PAGE_BLE[] = R"HTML(<!DOCTYPE html>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1c1c1e"><meta name="color-scheme" content="dark light">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="AStream"><meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="AStream"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
@@ -2287,6 +2330,20 @@ static const char PAGE_BLE[] = R"HTML(<!DOCTYPE html>
     for (var i = 0; i < bs.length; i++) bs[i].addEventListener('click', next);
     apply();
   });
+})();
+
+/* Lado de la muesca en horizontal (como en interval-hiit): html.notch-l si está a la izquierda, html.notch-r si está a la derecha;
+   el otro lado solo necesita un margen chico para las esquinas redondeadas. */
+(function () {
+  var r = document.documentElement;
+  function f() {
+    var o = window.orientation, a = window.screen && screen.orientation && screen.orientation.angle;
+    if (o == null && a != null) o = a === 270 ? -90 : a;
+    r.classList.toggle('notch-l', o === 90);
+    r.classList.toggle('notch-r', o === -90 || o === 270);
+  }
+  f(); addEventListener('orientationchange', f); addEventListener('resize', f);
+  try { screen.orientation.addEventListener('change', f); } catch (e) {}
 })();</script>
 <title>AStream — Añadir altavoz</title>
 <style>
@@ -2333,7 +2390,11 @@ html[data-theme=light]{
 /* Zonas seguras laterales: en el navegador (pestaña de Safari/Chrome) el propio navegador ya aparta la página de la isla/muesca
    y env() puede devolver un valor que no hace falta (hueco de ~47 px); solo en app instalada/pantalla completa se aplican (a la izquierda restando 15 px: el margen de la isla es más ancho que lo que tapa). */
 :root{--sal:0px;--sar:0px}
-@media (display-mode:standalone),(display-mode:fullscreen){:root{--sal:max(0px,calc(env(safe-area-inset-left) - 15px));--sar:env(safe-area-inset-right)}}
+@media (display-mode:standalone),(display-mode:fullscreen){
+  :root{--sal:max(0px,calc(env(safe-area-inset-left) - 15px));--sar:env(safe-area-inset-right)}
+  html.notch-l{--sar:min(env(safe-area-inset-right),14px)}   /* muesca a la izquierda: a la derecha solo las esquinas */
+  html.notch-r{--sal:min(env(safe-area-inset-left),14px)}    /* muesca a la derecha: a la izquierda solo las esquinas */
+}
 *{box-sizing:border-box;margin:0}
 html{font-size:106.25%}html[data-size=s]{font-size:96%}html[data-size=l]{font-size:120%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
 body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
@@ -2404,6 +2465,9 @@ label,.lbl{display:block;color:var(--mut);font-size:.74rem;font-weight:600;lette
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mut);flex:none}
 .dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
 
+/* franja fija arriba del color de la cabecera: Safari de iOS 26 toma su color para la barra de estado y no dibuja el degradado/desenfoque
+   (solución tomada de la app interval-hiit) */
+#topcap{position:fixed;top:0;left:0;right:0;height:max(8px,env(safe-area-inset-top));background:var(--top-solid);z-index:31;pointer-events:none}
 .top{position:sticky;top:0;z-index:30;background:var(--top-solid);border-bottom:1px solid var(--line);
   padding-top:env(safe-area-inset-top)}               /* en la app instalada (barra de estado translúcida) el contenido no queda bajo la muesca */
 .top .in{max-width:1180px;margin:auto;display:flex;align-items:center;gap:18px;padding:10px 18px;flex-wrap:wrap}
@@ -2475,7 +2539,7 @@ details.adv .in2{padding:4px 0 14px;display:flex;flex-direction:column;gap:12px}
 .row{display:flex;gap:8px;flex-wrap:wrap}
 .log{font:.82rem/1.6 var(--font);color:var(--mut);white-space:pre-wrap;max-height:150px;overflow:auto}
 @media (max-width:420px){.kv{grid-template-columns:1fr}}
-</style></head><body>
+</style></head><body><div id="topcap" aria-hidden="true"></div>
 <div class="top"><div class="in">
   <a class="brand" href="/"><svg class="logo" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 13h2M8 8v10M13 4v18M18 8v10M23 13h-2"/></svg>AStream</a>
   <span style="margin-left:auto;display:flex;gap:6px"><button class="btn ghost sm themebtn" data-theme-btn type="button"></button><a class="btn ghost sm" href="/">Volver al panel</a></span>
@@ -2612,8 +2676,8 @@ static const char PWA_MANIFEST[] = R"HTML({
 static const char PWA_SW[] = R"HTML(/* Service worker de AStream. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * 93ad91d12c lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-93ad91d12c';
+ * 1a06f91ef8 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-1a06f91ef8';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png', '/fonts/roboto-400.woff2', '/fonts/roboto-500.woff2'];
 
 self.addEventListener('install', e => {

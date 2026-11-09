@@ -45,3 +45,17 @@
     apply();
   });
 })();
+
+/* Lado de la muesca en horizontal (como en interval-hiit): html.notch-l si está a la izquierda, html.notch-r si está a la derecha;
+   el otro lado solo necesita un margen chico para las esquinas redondeadas. */
+(function () {
+  var r = document.documentElement;
+  function f() {
+    var o = window.orientation, a = window.screen && screen.orientation && screen.orientation.angle;
+    if (o == null && a != null) o = a === 270 ? -90 : a;
+    r.classList.toggle('notch-l', o === 90);
+    r.classList.toggle('notch-r', o === -90 || o === 270);
+  }
+  f(); addEventListener('orientationchange', f); addEventListener('resize', f);
+  try { screen.orientation.addEventListener('change', f); } catch (e) {}
+})();
