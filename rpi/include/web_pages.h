@@ -460,11 +460,11 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
 }
 /* Móvil en horizontal: la navegación pasa a un riel a la izquierda y la cabecera forma parte de la página */
 @media (orientation:landscape) and (max-height:500px){
-  body{padding-left:calc(84px + env(safe-area-inset-left))}
-  .tabs{position:fixed;display:flex;flex-direction:column;justify-content:flex-start;top:0;bottom:0;left:0;right:auto;width:calc(84px + env(safe-area-inset-left));margin:0;gap:4px;overflow-x:hidden;overflow-y:auto;
+  body{padding-left:calc(72px + env(safe-area-inset-left))}
+  .tabs{position:fixed;display:flex;flex-direction:column;justify-content:flex-start;top:0;bottom:0;left:0;right:auto;width:calc(72px + env(safe-area-inset-left));margin:0;gap:4px;overflow-x:hidden;overflow-y:auto;
     border:0;border-right:1px solid var(--line2);border-radius:0;background:var(--top-solid);z-index:35;
-    padding:calc(8px + env(safe-area-inset-top)) 6px calc(8px + env(safe-area-inset-bottom)) calc(6px + env(safe-area-inset-left))}
-  .tab{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:100%;min-height:56px;padding:6px 2px;font-size:.72rem;border-radius:var(--r-tab,14px)}
+    padding:calc(8px + env(safe-area-inset-top)) 4px calc(8px + env(safe-area-inset-bottom)) calc(4px + env(safe-area-inset-left))}
+  .tab{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:100%;min-height:56px;padding:6px 2px;font-size:.72rem;border-radius:8px}
   .tab svg{display:block}
   .top{position:static}
   /* cabecera en una sola fila: iconos en lugar de textos para que no se amontone */
@@ -2584,8 +2584,8 @@ static const char PWA_MANIFEST[] = R"HTML({
 static const char PWA_SW[] = R"HTML(/* Service worker de AStream. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * c71044260b lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-c71044260b';
+ * 53dfc6e8a9 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-53dfc6e8a9';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png', '/fonts/roboto-400.woff2', '/fonts/roboto-500.woff2'];
 
 self.addEventListener('install', e => {
