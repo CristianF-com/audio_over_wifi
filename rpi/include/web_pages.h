@@ -136,6 +136,7 @@ html[data-theme=light] .btn:not(.ghost):not(.danger){color:#1a1f27;border:1px so
 .seg button[aria-pressed=true]{background:var(--ac-bg);color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac-ln)}
 .seg button[aria-pressed=true]::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
 .seg.block{display:flex}.seg.block button{flex:1;min-width:0;white-space:normal;line-height:1.2;padding-left:8px;padding-right:8px}
+@media (max-width:380px){.seg.block button{padding-left:3px;padding-right:3px;font-size:.88rem}.seg.block{padding:3px;gap:1px}}   /* pantallas muy estrechas: que «Apagado» quepa entero */
 .seg.block button[aria-pressed=true]::before{display:none}   /* en segmentos de ancho completo el punto no cabe: el estado ya lo marcan el color, el fondo y el borde */   /* con texto grande o pantalla estrecha, las etiquetas bajan de línea en vez de salirse */
 
 .switch{appearance:none;position:relative;width:52px;height:32px;border-radius:16px;border:1px solid var(--ctl);background:var(--raise);flex:none;
@@ -420,7 +421,8 @@ th:first-child,td:first-child{text-align:left}
 td.bad{color:var(--bad)}td.warn{color:var(--warn)}
 .tw{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
 .tw table{min-width:640px}.tw tr:last-child td{border-bottom:0}
-.log{background:var(--code-bg);border:1px solid var(--line);border-radius:12px;padding:12px;font:.84rem/1.6 var(--font);height:340px;overflow-y:auto;color:var(--mut)}
+.log{background:var(--code-bg);border:1px solid var(--line);border-radius:12px;padding:12px;font:.84rem/1.6 var(--font);height:340px;overflow-y:auto;overflow-x:hidden;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--mut)}
+.cards>*,.tiles>*{min-width:0}   /* una línea larga (p. ej. el registro de la actualización) no debe ensanchar la tarjeta ni la página */
 .log b{color:var(--ac);font-weight:500}
 
 .found{border:1px solid var(--line);background:var(--bg);border-radius:20px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
@@ -451,7 +453,7 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   .links{margin-left:auto}
   .room{aspect-ratio:9/16;min-height:640px;--hw:60px;--ht:78px;--hb:70px}
   .spk{min-width:90px}.cab{width:40px;height:54px}.spk.sub .cab{width:48px;height:48px}.spk .ch{font-size:.92rem}.spk .cap{font-size:.66rem;padding:1px 4px}.spk .cal{font-size:.7rem;padding:1px 5px}
-  .tiles,.cards{grid-template-columns:1fr}
+  .tiles,.cards{grid-template-columns:minmax(0,1fr)}
   .drawer{top:auto;left:0;right:0;bottom:0;width:100%;max-height:88vh;max-height:calc(100dvh - 24px - env(safe-area-inset-top));border-bottom:0;box-shadow:0 -20px 50px -24px rgba(0,0,0,.6);border-top:1px solid var(--line2);border-radius:var(--r-sheet) var(--r-sheet) 0 0;transform:translateY(calc(100% + 40px))}
   .drawer.on{transform:none}
   .flow{flex-wrap:nowrap}
@@ -1815,6 +1817,7 @@ html[data-theme=light] .btn:not(.ghost):not(.danger){color:#1a1f27;border:1px so
 .seg button[aria-pressed=true]{background:var(--ac-bg);color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac-ln)}
 .seg button[aria-pressed=true]::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
 .seg.block{display:flex}.seg.block button{flex:1;min-width:0;white-space:normal;line-height:1.2;padding-left:8px;padding-right:8px}
+@media (max-width:380px){.seg.block button{padding-left:3px;padding-right:3px;font-size:.88rem}.seg.block{padding:3px;gap:1px}}   /* pantallas muy estrechas: que «Apagado» quepa entero */
 .seg.block button[aria-pressed=true]::before{display:none}   /* en segmentos de ancho completo el punto no cabe: el estado ya lo marcan el color, el fondo y el borde */   /* con texto grande o pantalla estrecha, las etiquetas bajan de línea en vez de salirse */
 
 .switch{appearance:none;position:relative;width:52px;height:32px;border-radius:16px;border:1px solid var(--ctl);background:var(--raise);flex:none;
@@ -2335,6 +2338,7 @@ html[data-theme=light] .btn:not(.ghost):not(.danger){color:#1a1f27;border:1px so
 .seg button[aria-pressed=true]{background:var(--ac-bg);color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac-ln)}
 .seg button[aria-pressed=true]::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
 .seg.block{display:flex}.seg.block button{flex:1;min-width:0;white-space:normal;line-height:1.2;padding-left:8px;padding-right:8px}
+@media (max-width:380px){.seg.block button{padding-left:3px;padding-right:3px;font-size:.88rem}.seg.block{padding:3px;gap:1px}}   /* pantallas muy estrechas: que «Apagado» quepa entero */
 .seg.block button[aria-pressed=true]::before{display:none}   /* en segmentos de ancho completo el punto no cabe: el estado ya lo marcan el color, el fondo y el borde */   /* con texto grande o pantalla estrecha, las etiquetas bajan de línea en vez de salirse */
 
 .switch{appearance:none;position:relative;width:52px;height:32px;border-radius:16px;border:1px solid var(--ctl);background:var(--raise);flex:none;
@@ -2580,8 +2584,8 @@ static const char PWA_MANIFEST[] = R"HTML({
 static const char PWA_SW[] = R"HTML(/* Service worker de AStream. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * b3e7555006 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-b3e7555006';
+ * c71044260b lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-c71044260b';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png', '/fonts/roboto-400.woff2', '/fonts/roboto-500.woff2'];
 
 self.addEventListener('install', e => {

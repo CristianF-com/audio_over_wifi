@@ -785,6 +785,9 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
      for(const id of (subs.length?subs:[null])){if(id){await mp.click('#'+id,{force:true}).catch(()=>{});await sleep(250);}
        const sw=await mp.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);if(sw>1)wide.push(tab+'/'+id+':'+sw);}}
    ok('iPhone: ninguna pestaña ni subpestaña desborda en horizontal (393 px)',wide.length===0,wide);
+   await mp.click('.tab[data-tab="sys"]');await mp.click('#sy_rpi');await sleep(300);
+   const lw=await mp.evaluate(()=>{const l=document.getElementById('upd_log');l.hidden=false;l.textContent='[ 37%] Building CXX object CMakeFiles/sonos_wifi.dir/src/'+'ruta_larguisima_sin_espacios_'.repeat(8)+'.cpp.o\nlinea corta';return {pg:document.documentElement.scrollWidth-document.documentElement.clientWidth,card:document.getElementById('c_upd').getBoundingClientRect().right-document.documentElement.clientWidth,wrap:getComputedStyle(l).whiteSpace};});
+   ok('iPhone: una línea larguísima en el registro de la actualización no ensancha la tarjeta ni la página',lw.pg<=1&&lw.card<=1&&lw.wrap==='pre-wrap',lw);
    ok('iPhone: sin errores de JS',merr.length===0,merr);
    await ip.close();}
   const cp=await ctx.newPage();const cerr=[];cp.on('pageerror',e=>cerr.push(String(e)));
