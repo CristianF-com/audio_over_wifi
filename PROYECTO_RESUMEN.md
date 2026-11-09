@@ -99,12 +99,12 @@ Constantes clave (`protocol.h`): `FRAMES_PER_PACKET=120`, `PLAYOUT_DELAY_US=8000
 | Controlador de sync + PLC + cambio de playout | ✅ en simulación | `tests/sim_sync.py` (±150 ppm, offsets hasta 20 ms, 1–6 % pérdidas, 80→120 / 80→50 ms) |
 | Firmware: validador IPv4 y UUID C↔JS | ✅ | `tests/test_firmware_units.py` |
 | Firmware: reordenación/NACK + tarea RX real (PC, loopback) | ✅ | `tests/test_reorder.c`, `tests/test_esp_rx.c` |
-| Firmware ESP32-C5 (incl. BLE) | ⚠️ compila y se flashea | el usuario lo compiló con ESP-IDF real y lo flasheó sin problemas (v9.7); audio/sync/NimBLE/pairing en placa sin confirmar |
-| Firmware ESP32-WROOM (`esp32_wroom/`) | ⚠️ compila y se flashea | confirmado por el usuario (nov 2026): compila, se flashea, la RPi lo detecta por Bluetooth y lo configura (WiFi de 2.4 GHz); audio/sync/OTA en placa sin confirmar |
+| Firmware ESP32-C5 (incl. BLE) | ⚠️ compila y se flashea | el usuario lo compiló con ESP-IDF real y lo flasheó sin problemas (v9.7); audio y modo Auto de latencia confirmados en placa por el usuario (nov 2026); OTA sin confirmar |
+| Firmware ESP32-WROOM (`esp32_wroom/`) | ⚠️ compila y se flashea | confirmado por el usuario (nov 2026): compila, se flashea, la RPi lo detecta por Bluetooth y lo configura (WiFi de 2.4 GHz); el audio y el modo Auto de latencia funcionan en placa (confirmado por el usuario, nov 2026); OTA sin confirmar |
 | Bluetooth RPi → ESP (`sonos_ble_prov.py`), lista de redes WiFi (`/api/wifi/scan`) | ✅ en placa | confirmado por el usuario con el C5 y el WROOM |
 | Calibración con móvil real / Web Bluetooth real | ❌ no probado | certificado autofirmado en iOS/Android, permisos de micrófono, pairing |
 | ALSA con Traktor real | ❌ no probado | sin hardware |
-| Audio/sync reales en WiFi | ❌ no probado | el plazo de reenvío y el colchón mínimo hay que ajustarlos en la red real (contadores `perd`/`rec`/`tarde`) |
+| Audio reales en WiFi (C5 y WROOM) y latencia Auto | ✅ en placa | confirmado por el usuario (nov 2026); en 2.4 GHz el canal 11 tenía interferencia y se pasó al 1; los contadores recientes (10 min) ayudan a ajustar el colchón |
 | EQ propuesto con móvil/altavoces reales | ❌ no probado | solo con respuestas sintéticas conocidas (error < 1 dB) |
 | OTA por WiFi (lado RPi: subida, token, orden UDP, pausa de audio, retorno) | ✅ | `tests/fake_esp.py` con ESP simulado |
 | OTA por WiFi (lado ESP: descarga, particiones, rollback, bootloader) | ⚠️ compila en C5 | compila y flashea en el C5; la descarga OTA, el rollback y `CONFIG_ESP_HTTPS_OTA_ALLOW_HTTP` sin probar en placa; WROOM sin compilar |

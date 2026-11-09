@@ -2,7 +2,7 @@
 
 Repuesto del XIAO ESP32-C5: si falta un C5 puedes usar un ESP32 normal. **Usa el mismo código** que `../esp32` (los fuentes se compilan desde ahí); esta carpeta solo cambia el chip, los pines y la configuración.
 
-> **Estado:** compila y se flashea con ESP-IDF real, y la RPi lo detecta por Bluetooth y le configura el WiFi (confirmado por el usuario). **Sin probar en placa:** el audio, el sync y la OTA. Si algo falla, copia el error.
+> **Estado:** compila y se flashea con ESP-IDF real, y la RPi lo detecta por Bluetooth y le configura el WiFi (confirmado por el usuario). El audio y la latencia Auto funcionan en placa (confirmado por el usuario). **Sin probar en placa:** la OTA. Si algo falla, copia el error.
 
 ## Diferencias con el C5
 | | XIAO ESP32-C5 | ESP32-WROOM-32D |
