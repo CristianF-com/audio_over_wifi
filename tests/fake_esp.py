@@ -177,8 +177,8 @@ except Exception as e:
 
 # 8b) LATENCIA en caliente: /api/playout -> CONFIG a los nodos online con el nuevo valor
 c, b = http("GET", "/api/status"); st = json.loads(b)
-check("status: playout_ms=80 y rango 20..200", (st["playout_ms"], st["playout_min_ms"], st["playout_max_ms"]) == (80, 20, 200), st.get("playout_ms"))
-for bad in (19, 201, "x"):
+check("status: playout_ms=80 y rango 40..200", (st["playout_ms"], st["playout_min_ms"], st["playout_max_ms"]) == (80, 40, 200), st.get("playout_ms"))
+for bad in (39, 201, "x"):
     c, _ = http("POST", "/api/playout", {"ms": bad}); check(f"playout ms={bad!r} -> 400", c == 400, c)
 while True:                                   # vaciar CONFIG/WELCOME pendientes
     try: ctrl.recvfrom(256)

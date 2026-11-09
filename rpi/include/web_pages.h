@@ -663,15 +663,15 @@ html[data-theme=light] .sub[aria-selected=true]{color:var(--fg);border-bottom-co
       <div class="seg block" id="plmode" role="group" aria-label="Modo del margen de red"><button data-m="manual" aria-pressed="true">Manual</button><button data-m="auto" aria-pressed="false">Auto</button></div>
       <div id="plmanual">
       <div class="fld"><div class="top2"><label for="pls">Margen de seguridad de red</label><b id="pld">80 ms</b></div>
-        <input class="rng" id="pls" type="range" min="20" max="200" step="5" value="80"></div>
+        <input class="rng" id="pls" type="range" min="40" max="200" step="5" value="80"></div>
       <div class="seg block" id="plseg"><button data-pl="40" aria-pressed="false">40 baja</button><button data-pl="60" aria-pressed="false">60</button><button data-pl="80" aria-pressed="false">80 normal</button><button data-pl="120" aria-pressed="false">120 segura</button></div>
       </div>
       <div id="plauto" hidden>
         <div class="fld"><div class="top2"><span>Margen actual (lo ajusta Auto)</span><b id="plcur">— ms</b></div></div>
         <div class="fld"><div class="top2"><label for="plfloor">Mínimo: nunca baja de aquí</label><b id="plfloord">80 ms</b></div>
-          <input class="rng" id="plfloor" type="range" min="20" max="200" step="5" value="80"></div>
+          <input class="rng" id="plfloor" type="range" min="40" max="200" step="5" value="80"></div>
         <div class="fld"><div class="top2"><label for="plmax">Tope: nunca sube de aquí</label><b id="plmaxd">160 ms</b></div>
-          <input class="rng" id="plmax" type="range" min="20" max="200" step="5" value="160"></div>
+          <input class="rng" id="plmax" type="range" min="40" max="200" step="5" value="160"></div>
         <div class="fld"><div class="top2"><label for="plre">Cortes por minuto para subir el margen</label><b id="plred">8</b></div>
           <input class="rng" id="plre" type="range" min="1" max="50" step="1" value="8"></div>
         <div class="fld"><div class="top2"><label for="plcm">Minutos sin cortes para bajarlo</label><b id="plcmd">10 min</b></div>
@@ -2661,8 +2661,8 @@ static const char PWA_MANIFEST[] = R"HTML({
 static const char PWA_SW[] = R"HTML(/* Service worker de AStream. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * 8d8fc3453e lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-8d8fc3453e';
+ * fc2ad4f3ea lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-fc2ad4f3ea';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png', '/fonts/roboto-400.woff2', '/fonts/roboto-500.woff2'];
 
 self.addEventListener('install', e => {
