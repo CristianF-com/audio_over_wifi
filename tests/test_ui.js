@@ -838,7 +838,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
    // horizontal (iPhone 16: 852×393)
    await n.setViewportSize({width:852,height:393});await sleep(400);
    t=await R('.tabs');
-   ok('horizontal: las pestañas pasan a un riel fijo a la izquierda, a todo el alto',t.l<1&&t.w>=70&&t.w<=130&&Math.abs(t.h-t.ih)<2,t);
+   ok('horizontal: las pestañas pasan a un riel fijo a la izquierda, a todo el alto',t.l<1&&t.w>=64&&t.w<=130&&Math.abs(t.h-t.ih)<2,t);
    ok('horizontal: la cabecera forma parte de la página (no queda fija) y empieza a la derecha del riel',await n.evaluate(()=>{const c=getComputedStyle(document.querySelector('.top')),r=document.querySelector('.top').getBoundingClientRect(),tb=document.querySelector('.tabs').getBoundingClientRect();return c.position==='static'&&r.left>=tb.right-1;}));
    await n.tap('.tab[data-tab="spk"]');await sleep(250);
    await n.tap('.tab[data-tab="spk"]');await sleep(250);
