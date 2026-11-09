@@ -527,6 +527,7 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
 .sub{appearance:none;background:none;border:0;border-bottom:3px solid transparent;margin-bottom:-1px;color:var(--mut);font-weight:600;padding:10px 16px;min-height:44px;white-space:nowrap}
 .sub:hover{color:var(--fg)}
 .sub[aria-selected=true]{color:var(--ac);border-bottom-color:var(--ac)}
+html[data-theme=light] .sub[aria-selected=true]{color:var(--fg);border-bottom-color:var(--fg)}   /* en Claro el acento es blanco: el subtab activo se lee con el color del texto */
 .sbm{appearance:none;position:absolute;top:0;bottom:1px;width:44px;border:0;background:var(--bg);color:var(--fg);font-size:1.5rem;font-weight:700;display:none;align-items:center;justify-content:center}
 .sbm.on{display:flex}.sbm.l{left:0;border-right:1px solid var(--line)}.sbm.r{right:0;border-left:1px solid var(--line)}
 .subpane[hidden],.cards[hidden]{display:none}
@@ -2676,8 +2677,8 @@ static const char PWA_MANIFEST[] = R"HTML({
 static const char PWA_SW[] = R"HTML(/* Service worker de AStream. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * 1a06f91ef8 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-1a06f91ef8';
+ * fec67c1d06 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-fec67c1d06';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png', '/fonts/roboto-400.woff2', '/fonts/roboto-500.woff2'];
 
 self.addEventListener('install', e => {

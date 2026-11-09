@@ -511,6 +511,10 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
     // el blanco sobre ese recuadro (~2,2:1) y el blanco sobre el fondo no cumplen 4,5:1. Se comprueba que siga siendo blanco y que ok/aviso/error cumplan.
     if(t==='light'){
       ok('Tema light: ok, aviso y error ≥ 4,5:1 sobre el fondo; el acento es blanco por decisión de diseño (excepción documentada)',['ok','warn','bad'].every(k=>cr(rgbOf(c[k]),c.bg)>=4.5)&&rgbOf(c.ac)==='rgb(255,255,255)',['ok','warn','bad'].map(k=>[k,cr(rgbOf(c[k]),c.bg)]).concat([['ac',c.ac]]));
+      await p.click('.tab[data-tab=sys]');await sleep(150);
+      const sb=await p.evaluate(()=>{const e=document.querySelector('#sys_sub .sub[aria-selected=true]'),c=getComputedStyle(e);return {fg:c.color.replace(/ /g,''),bd:c.borderBottomColor.replace(/ /g,'')};});
+      ok('Tema light: el subtab seleccionado se lee (texto y subrayado ≥ 4,5:1 sobre el fondo, no blanco)',cr(sb.fg,c.bg)>=4.5&&cr(sb.bd,c.bg)>=3,[sb,cr(sb.fg,c.bg),cr(sb.bd,c.bg)]);
+      await p.click('.tab[data-tab=spk]');await sleep(100);
       const bt=await p.evaluate(()=>{const e=document.getElementById('go_proc'),c=getComputedStyle(e);return {fg:c.color.replace(/ /g,''),bg:c.backgroundColor.replace(/ /g,''),bd:c.borderTopWidth};});
       ok('Tema light: el botón principal (p. ej. «Guardar WiFi») se lee: texto oscuro sobre fondo blanco ≥ 4,5:1 y con borde',cr(bt.fg,bt.bg)>=4.5&&bt.fg!==bt.bg&&parseFloat(bt.bd)>=1,bt);
     }else{

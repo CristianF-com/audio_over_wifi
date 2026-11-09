@@ -288,6 +288,7 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
 .sub{appearance:none;background:none;border:0;border-bottom:3px solid transparent;margin-bottom:-1px;color:var(--mut);font-weight:600;padding:10px 16px;min-height:44px;white-space:nowrap}
 .sub:hover{color:var(--fg)}
 .sub[aria-selected=true]{color:var(--ac);border-bottom-color:var(--ac)}
+html[data-theme=light] .sub[aria-selected=true]{color:var(--fg);border-bottom-color:var(--fg)}   /* en Claro el acento es blanco: el subtab activo se lee con el color del texto */
 .sbm{appearance:none;position:absolute;top:0;bottom:1px;width:44px;border:0;background:var(--bg);color:var(--fg);font-size:1.5rem;font-weight:700;display:none;align-items:center;justify-content:center}
 .sbm.on{display:flex}.sbm.l{left:0;border-right:1px solid var(--line)}.sbm.r{right:0;border-left:1px solid var(--line)}
 .subpane[hidden],.cards[hidden]{display:none}
