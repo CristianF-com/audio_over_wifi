@@ -772,6 +772,21 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
    ok('Placas: el altavoz elige entre las 16 entradas y las de la 2.ª placa llevan su id',await up.evaluate(()=>{const o=[...document.querySelectorAll('#d_cl option')].map(x=>x.textContent);return o.length===16&&/^B1 FL/.test(o[10])&&/^A1 FL/.test(o[0]);}));
    ok('Placas: sin errores de JS',uerr.length===0,uerr);
    await up.close();}
+  {// iPhone: sin zoom al tocar campos, sin desbordes y subpestañas que solo se mueven en horizontal
+   const ip=await b.newContext({viewport:{width:393,height:852},deviceScaleFactor:3,isMobile:true,hasTouch:true});
+   const mp=await ip.newPage();const merr=[];mp.on('pageerror',e=>merr.push(String(e)));
+   await mp.goto(BASE+'/');await mp.waitForSelector('#spks .spk');await sleep(1200);
+   ok('iPhone: campos y selectores con letra de 16 px o más (Safari no hace zoom al tocarlos)',await mp.evaluate(()=>[...document.querySelectorAll('input:not([type=range]):not([type=radio]):not([type=checkbox]),select,textarea')].every(e=>parseFloat(getComputedStyle(e).fontSize)>=16)));
+   ok('iPhone: sin zoom por doble toque (touch-action: manipulation)',await mp.evaluate(()=>getComputedStyle(document.body).touchAction==='manipulation'));
+   ok('iPhone: las subpestañas no se desplazan en vertical',await mp.evaluate(()=>[...document.querySelectorAll('.subtabs')].every(e=>getComputedStyle(e).overflowY==='hidden')));
+   let wide=[];
+   for(const tab of ['spk','snd','lat','sys']){await mp.click('.tab[data-tab="'+tab+'"]');await sleep(300);
+     const subs=await mp.evaluate(t=>[...document.querySelectorAll('.subtabs button')].filter(b=>b.offsetParent).map(b=>b.id),tab);
+     for(const id of (subs.length?subs:[null])){if(id){await mp.click('#'+id,{force:true}).catch(()=>{});await sleep(250);}
+       const sw=await mp.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);if(sw>1)wide.push(tab+'/'+id+':'+sw);}}
+   ok('iPhone: ninguna pestaña ni subpestaña desborda en horizontal (393 px)',wide.length===0,wide);
+   ok('iPhone: sin errores de JS',merr.length===0,merr);
+   await ip.close();}
   const cp=await ctx.newPage();const cerr=[];cp.on('pageerror',e=>cerr.push(String(e)));
   await cp.goto(BASE+'/calibrate');
   if(SHOTS)await cp.screenshot({path:SHOTS+'/calibrar_inicio.png',fullPage:true});

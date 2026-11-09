@@ -281,7 +281,7 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
 }
 /* Subpestañas con indicador de que hay más a los lados */
 .sbwrap{position:relative;margin:0 0 16px}
-.subtabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--line);-webkit-overflow-scrolling:touch}
+.subtabs{display:flex;gap:4px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scrollbar-width:none;border-bottom:1px solid var(--line);-webkit-overflow-scrolling:touch}
 .subtabs::-webkit-scrollbar{display:none}
 .sub{appearance:none;background:none;border:0;border-bottom:3px solid transparent;margin-bottom:-1px;color:var(--mut);font-weight:600;padding:10px 16px;min-height:44px;white-space:nowrap}
 .sub:hover{color:var(--fg)}

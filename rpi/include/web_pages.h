@@ -156,6 +156,9 @@ input[type=range].rng.mid{--lo:.5;--hi:.5;
 .rng::-moz-range-thumb{width:var(--tw);height:var(--th);border-radius:calc(var(--th)/2);background:var(--thumb);border:0;box-shadow:0 2px 8px rgba(0,0,0,.35),0 0 0 3px var(--thumb-ring)}
 .rng:focus-visible{outline-offset:0}
 
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{touch-action:manipulation}   /* sin zoom por doble toque en iPhone */
+@media (pointer:coarse){input,select,textarea,.num,.txt,.sel{font-size:16px}}   /* con menos de 16 px Safari hace zoom al tocar un campo y no vuelve */
 .num,.txt,.sel{background:var(--raise);border:1px solid var(--ctl);border-radius:14px;padding:9px 14px;min-height:44px;width:100%;color:var(--fg)}
 .num{width:110px}
 .num:focus,.txt:focus,.sel:focus{outline:2px solid var(--ac);outline-offset:1px;border-color:transparent}
@@ -491,7 +494,7 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
 }
 /* Subpestañas con indicador de que hay más a los lados */
 .sbwrap{position:relative;margin:0 0 16px}
-.subtabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--line);-webkit-overflow-scrolling:touch}
+.subtabs{display:flex;gap:4px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scrollbar-width:none;border-bottom:1px solid var(--line);-webkit-overflow-scrolling:touch}
 .subtabs::-webkit-scrollbar{display:none}
 .sub{appearance:none;background:none;border:0;border-bottom:3px solid transparent;margin-bottom:-1px;color:var(--mut);font-weight:600;padding:10px 16px;min-height:44px;white-space:nowrap}
 .sub:hover{color:var(--fg)}
@@ -1832,6 +1835,9 @@ input[type=range].rng.mid{--lo:.5;--hi:.5;
 .rng::-moz-range-thumb{width:var(--tw);height:var(--th);border-radius:calc(var(--th)/2);background:var(--thumb);border:0;box-shadow:0 2px 8px rgba(0,0,0,.35),0 0 0 3px var(--thumb-ring)}
 .rng:focus-visible{outline-offset:0}
 
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{touch-action:manipulation}   /* sin zoom por doble toque en iPhone */
+@media (pointer:coarse){input,select,textarea,.num,.txt,.sel{font-size:16px}}   /* con menos de 16 px Safari hace zoom al tocar un campo y no vuelve */
 .num,.txt,.sel{background:var(--raise);border:1px solid var(--ctl);border-radius:14px;padding:9px 14px;min-height:44px;width:100%;color:var(--fg)}
 .num{width:110px}
 .num:focus,.txt:focus,.sel:focus{outline:2px solid var(--ac);outline-offset:1px;border-color:transparent}
@@ -2349,6 +2355,9 @@ input[type=range].rng.mid{--lo:.5;--hi:.5;
 .rng::-moz-range-thumb{width:var(--tw);height:var(--th);border-radius:calc(var(--th)/2);background:var(--thumb);border:0;box-shadow:0 2px 8px rgba(0,0,0,.35),0 0 0 3px var(--thumb-ring)}
 .rng:focus-visible{outline-offset:0}
 
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{touch-action:manipulation}   /* sin zoom por doble toque en iPhone */
+@media (pointer:coarse){input,select,textarea,.num,.txt,.sel{font-size:16px}}   /* con menos de 16 px Safari hace zoom al tocar un campo y no vuelve */
 .num,.txt,.sel{background:var(--raise);border:1px solid var(--ctl);border-radius:14px;padding:9px 14px;min-height:44px;width:100%;color:var(--fg)}
 .num{width:110px}
 .num:focus,.txt:focus,.sel:focus{outline:2px solid var(--ac);outline-offset:1px;border-color:transparent}
@@ -2571,8 +2580,8 @@ static const char PWA_MANIFEST[] = R"HTML({
 static const char PWA_SW[] = R"HTML(/* Service worker de AStream. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * 5c63434b5d lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-5c63434b5d';
+ * b3e7555006 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-b3e7555006';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png', '/fonts/roboto-400.woff2', '/fonts/roboto-500.woff2'];
 
 self.addEventListener('install', e => {

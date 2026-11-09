@@ -90,6 +90,9 @@ input[type=range].rng.mid{--lo:.5;--hi:.5;
 .rng::-moz-range-thumb{width:var(--tw);height:var(--th);border-radius:calc(var(--th)/2);background:var(--thumb);border:0;box-shadow:0 2px 8px rgba(0,0,0,.35),0 0 0 3px var(--thumb-ring)}
 .rng:focus-visible{outline-offset:0}
 
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{touch-action:manipulation}   /* sin zoom por doble toque en iPhone */
+@media (pointer:coarse){input,select,textarea,.num,.txt,.sel{font-size:16px}}   /* con menos de 16 px Safari hace zoom al tocar un campo y no vuelve */
 .num,.txt,.sel{background:var(--raise);border:1px solid var(--ctl);border-radius:14px;padding:9px 14px;min-height:44px;width:100%;color:var(--fg)}
 .num{width:110px}
 .num:focus,.txt:focus,.sel:focus{outline:2px solid var(--ac);outline-offset:1px;border-color:transparent}
