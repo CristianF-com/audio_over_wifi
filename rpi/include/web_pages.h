@@ -105,9 +105,9 @@ html[data-theme=light]{
   color-scheme:light;
 }
 /* Zonas seguras laterales: en el navegador (pestaña de Safari/Chrome) el propio navegador ya aparta la página de la isla/muesca
-   y env() puede devolver un valor que no hace falta (hueco de ~47 px); solo en app instalada/pantalla completa se aplican (a la izquierda restando 18 px: el margen de la isla es más ancho que lo que tapa). */
+   y env() puede devolver un valor que no hace falta (hueco de ~47 px); solo en app instalada/pantalla completa se aplican (a la izquierda restando 15 px: el margen de la isla es más ancho que lo que tapa). */
 :root{--sal:0px;--sar:0px}
-@media (display-mode:standalone),(display-mode:fullscreen){:root{--sal:max(0px,calc(env(safe-area-inset-left) - 18px));--sar:env(safe-area-inset-right)}}
+@media (display-mode:standalone),(display-mode:fullscreen){:root{--sal:max(0px,calc(env(safe-area-inset-left) - 15px));--sar:env(safe-area-inset-right)}}
 *{box-sizing:border-box;margin:0}
 html{font-size:106.25%}html[data-size=s]{font-size:96%}html[data-size=l]{font-size:120%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
 body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
@@ -1806,9 +1806,9 @@ html[data-theme=light]{
   color-scheme:light;
 }
 /* Zonas seguras laterales: en el navegador (pestaña de Safari/Chrome) el propio navegador ya aparta la página de la isla/muesca
-   y env() puede devolver un valor que no hace falta (hueco de ~47 px); solo en app instalada/pantalla completa se aplican (a la izquierda restando 18 px: el margen de la isla es más ancho que lo que tapa). */
+   y env() puede devolver un valor que no hace falta (hueco de ~47 px); solo en app instalada/pantalla completa se aplican (a la izquierda restando 15 px: el margen de la isla es más ancho que lo que tapa). */
 :root{--sal:0px;--sar:0px}
-@media (display-mode:standalone),(display-mode:fullscreen){:root{--sal:max(0px,calc(env(safe-area-inset-left) - 18px));--sar:env(safe-area-inset-right)}}
+@media (display-mode:standalone),(display-mode:fullscreen){:root{--sal:max(0px,calc(env(safe-area-inset-left) - 15px));--sar:env(safe-area-inset-right)}}
 *{box-sizing:border-box;margin:0}
 html{font-size:106.25%}html[data-size=s]{font-size:96%}html[data-size=l]{font-size:120%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
 body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
@@ -2331,9 +2331,9 @@ html[data-theme=light]{
   color-scheme:light;
 }
 /* Zonas seguras laterales: en el navegador (pestaña de Safari/Chrome) el propio navegador ya aparta la página de la isla/muesca
-   y env() puede devolver un valor que no hace falta (hueco de ~47 px); solo en app instalada/pantalla completa se aplican (a la izquierda restando 18 px: el margen de la isla es más ancho que lo que tapa). */
+   y env() puede devolver un valor que no hace falta (hueco de ~47 px); solo en app instalada/pantalla completa se aplican (a la izquierda restando 15 px: el margen de la isla es más ancho que lo que tapa). */
 :root{--sal:0px;--sar:0px}
-@media (display-mode:standalone),(display-mode:fullscreen){:root{--sal:max(0px,calc(env(safe-area-inset-left) - 18px));--sar:env(safe-area-inset-right)}}
+@media (display-mode:standalone),(display-mode:fullscreen){:root{--sal:max(0px,calc(env(safe-area-inset-left) - 15px));--sar:env(safe-area-inset-right)}}
 *{box-sizing:border-box;margin:0}
 html{font-size:106.25%}html[data-size=s]{font-size:96%}html[data-size=l]{font-size:120%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
 body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
@@ -2612,8 +2612,8 @@ static const char PWA_MANIFEST[] = R"HTML({
 static const char PWA_SW[] = R"HTML(/* Service worker de AStream. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * 957b365988 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-957b365988';
+ * 93ad91d12c lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-93ad91d12c';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png', '/fonts/roboto-400.woff2', '/fonts/roboto-500.woff2'];
 
 self.addEventListener('install', e => {
