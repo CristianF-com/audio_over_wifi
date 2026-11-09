@@ -59,3 +59,47 @@
   f(); addEventListener('orientationchange', f); addEventListener('resize', f);
   try { screen.orientation.addEventListener('change', f); } catch (e) {}
 })();
+
+/* Entrada con clave dentro de la web (no el diálogo Basic del navegador, lento en la app instalada): todas las peticiones de la página
+   llevan «X-Requested-With: sonos» (el servidor entonces no manda WWW-Authenticate); ante un 401 de /api/ se muestra esta pantalla,
+   que envía la clave a POST /api/login y deja una cookie de sesión. */
+(function () {
+  if (!window.fetch || window.__sonosLogin) return;
+  window.__sonosLogin = true;
+  var of = window.fetch.bind(window), box = null;
+  function esc() { var el = document.getElementById('sonos_login'); if (el) el.remove(); box = null; }
+  function show() {
+    if (box || !document.body) return;
+    box = document.createElement('div'); box.id = 'sonos_login'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
+    box.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:max(16px,env(safe-area-inset-top)) 16px 16px;overflow:auto';
+    box.innerHTML = '<form id="sl_f" style="width:min(360px,100%);display:grid;gap:12px;font-family:var(--font);color:var(--fg)">' +
+      '<h1 style="margin:0 0 4px;font-size:1.5rem;font-weight:500">AStream</h1>' +
+      '<p style="margin:0 0 6px;color:var(--mut)">Escribe la contraseña para entrar.</p>' +
+      '<label for="sl_u" style="font-size:.9rem;color:var(--mut)">Usuario (opcional)</label>' +
+      '<input id="sl_u" autocomplete="username" autocapitalize="none" style="min-height:44px;padding:8px 12px;background:var(--panel);color:var(--fg);border:1px solid var(--ctl);font-size:1rem">' +
+      '<label for="sl_p" style="font-size:.9rem;color:var(--mut)">Contraseña</label>' +
+      '<input id="sl_p" type="password" autocomplete="current-password" required style="min-height:44px;padding:8px 12px;background:var(--panel);color:var(--fg);border:1px solid var(--ctl);font-size:1rem">' +
+      '<div id="sl_e" role="alert" style="min-height:1.2em;color:var(--bad-fg);font-size:.9rem"></div>' +
+      '<button class="btn" id="sl_b" type="submit">Entrar</button></form>';
+    document.body.appendChild(box);
+    var f = document.getElementById('sl_f'), p = document.getElementById('sl_p'), e = document.getElementById('sl_e'), b = document.getElementById('sl_b');
+    setTimeout(function () { try { p.focus(); } catch (x) {} }, 50);
+    f.addEventListener('submit', function (ev) {
+      ev.preventDefault(); b.disabled = true; e.textContent = '';
+      of('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'sonos' }, body: JSON.stringify({ pass: p.value }) })
+        .then(function (r) { if (r.ok) { esc(); location.reload(); } else { e.textContent = r.status === 401 ? 'Contraseña incorrecta.' : 'No se pudo entrar.'; b.disabled = false; p.select(); } })
+        .catch(function () { e.textContent = 'Sin conexión con la Raspberry.'; b.disabled = false; });
+    });
+  }
+  window.fetch = function (input, init) {
+    var url = typeof input === 'string' ? input : (input && input.url) || '';
+    var same = url.charAt(0) === '/' || url.indexOf(location.origin) === 0;
+    if (same) { init = init || {}; var h = new Headers(init.headers || (typeof input !== 'string' && input.headers) || {}); h.set('X-Requested-With', 'sonos'); init.headers = h; }
+    return of(input, init).then(function (r) {
+      if (r.status === 401 && same && url.indexOf('/api/login') < 0) {
+        if (document.body) show(); else document.addEventListener('DOMContentLoaded', show);
+      }
+      return r;
+    });
+  };
+})();

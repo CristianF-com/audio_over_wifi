@@ -136,7 +136,7 @@ En el panel, **Añadir altavoces** (botón +): pulsas **Buscar altavoces por Blu
 * **Cómo funciona:** el servidor lanza `scripts/sonos_ble_prov.py` (BlueZ + `bleak`) como subproceso; las órdenes (con la contraseña) van por stdin, no por argumentos. El firmware no cambia: usa el mismo servicio GATT que la página `/ble`. Escribe ID → SSID → IP de la RPi (si hay) → contraseña → `apply`.
 * **Instalación:** `scripts/build.sh` instala `python3-bleak` (o `pip`), copia el ayudante a `/usr/local/lib/sonos_wifi/` y añade el usuario del servicio al grupo `bluetooth`. Ruta alternativa: `-B /ruta/sonos_ble_prov.py`. Si no hay ayudante, el panel lo dice y ofrece la página `/ble` del móvil.
 * **API:** `GET /api/ble/status`, `POST /api/ble/wifi {ssid,pass,rpi_ip}`, `POST /api/ble/scan {seconds 3-15}`, `POST /api/ble/provision {address,id,force}`, `POST /api/ble/identify {address}`. Una sola operación Bluetooth a la vez.
-* **Notas:** el firmware exige enlace cifrado (Just Works) para escribir (`SONOS_BLE_REQUIRE_ENC`); el ayudante intenta emparejar antes. Un ESP32 con WiFi ya funcionando cierra su BLE a los 300 s del arranque: para reconfigurarlo, reinícialo. Alcance BLE: unos metros.
+* **Notas:** el firmware exige enlace cifrado (Just Works) para escribir (`SONOS_BLE_REQUIRE_ENC`); el ayudante intenta emparejar antes. Un ESP32 con WiFi ya funcionando cierra su BLE a los 15 s de conectarse al Wi-Fi: para reconfigurarlo, reinícialo. Alcance BLE: unos metros.
 * **Pruebas:** `tests/test_ble_helper.py` (bleak falso: qué se escribe y en qué orden), la API contra el ayudante en modo simulado (`SONOS_BLE_MOCK`) en `fake_esp.py`, y la interfaz en `test_ui.js`. **No probado con Bluetooth real ni con ESP32 reales.**
 
 ## Probar altavoces, distancias, modo noche, perfiles, salud y firmware por WiFi (v9.6)
@@ -169,7 +169,7 @@ Consejos de router (generales, no medidos en tu red):
 ## Configurar los ESP32 por Bluetooth (sin cable, sin Wi-Fi)
 
 Cada receptor se anuncia por BLE como **`SonosWiFi-XXXX`** (XXXX = final de su MAC, único aunque todos tengan ID 0)
-durante los primeros 5 min tras arrancar, y siempre que no tenga Wi-Fi.
+mientras no tenga Wi-Fi (y 15 s después de conectarse), y siempre que no tenga Wi-Fi.
 Ahí puedes cambiar **ID, red Wi-Fi y contraseña**, ver su estado en vivo (IP, RSSI, sync, pérdidas) y hacer que
 **pite** para saber qué placa es cuál. Después del primer arranque con Wi-Fi, el BLE se apaga solo (cero impacto en audio).
 
@@ -230,4 +230,4 @@ El firmware ESP (C5 y WROOM) compila, se flashea y funciona en placa (confirmado
 La web UI/API no tiene autenticación ni CORS: úsala solo en una LAN de confianza. El HTTPS usa un certificado
 autofirmado (`/etc/sonos_wifi/`), sirve para habilitar micrófono/Bluetooth del navegador, no para autenticar.
 BLE: «Just Works» cifra el enlace pero no impide un atacante activo cercano durante la ventana de configuración;
-por eso el BLE solo está activo 5 min tras arrancar (o sin Wi-Fi) y la contraseña Wi-Fi no es legible por BLE.
+por eso el BLE solo está activo sin Wi-Fi (y 15 s tras conectarse) (o sin Wi-Fi) y la contraseña Wi-Fi no es legible por BLE.

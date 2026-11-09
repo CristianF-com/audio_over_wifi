@@ -22,6 +22,7 @@
  *   - HELLO.reserved = versión de firmware (bits 0..5) | chip (bits 6..7: 1 = ESP32-C5, 2 = ESP32 clásico); 0 = firmware antiguo.
  *   - REPORT.reserved[0] = RSSI WiFi en dBm (int8; 0 = desconocido).
  *   - PKT_OTA (RPi -> ESP:5005): orden de actualizar el firmware por WiFi (el ESP la ignora si no la entiende).
+ *   - PKT_WIFI (RPi -> ESP:5005): cambiar la red WiFi del ESP por WiFi (el ESP la ignora si no la entiende).
  * Volumen, crossover y ecualización: se aplican SOLO en la RPi. El ESP no toca las muestras.
  * (antes:) Volumen: se aplica SOLO en la RPi. El ESP no escala muestras.
  * Todo en little-endian (RPi y ESP32-C5 lo son). Structs empaquetados.
@@ -65,6 +66,7 @@
 #define PKT_AUDIO_MONO  0x08   /* RPi -> ESP:5006 (240 frames mono; num_samples = 240) */
 #define PKT_NACK        0x09   /* ESP -> RPi:5005 (pide reenvío de paquetes de audio)  */
 #define PKT_OTA         0x0A   /* RPi -> ESP:5005 (actualizar firmware por HTTP desde la RPi) */
+#define PKT_WIFI        0x0B   /* RPi -> ESP:5005 (cambiar la red WiFi: el ESP la prueba y, si no conecta, vuelve a la anterior) */
 
 #define FW_CHIP_UNKNOWN 0
 #define FW_CHIP_C5      1
@@ -171,6 +173,15 @@ typedef struct {
 
 typedef struct {
     uint32_t magic;
+    uint8_t  pkt_type;     /* PKT_WIFI */
+    uint8_t  esp_id;
+    uint8_t  reserved[2];
+    char     ssid[36];     /* terminada en NUL; 1..32 caracteres */
+    char     pass[68];     /* terminada en NUL; vacía (red abierta) o 8..64 caracteres */
+} WifiPacket;              /* 112 */
+
+typedef struct {
+    uint32_t magic;
     uint8_t  pkt_type;     /* PKT_SYNC_REQ */
     uint8_t  esp_id;
     uint8_t  reserved[2];
@@ -196,5 +207,6 @@ PROTO_ASSERT(sizeof(AudioPacket)    == 500, "AudioPacket");
 PROTO_ASSERT(sizeof(ReportPacket)   == 52, "ReportPacket");
 PROTO_ASSERT(sizeof(NackPacket)     == 40, "NackPacket");
 PROTO_ASSERT(sizeof(OtaPacket)      == 24, "OtaPacket");
+PROTO_ASSERT(sizeof(WifiPacket)    == 112, "WifiPacket");
 PROTO_ASSERT(sizeof(SyncReqPacket)  == 16, "SyncReqPacket");
 PROTO_ASSERT(sizeof(SyncRespPacket) == 32, "SyncRespPacket");

@@ -54,15 +54,25 @@ menu "SonosWiFi receiver"
         string "IP fija de la RPi (opcional; vacío = solo broadcast). El NVS/BLE la sobreescribe"
         default ""
 
+    config SONOS_LED_GPIO
+        int "GPIO del LED de estado (-1 = sin LED)"
+        range -1 48
+        default 27
+
+    config SONOS_LED_ACTIVE_LOW
+        bool "El LED enciende con nivel bajo"
+        depends on SONOS_LED_GPIO >= 0
+        default y
+
     config SONOS_BLE_ENABLE
         bool "Configuración por Bluetooth LE (NimBLE)"
         default y
 
     config SONOS_BLE_WINDOW_S
-        int "Segundos que el BLE permanece anunciándose tras arrancar (si hay WiFi)"
+        int "Segundos con WiFi conectado tras los que el BLE se apaga (sin WiFi sigue activo)"
         depends on SONOS_BLE_ENABLE
-        range 30 3600
-        default 300
+        range 5 3600
+        default 15
 
     config SONOS_BLE_REQUIRE_ENC
         bool "Exigir enlace cifrado (emparejamiento Just Works) para escribir"

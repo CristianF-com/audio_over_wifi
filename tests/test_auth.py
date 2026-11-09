@@ -12,7 +12,7 @@ def get(path, user=None, pw=None):
     except urllib.error.HTTPError as e: return e.code, dict(e.headers)
 c, h = get("/api/status");                           check("sin credenciales -> 401", c == 401, c)
 check("401 incluye WWW-Authenticate Basic", "Basic" in h.get("WWW-Authenticate", ""), h.get("WWW-Authenticate"))
-c, _ = get("/");                                     check("la SPA también exige contraseña", c == 401, c)
+c, _ = get("/");                                     check("las páginas HTML son públicas (la web pide la clave con su pantalla)", c == 200, c)
 c, _ = get("/api/status", "x", "mal");               check("contraseña incorrecta -> 401", c == 401, c)
 c, _ = get("/api/status", "sonos", "s3cret");        check("prefijo de la contraseña -> 401", c == 401, c)
 c, _ = get("/api/status", "sonos", "s3cret:clave");  check("contraseña correcta (con ':' dentro) -> 200", c == 200, c)
@@ -74,5 +74,29 @@ check("WiFi de la RPi: la contraseña no sale nunca por la API", "clave12345" no
 c, r = post("/api/update", {}); check("actualizar el servidor -> 200", c == 200, (c, r))
 u = esperar(lambda: (lambda x: x if x["update"]["state"] == "ok" else None)(sysinfo()))
 check("actualizar: estado «ok» y registro visible", u and "Listo" in u["update"]["log"], u and u["update"])
+
+# ── Entrada desde la web: POST /api/login → cookie de sesión; con X-Requested-With no se manda el diálogo Basic ──
+import json as _j, http.client as _hc
+def raw(method, path, body=None, headers=None):
+    c = _hc.HTTPConnection("127.0.0.1", 18081, timeout=5)
+    h = dict(headers or {}); data = None
+    if body is not None: data = _j.dumps(body); h["Content-Type"] = "application/json"
+    c.request(method, path, data, h); r = c.getresponse(); r.read(); hd = {k.lower(): v for k, v in r.getheaders()}; c.close(); return r.status, hd
+XH = {"X-Requested-With": "sonos"}
+st, hd = raw("GET", "/api/status", headers=XH)
+check("login: 401 desde la web sin WWW-Authenticate (no sale el diálogo del navegador)", st == 401 and "www-authenticate" not in hd, (st, hd.get("www-authenticate")))
+st, hd = raw("GET", "/api/status")
+check("login: un cliente sin la cabecera sigue recibiendo WWW-Authenticate (curl, scripts)", st == 401 and "basic" in hd.get("www-authenticate", "").lower(), (st, hd.get("www-authenticate")))
+st, hd = raw("POST", "/api/login", {"pass": "mal"}, XH)
+check("login: clave incorrecta -> 401 y sin cookie", st == 401 and "set-cookie" not in hd, (st, hd.get("set-cookie")))
+st, hd = raw("POST", "/api/login", {"pass": "s3cret:clave"}, XH)
+ck = hd.get("set-cookie", "")
+check("login: clave correcta -> 200 y cookie HttpOnly SameSite=Strict", st == 200 and "sonos_sid=" in ck and "HttpOnly" in ck and "SameSite=Strict" in ck, (st, ck))
+sid = ck.split(";")[0]
+st, _ = raw("GET", "/api/status", headers={**XH, "Cookie": sid}); check("login: con la cookie /api/status -> 200", st == 200, st)
+st, _ = raw("GET", "/api/status", headers={**XH, "Cookie": "sonos_sid=" + "0" * 32}); check("login: cookie inventada -> 401", st == 401, st)
+st, _ = raw("GET", "/api/status", headers={**XH, "Cookie": "otra=1; " + sid}); check("login: la cookie funciona entre otras", st == 200, st)
+st, hd = raw("POST", "/api/logout", {}, {**XH, "Cookie": sid}); check("login: logout -> 200 y cookie borrada", st == 200 and "Max-Age=0" in hd.get("set-cookie", ""), (st, hd.get("set-cookie")))
+st, _ = raw("GET", "/api/status", headers={**XH, "Cookie": sid}); check("login: tras el logout la cookie ya no sirve", st == 401, st)
 
 sys.exit(0 if ok else 1)

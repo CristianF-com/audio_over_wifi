@@ -10,6 +10,7 @@
 #include <atomic>
 #include <string>
 #include <mutex>
+#include <map>
 
 class WebServer {
 public:
@@ -50,6 +51,7 @@ private:
     std::string firmwareUpload(const std::string& body);
     std::string firmwareInfo();
     std::string otaStart(const std::string& body);
+    std::string wifiPush(const std::string& body);
     std::string otaCancel(const std::string& body);
     std::string serveFirmware(const std::string& path, int& code);
     std::string toneStart(const std::string& body);
@@ -84,6 +86,11 @@ private:
     int               tfd_ = -1;
     uint16_t          tls_port_ = 0;
     std::string       cert_, key_, password_, web_dir_;
+    std::mutex        sess_mtx_;               // sesiones de la web (cookie sonos_sid)
+    std::map<std::string, long long> sess_;
+    std::string sessionCreate();
+    bool sessionValid(const std::string& cookie);
+    void sessionDrop(const std::string& cookie);
     std::mutex        fw_mtx_;                 // firmware subido para la OTA (en memoria)
     std::string       fw_data_, fw_ver_;
     int               fw_chip_ = 0;

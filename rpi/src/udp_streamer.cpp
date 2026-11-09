@@ -827,6 +827,22 @@ bool UdpStreamer::sendOta(uint8_t id, uint16_t http_port, uint32_t size, uint64_
     fprintf(stderr, "[OTA] ESP%d: orden de actualización enviada (%u bytes)\n", id, size);
     return true;
 }
+bool UdpStreamer::sendWifi(uint8_t id, const std::string& ssid, const std::string& pass) {
+    if (id >= MAX_NODES || ctrl_sock_ < 0 || ssid.empty() || ssid.size() > 32 || pass.size() > 64) return false;
+    sockaddr_in to;
+    {
+        std::lock_guard<std::mutex> lk(nodes_mtx_);
+        const ESPNode& n = nodes_[id];
+        if (!n.online || n.ota_busy) return false;
+        to = n.ctrl_addr;
+    }
+    WifiPacket w{};
+    w.magic = PROTOCOL_MAGIC; w.pkt_type = PKT_WIFI; w.esp_id = id;
+    memcpy(w.ssid, ssid.data(), ssid.size()); memcpy(w.pass, pass.data(), pass.size());
+    for (int k = 0; k < 3; k++) sendto(ctrl_sock_, &w, sizeof(w), 0, (const sockaddr*)&to, sizeof(to));   // UDP: se repite por si se pierde
+    fprintf(stderr, "[WiFi] ESP%d: orden de cambio de red enviada ('%s')\n", id, ssid.c_str());   // la clave nunca se registra
+    return true;
+}
 void UdpStreamer::cancelOta(uint8_t id) {
     if (id >= MAX_NODES) return;
     std::lock_guard<std::mutex> lk(nodes_mtx_);

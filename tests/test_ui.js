@@ -246,6 +246,24 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('escritorio ancho: el cajón es un panel lateral fijo (sin velo, la página sigue activa)',await until(async()=>await p.evaluate(()=>document.body.classList.contains('has-dock')&&!document.getElementById('scrim').classList.contains('on')&&!document.querySelector('main').inert&&!document.querySelector('.top').inert&&!document.getElementById('drawer').inert)));
   await p.keyboard.press('Escape');
   ok('al cerrar con Esc: el foco vuelve al altavoz que lo abrió y la página deja de ser inerte',await until(async()=>await p.evaluate(()=>document.activeElement&&document.activeElement.classList.contains('spk')&&document.activeElement.dataset.id==='2'&&!document.querySelector('main').inert&&document.getElementById('drawer').inert)));
+  {   // Cambiar la red WiFi del altavoz por WiFi (PKT_WIFI vía /api/wifi/push)
+    await p.click('.tab[data-tab="spk"]');
+    let FW=7;await p.route('**/api/nodes',async r=>{const resp=await r.fetch();const j=await resp.json();const n=j.find(x=>x.id===3);if(n){n.online=true;n.fw_version=FW;}await r.fulfill({response:resp,json:j});});
+    const openN=async(fw)=>{FW=fw;await p.evaluate(()=>loadNodes());await sleep(400);await p.click('#spks .spk[data-id="3"][data-side="0"]');await p.waitForSelector('#drawer.on');await adv(p);await sleep(200);};
+    await openN(7);
+    ok('Cambiar red: con firmware < 14 los campos y el botón están desactivados y se explica por qué',await p.evaluate(()=>document.getElementById('d_wsb').disabled&&document.getElementById('d_wss').disabled&&/versión 14/.test(document.getElementById('d_wsh').textContent)));
+    await p.keyboard.press('Escape');await sleep(250);
+    await openN(14);
+    ok('Cambiar red: con firmware ≥ 14 se activa y avisa que si no conecta en 1 minuto vuelve a la anterior',await p.evaluate(()=>!document.getElementById('d_wsb').disabled&&/vuelve a la anterior/.test(document.getElementById('d_wsh').textContent)&&document.getElementById('d_wsp').type==='password'));
+    let sent=null;await p.route('**/api/wifi/push',async r=>{sent=JSON.parse(r.request().postData());await r.fulfill({contentType:'application/json',body:'{"ok":true}'});});
+    await p.fill('#d_wss','CasaNueva');await p.fill('#d_wsp','corta');await p.click('#d_wsb');await sleep(150);
+    ok('Cambiar red: una clave de menos de 8 caracteres no se envía',sent===null);
+    await p.fill('#d_wsp','claveLarga123');await p.click('#d_wsb');await sleep(100);
+    ok('Cambiar red: el primer toque pide confirmar y no envía nada',sent===null&&/otra vez/.test(await p.textContent('#d_wsb')));
+    await p.click('#d_wsb');await sleep(250);
+    ok('Cambiar red: el segundo toque envía id, nombre y clave a /api/wifi/push y limpia la clave del campo',sent&&sent.id===3&&sent.ssid==='CasaNueva'&&sent.pass==='claveLarga123'&&await p.inputValue('#d_wsp')==='',JSON.stringify(sent));
+    await p.unroute('**/api/wifi/push');await p.unroute('**/api/nodes');await p.keyboard.press('Escape');await sleep(250);
+  }
   await p.focus('.tab[data-tab="spk"]');await p.keyboard.press('ArrowRight');
   ok('pestañas con teclado: → selecciona y enfoca la siguiente (foco itinerante)',await p.evaluate(()=>document.activeElement.dataset.tab==='snd'&&document.activeElement.getAttribute('aria-selected')==='true'&&document.querySelector('.tab[data-tab="spk"]').tabIndex===-1&&!document.getElementById('p_snd').hidden));
   await p.keyboard.press('End');ok('pestañas con teclado: Fin va a la última',await p.evaluate(()=>document.activeElement.dataset.tab==='sys'));
@@ -385,6 +403,19 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
    ok('forma: ?forma=recta la activa y se recuerda; ?forma=redonda la quita',await p.evaluate(()=>SonosTheme.getShape()==='square')&&(await p.goto(BASE+'/?forma=redonda'),await p.waitForSelector('#spks .spk',{state:'attached'}),await p.evaluate(()=>SonosTheme.getShape()==='round'&&document.documentElement.getAttribute('data-shape')==='round')));
    await p.click('.tab[data-tab="spk"]');}
   // Móvil
+  {// Pantalla de entrada propia (sin diálogo Basic): un 401 de /api/ la muestra; la clave sale por POST /api/login
+   const lc=await b.newContext({viewport:{width:390,height:844}});const lp=await lc.newPage();let logged=false,xh=null,authed=false;
+   await lp.route('**/api/status',r=>{xh=r.request().headers()['x-requested-with'];return authed?r.continue():r.fulfill({status:401,contentType:'application/json',body:'{"error":"unauthorized"}'});});
+   await lp.route('**/api/login',r=>{const j=JSON.parse(r.request().postData()||'{}');if(j.pass==='bien'){authed=true;logged=true;return r.fulfill({status:200,contentType:'application/json',body:'{"ok":true}'});}return r.fulfill({status:401,contentType:'application/json',body:'{"error":"Clave incorrecta"}'});});
+   await lp.goto(BASE+'/');
+   ok('Entrada: un 401 de la API muestra la pantalla de clave de la web',await until(()=>lp.locator('#sonos_login').isVisible()));
+   ok('Entrada: las peticiones de la web llevan X-Requested-With: sonos',xh==='sonos');
+   ok('Entrada: campo de clave de tipo password y botón «Entrar» ≥ 44 px',await lp.evaluate(()=>document.getElementById('sl_p').type==='password'&&document.getElementById('sl_b').getBoundingClientRect().height>=44));
+   await lp.fill('#sl_p','mal');await lp.click('#sl_b');
+   ok('Entrada: clave incorrecta muestra el error y no recarga',await until(()=>lp.locator('#sl_e').textContent().then(t=>/incorrecta/.test(t)))&&await lp.locator('#sonos_login').isVisible());
+   await lp.fill('#sl_p','bien');await lp.click('#sl_b');
+   ok('Entrada: con la clave buena envía el login y entra (pantalla fuera)',await until(()=>logged)&&await until(async()=>(await lp.locator('#sonos_login').count())===0));
+   await lc.close();}
   const m=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
   await m.addInitScript(()=>{try{if(localStorage.getItem('sonos_shape')===null)localStorage.setItem('sonos_shape','round');}catch(e){}});
   const q=await m.newPage();await q.goto(BASE+'/');await q.waitForSelector('#spks .spk');await sleep(800);

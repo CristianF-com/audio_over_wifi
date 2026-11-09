@@ -220,6 +220,8 @@ public:
     // ── Actualización de firmware por WiFi (OTA): envía la orden al ESP y deja de mandarle audio ──
     bool sendOta(uint8_t id, uint16_t http_port, uint32_t size, uint64_t token);
     void cancelOta(uint8_t id);
+    // Cambia la red WiFi de un ESP en línea (PKT_WIFI): el ESP la prueba y, si no conecta en 60 s, vuelve a la anterior. false si no está en línea.
+    bool sendWifi(uint8_t id, const std::string& ssid, const std::string& pass);
 
 private:
     void controlLoop();                       // HELLO / REPORT / SYNC_REQ

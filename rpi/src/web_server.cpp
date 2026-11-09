@@ -12,6 +12,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <ctime>
 #include <cstring>
 #include <cstdlib>
 #include <cmath>
@@ -144,7 +145,7 @@ struct Conn {
 };
 
 static constexpr long MAX_BODY = 16384, MAX_FW_BODY = 3 * 1024 * 1024;   // el firmware (.bin) es lo único que pasa de 16 KB
-static bool readHTTP(Conn& c, std::string& method, std::string& path, std::string& body, std::string& auth) {
+static bool readHTTP(Conn& c, std::string& method, std::string& path, std::string& body, std::string& auth, std::string& cookie, bool& xhr) {
     const int fd = c.fd;
     std::string raw; raw.reserve(4096); char tmp[16384];
     struct timeval tv{5, 0};
@@ -168,6 +169,14 @@ static bool readHTTP(Conn& c, std::string& method, std::string& path, std::strin
         auth = raw.substr(ap, ae == std::string::npos ? std::string::npos : ae - ap);
         while (!auth.empty() && (auth.front() == ' ' || auth.front() == '\t')) auth.erase(auth.begin());
     }
+    size_t cp = hdrs.find("\r\ncookie:");
+    if (cp != std::string::npos) {                         // valor con su capitalización original
+        cp += 9;
+        size_t ce = raw.find("\r\n", cp);
+        cookie = raw.substr(cp, ce == std::string::npos ? std::string::npos : ce - cp);
+        while (!cookie.empty() && (cookie.front() == ' ' || cookie.front() == '\t')) cookie.erase(cookie.begin());
+    }
+    xhr = hdrs.find("\r\nx-requested-with: sonos") != std::string::npos;   // lo añade la propia web a sus fetch: no se le manda el diálogo Basic del navegador
     long clen = 0;
     size_t pp = hdrs.find("content-length:");
     if (pp != std::string::npos) {
@@ -269,6 +278,37 @@ void WebServer::serverLoop() {
         }
     }
 }
+// ── Sesiones de la web: cookie «sonos_sid» (token aleatorio de 128 bits, en memoria, 30 días, máx. 32) ──
+static std::string cookieSid(const std::string& cookie) {
+    size_t i = cookie.find("sonos_sid=");
+    if (i == std::string::npos || (i > 0 && cookie[i - 1] != ' ' && cookie[i - 1] != ';')) return std::string();
+    i += 10; size_t e = cookie.find(';', i);
+    return cookie.substr(i, e == std::string::npos ? std::string::npos : e - i);
+}
+std::string WebServer::sessionCreate() {
+    unsigned char rnd[16] = {0};
+    FILE* f = fopen("/dev/urandom", "rb");
+    if (!f || fread(rnd, 1, sizeof(rnd), f) != sizeof(rnd)) { if (f) fclose(f); for (auto& x : rnd) x = (unsigned char)rand(); } else fclose(f);
+    char hex[33]; for (int i = 0; i < 16; i++) snprintf(hex + 2 * i, 3, "%02x", rnd[i]);
+    const std::string tok = hex; const time_t now = time(nullptr);
+    std::lock_guard<std::mutex> lk(sess_mtx_);
+    for (auto it = sess_.begin(); it != sess_.end();) it = it->second < now ? sess_.erase(it) : std::next(it);
+    while (sess_.size() >= 32) sess_.erase(sess_.begin());
+    sess_[tok] = now + 2592000;
+    return tok;
+}
+bool WebServer::sessionValid(const std::string& cookie) {
+    const std::string tok = cookieSid(cookie);
+    if (tok.size() != 32) return false;
+    std::lock_guard<std::mutex> lk(sess_mtx_);
+    auto it = sess_.find(tok);
+    return it != sess_.end() && it->second >= time(nullptr);
+}
+void WebServer::sessionDrop(const std::string& cookie) {
+    const std::string tok = cookieSid(cookie);
+    std::lock_guard<std::mutex> lk(sess_mtx_);
+    sess_.erase(tok);
+}
 void WebServer::handleClient(int cfd, bool tls) {
     Conn c; c.fd = cfd;
     struct timeval tv0{5, 0};
@@ -285,8 +325,8 @@ void WebServer::handleClient(int cfd, bool tls) {
 #else
     (void)tls;
 #endif
-    std::string m, p, b, auth;
-    if (!readHTTP(c, m, p, b, auth)) {
+    std::string m, p, b, auth, cookie; bool xhr = false;
+    if (!readHTTP(c, m, p, b, auth, cookie, xhr)) {
 #ifdef WITH_TLS
         if (ssl) { SSL_shutdown(ssl); SSL_free(ssl); }
 #endif
@@ -313,16 +353,35 @@ void WebServer::handleClient(int cfd, bool tls) {
     }
     bool fwget = false;                                     // GET /fw/ota.bin?t=<token>: lo pide el ESP, que no puede enviar contraseña; lo protege un token de un solo uso por orden
     if (m == "GET" && p.rfind("/fw/ota.bin", 0) == 0) fwget = true;
-    const bool pwa = pwaTxt || pwaBin || fwget;
+    // Las páginas (HTML) son públicas: no llevan datos y así la app instalada las abre sin diálogo del navegador; la API sí exige clave,
+    // y la propia web pide usuario y clave con su pantalla de entrada (POST /api/login → cookie de sesión).
+    const bool page = m == "GET" && (p == "/" || p == "/index.html" || p == "/calibrate" || p == "/ble");
+    const bool pwa = pwaTxt || pwaBin || fwget || page;
     bool authed = password_.empty();
     if (!authed && auth.size() > 6 && strncasecmp(auth.c_str(), "Basic ", 6) == 0) {
         std::string up = b64decode(auth.substr(6));
         size_t colon = up.find(':');
         authed = colon != std::string::npos && constEq(up.substr(colon + 1), password_);   // el usuario es libre
     }
-    if (!authed && !pwa) {
+    if (!authed) authed = sessionValid(cookie);
+    if (m == "POST" && p == "/api/login") {                 // entrada desde la web: la clave correcta crea una sesión (cookie HttpOnly)
+        if (password_.empty()) { resp = "{\"ok\":true}"; }
+        else if (constEq(jsonGet(b, "pass"), password_)) {
+            resp = "{\"ok\":true}";
+            extra = "Set-Cookie: sonos_sid=" + sessionCreate() + "; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000\r\n";
+        } else {
+            usleep(700000);                                  // frena la adivinanza de claves
+            code = 401; resp = "{\"error\":\"Clave incorrecta\"}";
+        }
+    }
+    else if (m == "POST" && p == "/api/logout") {
+        sessionDrop(cookie);
+        extra = "Set-Cookie: sonos_sid=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0\r\n";
+        resp = "{\"ok\":true}";
+    }
+    else if (!authed && !pwa) {
         code = 401; resp = "{\"error\":\"unauthorized\"}";
-        extra = "WWW-Authenticate: Basic realm=\"AStream\", charset=\"UTF-8\"\r\n";
+        if (!xhr) extra = "WWW-Authenticate: Basic realm=\"AStream\", charset=\"UTF-8\"\r\n";   // a la web no: pide la clave con su pantalla
     }
     else if (fwget) { resp = serveFirmware(p, code); ct = code == 200 ? "application/octet-stream" : "application/json"; }
     else if (pwaTxt) { resp = pwaTxt; ct = pwaCt; }
@@ -411,6 +470,11 @@ std::string WebServer::handlePOST(const std::string& p, const std::string& b, in
     else if (p == "/api/inputs")    r = inputsPost(b);
     else if (p == "/api/firmware")  r = firmwareUpload(b);
     else if (p == "/api/ota")       r = otaStart(b);
+    else if (p == "/api/wifi/push") {
+        // cambia la red WiFi de un altavoz: manda la clave por la red local, solo con contraseña configurada
+        if (password_.empty()) { code = 403; return "{\"error\":\"Configura una contraseña para usar esto: sudo ./scripts/set_password.sh \\\"tu clave\\\"\"}"; }
+        r = wifiPush(b);
+    }
     else if (p == "/api/ota/cancel") r = otaCancel(b);
     else if (p == "/api/ble/wifi")      r = bleWifi(b);
     else if (p == "/api/ble/scan")      r = bleScan(b);
@@ -729,6 +793,19 @@ std::string WebServer::firmwareInfo() {
     std::ostringstream o;
     o << "{" << jbool("loaded", !fw_data_.empty()) << "," << jnum("size", (double)fw_data_.size()) << "," << jnum("chip", fw_chip_) << "," << jstr("version", fw_ver_) << "}";
     return o.str();
+}
+std::string WebServer::wifiPush(const std::string& b) {
+    long id;
+    if (!parseInt(jsonGet(b, "id"), 0, MAX_NODES - 1, id)) return "{\"error\":\"id fuera de rango (0-9)\"}";
+    const std::string ssid = jsonGet(b, "ssid"), pass = jsonGet(b, "pass");
+    if (ssid.empty() || ssid.size() > 32) return "{\"error\":\"El nombre de la red debe tener entre 1 y 32 caracteres\"}";
+    if (!pass.empty() && (pass.size() < 8 || pass.size() > 64)) return "{\"error\":\"La clave debe tener entre 8 y 64 caracteres (o estar vacía si la red es abierta)\"}";
+    for (char c : ssid + pass) if ((unsigned char)c < 0x20 || c == 0x7f) return "{\"error\":\"El nombre y la clave no pueden llevar caracteres de control\"}";
+    const auto nodes = streamer_.getNodes();
+    if (!nodes[id].online) return "{\"error\":\"El altavoz no está en línea\"}";
+    if (nodes[id].fw_version < 14) return "{\"error\":\"Este altavoz tiene un firmware sin cambio de red por WiFi (hace falta la versión 14): actualízalo primero\"}";
+    if (!streamer_.sendWifi((uint8_t)id, ssid, pass)) return "{\"error\":\"No se pudo enviar la orden (el altavoz se está actualizando o no está en línea)\"}";
+    return "{\"ok\":true}";
 }
 std::string WebServer::otaStart(const std::string& b) {
     long id;

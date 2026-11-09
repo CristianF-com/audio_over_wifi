@@ -9,6 +9,7 @@ idf_component_register(
         esp_netif
         esp_timer
         esp_driver_i2s
+        esp_driver_gpio
         nvs_flash
         lwip
         bt

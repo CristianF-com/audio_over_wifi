@@ -151,6 +151,7 @@ c, b = http("GET", "/api/system"); si = json.loads(b) if c == 200 else {}
 check("/api/system sin contraseña: protected=false y WiFi actual de la RPi", c == 200 and si.get("protected") is False and si.get("wifi", {}).get("ssid") == "CasaHogar", si)
 c, _ = http("POST", "/api/update", {});               check("sin contraseña no se puede actualizar el servidor -> 403", c == 403, c)
 c, _ = http("POST", "/api/rpi/wifi", {"ssid": "X"});  check("sin contraseña no se puede cambiar la WiFi de la RPi -> 403", c == 403, c)
+c, _ = http("POST", "/api/wifi/push", {"id": 0, "ssid": "X", "pass": "12345678"}); check("sin contraseña no se puede cambiar la WiFi de un altavoz -> 403", c == 403, c)
 c, _ = http("POST", "/api/node", {"id": 0, "name": "Sofá"});          check("nombre del altavoz -> 200", c == 200, c)
 c, b = http("GET", "/api/nodes"); n0 = [n for n in json.loads(b) if n["id"] == 0][0] if c == 200 else {}
 check("/api/nodes devuelve el nombre", n0.get("name") == "Sofá", n0.get("name"))

@@ -52,7 +52,7 @@ Constantes clave (`protocol.h`): `FRAMES_PER_PACKET=120`, `PLAYOUT_DELAY_US=8000
 
 ## 3c. BLE (ESP32-C5) — NUEVO
 * Servicio `5c0a0001-8e3b-4d5e-9a41-534f4e4f5346`; chars 0002 SSID R/W, 0003 PASS W, 0004 ID R/W, 0005 STATUS R/N (JSON), 0006 CMD W (`apply|identify|reboot|factory`). `apply` guarda en NVS ("config": wifi_ssid, wifi_pass, receiver_id) y reinicia a los 0.8 s.
-* Nombre `SonosWiFi-<últimos 2 bytes MAC BT>`. Escrituras exigen cifrado (Just Works, `CONFIG_SONOS_BLE_REQUIRE_ENC`). BLE activo `SONOS_BLE_WINDOW_S`=300 s tras el arranque y siempre sin Wi-Fi; `report_task` lo apaga con Wi-Fi activo y lo reactiva si el Wi-Fi cae >60 s.
+* Nombre `SonosWiFi-<últimos 2 bytes MAC BT>`. Escrituras exigen cifrado (Just Works, `CONFIG_SONOS_BLE_REQUIRE_ENC`). BLE activo mientras no hay Wi-Fi y `SONOS_BLE_WINDOW_S`=15 s después de conectarse (FW v13; antes 300 s desde el arranque: el BLE comparte radio con el Wi-Fi de 2.4 GHz y obligaba a ≥ 120 ms durante esos 5 min) y siempre sin Wi-Fi; `report_task` lo apaga con Wi-Fi activo y lo reactiva si el Wi-Fi cae >60 s.
 * Orden de arranque: i2s → tarea i2s (pitido `identify` sin red) → BLE → wifi_start (no bloqueante, reintento con backoff 1–10 s por esp_timer) → wifi_wait → sockets → tareas.
 * Acceso: `https://<rpi>:8443/ble` (Web Bluetooth: Chrome/Edge; iPhone: Bluefy) o nRF Connect.
 * `bt` + NimBLE en `sdkconfig.defaults`; los nombres CONFIG_BT_NIMBLE_* pueden variar según versión de IDF (revisar con menuconfig).
@@ -172,3 +172,10 @@ Ver sección «Historial v7». Archivos tocados: common/protocol.h, rpi/{udp_str
 
 ## v9.21 — App instalada en iPhone
 App instalada / zonas seguras (v9.21, patrón tomado de `interval-hiit`): `--sal`/`--sar` valen 0 en el navegador y solo se aplican en `display-mode: standalone|fullscreen` (a la izquierda restando 15 px); `theme.js` pone `html.notch-l`/`notch-r` según la orientación y el lado sin muesca queda en 14 px. Barra de estado `default` + franja fija `#topcap` (color de la cabecera) para que iOS 26 no dibuje el desenfoque bajo la muesca; se oculta en horizontal. En horizontal el modal es una hoja inferior que empieza donde termina el riel (el riel queda a la vista y centrado). Sin probar en un iPhone con la app instalada.
+
+## v9.22 — Cambiar la red WiFi de un ESP por WiFi (FW v14)
+* `PKT_WIFI` 0x0B (112 B), `POST /api/wifi/push`, cajón del altavoz → Ajustes avanzados. Prueba de 60 s con vuelta a la red anterior; BLE apagado con Wi-Fi (se apaga a los 15 s de conectar). Sin probar en placa.
+
+## v9.23 — entrada con clave dentro de la web y LED de estado (sin probar en placa / app instalada)
+* Login propio (`/api/login`, cookie de sesión, páginas públicas, `X-Requested-With: sonos` evita el diálogo Basic). Pruebas: `tests/test_auth.py`, `tests/test_ui.js` («Entrada»).
+* FW v15: LED de estado (ver CLAUDE.md). El C5 tiene un solo LED por software.

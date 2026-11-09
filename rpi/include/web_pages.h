@@ -75,6 +75,50 @@ static const char PAGE_PANEL[] = R"HTML(<!DOCTYPE html>
   }
   f(); addEventListener('orientationchange', f); addEventListener('resize', f);
   try { screen.orientation.addEventListener('change', f); } catch (e) {}
+})();
+
+/* Entrada con clave dentro de la web (no el diálogo Basic del navegador, lento en la app instalada): todas las peticiones de la página
+   llevan «X-Requested-With: sonos» (el servidor entonces no manda WWW-Authenticate); ante un 401 de /api/ se muestra esta pantalla,
+   que envía la clave a POST /api/login y deja una cookie de sesión. */
+(function () {
+  if (!window.fetch || window.__sonosLogin) return;
+  window.__sonosLogin = true;
+  var of = window.fetch.bind(window), box = null;
+  function esc() { var el = document.getElementById('sonos_login'); if (el) el.remove(); box = null; }
+  function show() {
+    if (box || !document.body) return;
+    box = document.createElement('div'); box.id = 'sonos_login'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
+    box.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:max(16px,env(safe-area-inset-top)) 16px 16px;overflow:auto';
+    box.innerHTML = '<form id="sl_f" style="width:min(360px,100%);display:grid;gap:12px;font-family:var(--font);color:var(--fg)">' +
+      '<h1 style="margin:0 0 4px;font-size:1.5rem;font-weight:500">AStream</h1>' +
+      '<p style="margin:0 0 6px;color:var(--mut)">Escribe la contraseña para entrar.</p>' +
+      '<label for="sl_u" style="font-size:.9rem;color:var(--mut)">Usuario (opcional)</label>' +
+      '<input id="sl_u" autocomplete="username" autocapitalize="none" style="min-height:44px;padding:8px 12px;background:var(--panel);color:var(--fg);border:1px solid var(--ctl);font-size:1rem">' +
+      '<label for="sl_p" style="font-size:.9rem;color:var(--mut)">Contraseña</label>' +
+      '<input id="sl_p" type="password" autocomplete="current-password" required style="min-height:44px;padding:8px 12px;background:var(--panel);color:var(--fg);border:1px solid var(--ctl);font-size:1rem">' +
+      '<div id="sl_e" role="alert" style="min-height:1.2em;color:var(--bad-fg);font-size:.9rem"></div>' +
+      '<button class="btn" id="sl_b" type="submit">Entrar</button></form>';
+    document.body.appendChild(box);
+    var f = document.getElementById('sl_f'), p = document.getElementById('sl_p'), e = document.getElementById('sl_e'), b = document.getElementById('sl_b');
+    setTimeout(function () { try { p.focus(); } catch (x) {} }, 50);
+    f.addEventListener('submit', function (ev) {
+      ev.preventDefault(); b.disabled = true; e.textContent = '';
+      of('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'sonos' }, body: JSON.stringify({ pass: p.value }) })
+        .then(function (r) { if (r.ok) { esc(); location.reload(); } else { e.textContent = r.status === 401 ? 'Contraseña incorrecta.' : 'No se pudo entrar.'; b.disabled = false; p.select(); } })
+        .catch(function () { e.textContent = 'Sin conexión con la Raspberry.'; b.disabled = false; });
+    });
+  }
+  window.fetch = function (input, init) {
+    var url = typeof input === 'string' ? input : (input && input.url) || '';
+    var same = url.charAt(0) === '/' || url.indexOf(location.origin) === 0;
+    if (same) { init = init || {}; var h = new Headers(init.headers || (typeof input !== 'string' && input.headers) || {}); h.set('X-Requested-With', 'sonos'); init.headers = h; }
+    return of(input, init).then(function (r) {
+      if (r.status === 401 && same && url.indexOf('/api/login') < 0) {
+        if (document.body) show(); else document.addEventListener('DOMContentLoaded', show);
+      }
+      return r;
+    });
+  };
 })();</script>
 <title>AStream</title>
 <style>
@@ -1130,6 +1174,11 @@ function buildDrawer(){
    '<div class="fld"><label for="d_lat">Retardo extra (ms; positivo lo retrasa)</label><input class="num" id="d_lat" type="number" min="-500" max="500" step="0.01" value="'+((n.latency_offset_us||0)/1000)+'"></div>'+
    '<hr class="sep"><div class="fld wide"><div class="top2"><b>Ecualizador</b><button class="btn ghost sm" id="d_eqz">Plano</button></div><p class="hint" id="d_eqh" style="margin:4px 0 8px"></p>'+
    EQF.map((f,i)=>'<div class="eqrow"><span>'+f+'</span><input class="rng mid" type="range" min="-12" max="12" step="0.5" id="d_eq'+i+'" value="'+(eq[i]||0)+'" aria-label="EQ '+f+'"><output id="d_eo'+i+'"></output></div>').join('')+'</div>'+
+   '<hr class="sep"><div class="fld wide" id="d_wsw"><label for="d_wss">Cambiar la red WiFi de este altavoz</label>'+
+   '<input class="txt" id="d_wss" type="text" maxlength="32" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Nombre de la red">'+
+   '<input class="txt" id="d_wsp" type="password" maxlength="64" autocomplete="new-password" placeholder="Clave (vacía si la red es abierta)" style="margin-top:8px">'+
+   '<button class="btn ghost sm" id="d_wsb" type="button" style="margin-top:8px">Cambiar red</button>'+
+   '<p class="hint" style="margin-top:6px" id="d_wsh"></p></div>'+
    '<div class="fld wide" id="d_fgw"><button class="btn danger sm" id="d_fg" type="button">Quitar este ESP del panel</button><p class="hint" style="margin-top:6px">Solo si está apagado. Si vuelve a conectarse, aparece de nuevo con su configuración.</p></div></div></details>'+
    '<div class="hint wide" id="d_stats"></div><div class="savestate wide" id="d_ss"></div>';
   wireDrawer();modeUI();rolHint();eqHint();document.querySelectorAll('#dbody .rng').forEach(fillRng);for(let i=0;i<6;i++)eqOut(i);updDrawerStats();
@@ -1168,6 +1217,17 @@ function wireDrawer(){
   ['d_cl','d_cr'].forEach(i=>$(i).onchange=q);
   $('d_lat').onchange=q;$('d_dist').onchange=q;$('d_name').oninput=q;
   $('d_tone').querySelectorAll('button').forEach(b=>b.onclick=()=>toneBtn(b));
+  {const wb=$('d_wsb'),wn=find(openId),ok=!!(wn&&wn.online&&wn.fw_version>=14);
+    $('d_wsh').textContent=ok?'El altavoz se reinicia y prueba la red nueva; si no conecta en 1 minuto, vuelve a la anterior. Los otros altavoces y la Raspberry no cambian.':!(wn&&wn.online)?'El altavoz tiene que estar en línea. Si no lo está, configúralo por Bluetooth con «+».':'Este altavoz tiene un firmware sin esta función (hace falta la versión 14): actualízalo primero.';
+    wb.disabled=!ok;$('d_wss').disabled=!ok;$('d_wsp').disabled=!ok;
+    wb.onclick=async()=>{const ssid=$('d_wss').value.trim(),pass=$('d_wsp').value;
+      if(!ssid){toast('Escribe el nombre de la red',false);return;}
+      if(pass&&pass.length<8){toast('La clave debe tener al menos 8 caracteres',false);return;}
+      if(!wb.dataset.arm){wb.dataset.arm='1';wb.textContent='Pulsa otra vez para cambiarla';setTimeout(()=>{delete wb.dataset.arm;wb.textContent='Cambiar red';},4000);return;}
+      delete wb.dataset.arm;wb.textContent='Cambiar red';wb.disabled=true;
+      const r=await J('/api/wifi/push',{id:openId,ssid,pass});wb.disabled=false;
+      if(r.ok){$('d_wsp').value='';toast('Orden enviada: el altavoz probará la red «'+ssid+'»');log('ESP '+openId+': cambio de red a «'+ssid+'»');}
+      else toast(r.error||'No se pudo enviar la orden',false);};}
   const fg=$('d_fg'),nn=find(openId);if(nn&&nn.online)fg.disabled=true;
   fg.onclick=async()=>{
     if(!fg.dataset.arm){fg.dataset.arm='1';fg.textContent='Pulsa otra vez para quitarlo';setTimeout(()=>{delete fg.dataset.arm;fg.textContent='Quitar este ESP del panel';},4000);return;}
@@ -1783,6 +1843,50 @@ static const char PAGE_CAL[] = R"HTML(<!DOCTYPE html>
   }
   f(); addEventListener('orientationchange', f); addEventListener('resize', f);
   try { screen.orientation.addEventListener('change', f); } catch (e) {}
+})();
+
+/* Entrada con clave dentro de la web (no el diálogo Basic del navegador, lento en la app instalada): todas las peticiones de la página
+   llevan «X-Requested-With: sonos» (el servidor entonces no manda WWW-Authenticate); ante un 401 de /api/ se muestra esta pantalla,
+   que envía la clave a POST /api/login y deja una cookie de sesión. */
+(function () {
+  if (!window.fetch || window.__sonosLogin) return;
+  window.__sonosLogin = true;
+  var of = window.fetch.bind(window), box = null;
+  function esc() { var el = document.getElementById('sonos_login'); if (el) el.remove(); box = null; }
+  function show() {
+    if (box || !document.body) return;
+    box = document.createElement('div'); box.id = 'sonos_login'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
+    box.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:max(16px,env(safe-area-inset-top)) 16px 16px;overflow:auto';
+    box.innerHTML = '<form id="sl_f" style="width:min(360px,100%);display:grid;gap:12px;font-family:var(--font);color:var(--fg)">' +
+      '<h1 style="margin:0 0 4px;font-size:1.5rem;font-weight:500">AStream</h1>' +
+      '<p style="margin:0 0 6px;color:var(--mut)">Escribe la contraseña para entrar.</p>' +
+      '<label for="sl_u" style="font-size:.9rem;color:var(--mut)">Usuario (opcional)</label>' +
+      '<input id="sl_u" autocomplete="username" autocapitalize="none" style="min-height:44px;padding:8px 12px;background:var(--panel);color:var(--fg);border:1px solid var(--ctl);font-size:1rem">' +
+      '<label for="sl_p" style="font-size:.9rem;color:var(--mut)">Contraseña</label>' +
+      '<input id="sl_p" type="password" autocomplete="current-password" required style="min-height:44px;padding:8px 12px;background:var(--panel);color:var(--fg);border:1px solid var(--ctl);font-size:1rem">' +
+      '<div id="sl_e" role="alert" style="min-height:1.2em;color:var(--bad-fg);font-size:.9rem"></div>' +
+      '<button class="btn" id="sl_b" type="submit">Entrar</button></form>';
+    document.body.appendChild(box);
+    var f = document.getElementById('sl_f'), p = document.getElementById('sl_p'), e = document.getElementById('sl_e'), b = document.getElementById('sl_b');
+    setTimeout(function () { try { p.focus(); } catch (x) {} }, 50);
+    f.addEventListener('submit', function (ev) {
+      ev.preventDefault(); b.disabled = true; e.textContent = '';
+      of('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'sonos' }, body: JSON.stringify({ pass: p.value }) })
+        .then(function (r) { if (r.ok) { esc(); location.reload(); } else { e.textContent = r.status === 401 ? 'Contraseña incorrecta.' : 'No se pudo entrar.'; b.disabled = false; p.select(); } })
+        .catch(function () { e.textContent = 'Sin conexión con la Raspberry.'; b.disabled = false; });
+    });
+  }
+  window.fetch = function (input, init) {
+    var url = typeof input === 'string' ? input : (input && input.url) || '';
+    var same = url.charAt(0) === '/' || url.indexOf(location.origin) === 0;
+    if (same) { init = init || {}; var h = new Headers(init.headers || (typeof input !== 'string' && input.headers) || {}); h.set('X-Requested-With', 'sonos'); init.headers = h; }
+    return of(input, init).then(function (r) {
+      if (r.status === 401 && same && url.indexOf('/api/login') < 0) {
+        if (document.body) show(); else document.addEventListener('DOMContentLoaded', show);
+      }
+      return r;
+    });
+  };
 })();</script>
 <title>AStream — Calibración</title>
 <style>
@@ -2329,6 +2433,50 @@ static const char PAGE_BLE[] = R"HTML(<!DOCTYPE html>
   }
   f(); addEventListener('orientationchange', f); addEventListener('resize', f);
   try { screen.orientation.addEventListener('change', f); } catch (e) {}
+})();
+
+/* Entrada con clave dentro de la web (no el diálogo Basic del navegador, lento en la app instalada): todas las peticiones de la página
+   llevan «X-Requested-With: sonos» (el servidor entonces no manda WWW-Authenticate); ante un 401 de /api/ se muestra esta pantalla,
+   que envía la clave a POST /api/login y deja una cookie de sesión. */
+(function () {
+  if (!window.fetch || window.__sonosLogin) return;
+  window.__sonosLogin = true;
+  var of = window.fetch.bind(window), box = null;
+  function esc() { var el = document.getElementById('sonos_login'); if (el) el.remove(); box = null; }
+  function show() {
+    if (box || !document.body) return;
+    box = document.createElement('div'); box.id = 'sonos_login'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
+    box.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:max(16px,env(safe-area-inset-top)) 16px 16px;overflow:auto';
+    box.innerHTML = '<form id="sl_f" style="width:min(360px,100%);display:grid;gap:12px;font-family:var(--font);color:var(--fg)">' +
+      '<h1 style="margin:0 0 4px;font-size:1.5rem;font-weight:500">AStream</h1>' +
+      '<p style="margin:0 0 6px;color:var(--mut)">Escribe la contraseña para entrar.</p>' +
+      '<label for="sl_u" style="font-size:.9rem;color:var(--mut)">Usuario (opcional)</label>' +
+      '<input id="sl_u" autocomplete="username" autocapitalize="none" style="min-height:44px;padding:8px 12px;background:var(--panel);color:var(--fg);border:1px solid var(--ctl);font-size:1rem">' +
+      '<label for="sl_p" style="font-size:.9rem;color:var(--mut)">Contraseña</label>' +
+      '<input id="sl_p" type="password" autocomplete="current-password" required style="min-height:44px;padding:8px 12px;background:var(--panel);color:var(--fg);border:1px solid var(--ctl);font-size:1rem">' +
+      '<div id="sl_e" role="alert" style="min-height:1.2em;color:var(--bad-fg);font-size:.9rem"></div>' +
+      '<button class="btn" id="sl_b" type="submit">Entrar</button></form>';
+    document.body.appendChild(box);
+    var f = document.getElementById('sl_f'), p = document.getElementById('sl_p'), e = document.getElementById('sl_e'), b = document.getElementById('sl_b');
+    setTimeout(function () { try { p.focus(); } catch (x) {} }, 50);
+    f.addEventListener('submit', function (ev) {
+      ev.preventDefault(); b.disabled = true; e.textContent = '';
+      of('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'sonos' }, body: JSON.stringify({ pass: p.value }) })
+        .then(function (r) { if (r.ok) { esc(); location.reload(); } else { e.textContent = r.status === 401 ? 'Contraseña incorrecta.' : 'No se pudo entrar.'; b.disabled = false; p.select(); } })
+        .catch(function () { e.textContent = 'Sin conexión con la Raspberry.'; b.disabled = false; });
+    });
+  }
+  window.fetch = function (input, init) {
+    var url = typeof input === 'string' ? input : (input && input.url) || '';
+    var same = url.charAt(0) === '/' || url.indexOf(location.origin) === 0;
+    if (same) { init = init || {}; var h = new Headers(init.headers || (typeof input !== 'string' && input.headers) || {}); h.set('X-Requested-With', 'sonos'); init.headers = h; }
+    return of(input, init).then(function (r) {
+      if (r.status === 401 && same && url.indexOf('/api/login') < 0) {
+        if (document.body) show(); else document.addEventListener('DOMContentLoaded', show);
+      }
+      return r;
+    });
+  };
 })();</script>
 <title>AStream — Añadir altavoz</title>
 <style>
@@ -2661,8 +2809,8 @@ static const char PWA_MANIFEST[] = R"HTML({
 static const char PWA_SW[] = R"HTML(/* Service worker de AStream. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * fc2ad4f3ea lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-fc2ad4f3ea';
+ * 8d30004d73 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-8d30004d73';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png', '/fonts/roboto-400.woff2', '/fonts/roboto-500.woff2'];
 
 self.addEventListener('install', e => {
