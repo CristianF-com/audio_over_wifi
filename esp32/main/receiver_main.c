@@ -83,7 +83,7 @@ static const char* TAG = "RECV";
 #ifndef CONFIG_SONOS_BLE_WINDOW_S
   #define CONFIG_SONOS_BLE_WINDOW_S 300
 #endif
-#define FW_VERSION          10  /* 10: prioridades de las tareas I2S (20) y recepción (19) sobre lwIP (18). 9: vuelve a la cola DMA de 6 y al mínimo de 40 ms (la de 4 daba cortes en placa; v8 fue ese experimento). 7: ID automático por MAC (HELLO con ESP_ID_AUTO, WELCOME_F_ASSIGNED). 6: OTA por WiFi, versión/chip en el HELLO y RSSI en el REPORT (protocolo sin cambios: v5) */
+#define FW_VERSION          11  /* 11: vuelve a las prioridades 15/14 (la v10 con 20/19 empeoró en placa). 10: prioridades de las tareas I2S (20) y recepción (19) sobre lwIP (18). 9: vuelve a la cola DMA de 6 y al mínimo de 40 ms (la de 4 daba cortes en placa; v8 fue ese experimento). 7: ID automático por MAC (HELLO con ESP_ID_AUTO, WELCOME_F_ASSIGNED). 6: OTA por WiFi, versión/chip en el HELLO y RSSI en el REPORT (protocolo sin cambios: v5) */
 #if CONFIG_IDF_TARGET_ESP32C5
 #define FW_CHIP_ID          FW_CHIP_C5
 #else
@@ -827,9 +827,8 @@ void app_main(void)
     if (!g_q) { ESP_LOGE(TAG, "FATAL: cola"); esp_restart(); }
 
     i2s_init();
-    /* Prioridades (FW v10, experimento de latencia): I2S (20) y recepción de audio (19) POR ENCIMA de lwIP/tcpip (18) para que el Wi-Fi
-       no las retrase, pero por debajo de la tarea del WiFi (23). Antes eran 15 y 14. */
-    xTaskCreate(i2s_task, "i2s", 4096, NULL, 20, NULL);    /* ya activa: permite "identificar" sin WiFi */
+    /* UN solo núcleo: prioridades por debajo de WiFi (23) y tcpip (18). Probado en placa: subirlas sobre lwIP (v10: 20/19) empeoró los cortes. */
+    xTaskCreate(i2s_task, "i2s", 4096, NULL, 15, NULL);    /* ya activa: permite "identificar" sin WiFi */
     xTaskCreate(report_task, "rpt", 4096, NULL, 5, NULL);  /* gestiona la ventana BLE aunque aún no haya WiFi */
 
 #if CONFIG_SONOS_BLE_ENABLE
@@ -840,7 +839,7 @@ void app_main(void)
     if (!sockets_init()) { vTaskDelay(pdMS_TO_TICKS(1000)); esp_restart(); }
 
     xTaskCreate(control_task,  "ctrl", 4096, NULL, 12, NULL);
-    xTaskCreate(audio_rx_task, "arx",  4096, NULL, 19, NULL);
+    xTaskCreate(audio_rx_task, "arx",  4096, NULL, 14, NULL);
 
     ESP_LOGI(TAG, "Listo. Esperando WELCOME de la RPi...");
 }
