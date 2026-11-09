@@ -987,8 +987,8 @@ function drawRoom(){
       const nm=CH[u.ch],sub=n.role===2,live=n.enabled&&n.online,state=!n.enabled?'Desactivado':n.online?'En línea':'Sin conexión';
       h+='<button class="spk'+(sub?' sub':'')+(live?'':' off')+'" data-id="'+n.id+'" data-side="'+u.side+'" aria-expanded="'+(openId===n.id)+'" data-x="'+x+'" data-y="'+y+'" '+
         'aria-label="Altavoz '+nm+' ('+CHN[u.ch]+'), '+spkName(n)+', '+state.toLowerCase()+', volumen '+pct(u.side?n.volume_r:n.volume_l)+' %, retardo '+fmtMs(n.latency_offset_us)+(editRoom?'. Mover con las flechas del teclado':'. Pulsa para ajustarlo')+'">'+
-        '<span class="cab">'+spkSvg(sub)+'<i class="st'+(live?' on':'')+'"></i>'+vuHtml(u.ch)+'</span>'+
-        '<b class="ch">'+nm+'</b><span class="cap"><i class="dot '+(live?'ok':'bad')+'"></i>'+esc(spkName(n))+' · '+state+'</span>'+
+        '<span class="cab">'+spkSvg(sub)+'<i class="st'+(n.enabled?' on':'')+'"></i>'+vuHtml(u.ch)+'</span>'+
+        '<b class="ch">'+nm+'</b><span class="cap"><i class="dot '+(n.online?'ok':'bad')+'"></i>'+esc(spkName(n))+' · '+state+'</span>'+
         '<span class="cal" title="Volumen · retardo de este altavoz (los de la calibración)">'+pct(u.side?n.volume_r:n.volume_l)+'% <i>·</i> '+fmtMs(n.latency_offset_us)+'</span></button>';
     });
   });
@@ -2455,8 +2455,8 @@ static const char PWA_MANIFEST[] = R"HTML({
 static const char PWA_SW[] = R"HTML(/* Service worker de AStream. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * ef5753f065 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-ef5753f065';
+ * 0714267aa7 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-0714267aa7';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png', '/fonts/roboto-400.woff2', '/fonts/roboto-500.woff2'];
 
 self.addEventListener('install', e => {
