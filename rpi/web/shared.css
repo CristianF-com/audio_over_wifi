@@ -38,11 +38,15 @@ html[data-theme=light]{
   --room-bg:#e4e7ec; --led-g:#1fa84a; --led-y:#d9a400; --led-r:#e0342b;
   color-scheme:light;
 }
+/* Zonas seguras laterales: en el navegador (pestaña de Safari/Chrome) el propio navegador ya aparta la página de la isla/muesca
+   y env() puede devolver un valor que no hace falta (hueco de ~47 px); solo en app instalada/pantalla completa se aplican. */
+:root{--sal:0px;--sar:0px}
+@media (display-mode:standalone),(display-mode:fullscreen){:root{--sal:env(safe-area-inset-left);--sar:env(safe-area-inset-right)}}
 *{box-sizing:border-box;margin:0}
 html{font-size:106.25%}html[data-size=s]{font-size:96%}html[data-size=l]{font-size:120%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
 body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
   font-variant-numeric:tabular-nums;min-height:100vh;-webkit-text-size-adjust:100%;
-  padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+  padding-left:var(--sal);padding-right:var(--sar)}
 a{color:var(--ac);text-decoration:none}a:hover{text-decoration:underline}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}

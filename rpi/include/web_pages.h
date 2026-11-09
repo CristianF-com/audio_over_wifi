@@ -104,11 +104,15 @@ html[data-theme=light]{
   --room-bg:#e4e7ec; --led-g:#1fa84a; --led-y:#d9a400; --led-r:#e0342b;
   color-scheme:light;
 }
+/* Zonas seguras laterales: en el navegador (pestaña de Safari/Chrome) el propio navegador ya aparta la página de la isla/muesca
+   y env() puede devolver un valor que no hace falta (hueco de ~47 px); solo en app instalada/pantalla completa se aplican. */
+:root{--sal:0px;--sar:0px}
+@media (display-mode:standalone),(display-mode:fullscreen){:root{--sal:env(safe-area-inset-left);--sar:env(safe-area-inset-right)}}
 *{box-sizing:border-box;margin:0}
 html{font-size:106.25%}html[data-size=s]{font-size:96%}html[data-size=l]{font-size:120%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
 body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
   font-variant-numeric:tabular-nums;min-height:100vh;-webkit-text-size-adjust:100%;
-  padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+  padding-left:var(--sal);padding-right:var(--sar)}
 a{color:var(--ac);text-decoration:none}a:hover{text-decoration:underline}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
@@ -438,7 +442,7 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   /* Barra de pestañas fija abajo, pegada a los bordes (patrón de app web); icono y una palabra */
   .tabs{position:fixed;left:0;right:0;bottom:0;z-index:35;margin:0;gap:0;overflow:visible;justify-content:space-around;
     border:0;border-top:1px solid var(--line2);border-radius:0;background:var(--top-solid);
-    padding:4px calc(6px + env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom)) calc(6px + env(safe-area-inset-left))}
+    padding:4px calc(6px + var(--sar)) calc(4px + env(safe-area-inset-bottom)) calc(6px + var(--sal))}
   .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 2px;font-size:.72rem;min-height:52px;border-radius:var(--r-tab,14px)}
   .tab svg{display:block}
   .toasts{bottom:calc(68px + env(safe-area-inset-bottom))}
@@ -460,7 +464,7 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
 }
 /* Móvil en horizontal: la navegación pasa a un riel a la izquierda y la cabecera forma parte de la página */
 @media (orientation:landscape) and (max-height:500px){
-  body{--sal:min(env(safe-area-inset-left),20px);padding-left:calc(68px + var(--sal))}
+  body{padding-left:calc(68px + var(--sal))}
   .tabs{position:fixed;display:flex;flex-direction:column;justify-content:flex-start;top:0;bottom:0;left:0;right:auto;width:calc(68px + var(--sal));margin:0;gap:4px;overflow-x:hidden;overflow-y:auto;
     border:0;border-right:1px solid var(--line2);border-radius:0;background:var(--top-solid);z-index:35;
     padding:calc(8px + env(safe-area-inset-top)) 4px calc(8px + env(safe-area-inset-bottom)) calc(4px + var(--sal))}
@@ -479,7 +483,7 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   .room{aspect-ratio:16/9;min-height:300px}
   /* los modales ocupan todo el alto, sin pasar bajo la muesca ni el indicador de inicio */
   .drawer{top:0;bottom:0;left:0;right:0;width:100%;max-height:none;height:100vh;height:100dvh;border-radius:0;border:0;
-    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);transform:translateX(calc(100% + 40px));box-shadow:-20px 0 50px -24px rgba(0,0,0,.6)}
+    padding:env(safe-area-inset-top) var(--sar) env(safe-area-inset-bottom) var(--sal);transform:translateX(calc(100% + 40px));box-shadow:-20px 0 50px -24px rgba(0,0,0,.6)}
   .drawer.on{transform:none}
   .grab{display:none}
   .drawer header{padding:10px 14px}
@@ -1696,6 +1700,7 @@ p.textContent='safe T/R/B/L: '+c.paddingTop+' / '+c.paddingRight+' / '+c.padding
 'riel: x '+r.left.toFixed(1)+' ancho '+r.width.toFixed(1)+'  pad-izq '+tc.paddingLeft+'\n'+
 '1ª pestaña: x '+q.left.toFixed(1)+' ancho '+q.width.toFixed(1)+'\n'+
 'body pad-izq '+b.paddingLeft+'  --sal '+b.getPropertyValue('--sal')+'\n'+
+'display-mode: '+(['standalone','fullscreen','minimal-ui','browser'].find(m=>matchMedia('(display-mode:'+m+')').matches))+'  --sar '+b.getPropertyValue('--sar')+'\n'+
 'orient: '+(matchMedia('(orientation:landscape)').matches?'horizontal':'vertical');}
 u();addEventListener('resize',u);addEventListener('orientationchange',()=>setTimeout(u,300));setInterval(u,1000);}catch(e){}})();
 </script>
@@ -1800,11 +1805,15 @@ html[data-theme=light]{
   --room-bg:#e4e7ec; --led-g:#1fa84a; --led-y:#d9a400; --led-r:#e0342b;
   color-scheme:light;
 }
+/* Zonas seguras laterales: en el navegador (pestaña de Safari/Chrome) el propio navegador ya aparta la página de la isla/muesca
+   y env() puede devolver un valor que no hace falta (hueco de ~47 px); solo en app instalada/pantalla completa se aplican. */
+:root{--sal:0px;--sar:0px}
+@media (display-mode:standalone),(display-mode:fullscreen){:root{--sal:env(safe-area-inset-left);--sar:env(safe-area-inset-right)}}
 *{box-sizing:border-box;margin:0}
 html{font-size:106.25%}html[data-size=s]{font-size:96%}html[data-size=l]{font-size:120%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
 body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
   font-variant-numeric:tabular-nums;min-height:100vh;-webkit-text-size-adjust:100%;
-  padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+  padding-left:var(--sal);padding-right:var(--sar)}
 a{color:var(--ac);text-decoration:none}a:hover{text-decoration:underline}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
@@ -2321,11 +2330,15 @@ html[data-theme=light]{
   --room-bg:#e4e7ec; --led-g:#1fa84a; --led-y:#d9a400; --led-r:#e0342b;
   color-scheme:light;
 }
+/* Zonas seguras laterales: en el navegador (pestaña de Safari/Chrome) el propio navegador ya aparta la página de la isla/muesca
+   y env() puede devolver un valor que no hace falta (hueco de ~47 px); solo en app instalada/pantalla completa se aplican. */
+:root{--sal:0px;--sar:0px}
+@media (display-mode:standalone),(display-mode:fullscreen){:root{--sal:env(safe-area-inset-left);--sar:env(safe-area-inset-right)}}
 *{box-sizing:border-box;margin:0}
 html{font-size:106.25%}html[data-size=s]{font-size:96%}html[data-size=l]{font-size:120%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
 body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
   font-variant-numeric:tabular-nums;min-height:100vh;-webkit-text-size-adjust:100%;
-  padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+  padding-left:var(--sal);padding-right:var(--sar)}
 a{color:var(--ac);text-decoration:none}a:hover{text-decoration:underline}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
@@ -2599,8 +2612,8 @@ static const char PWA_MANIFEST[] = R"HTML({
 static const char PWA_SW[] = R"HTML(/* Service worker de AStream. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * 71540123b7 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-71540123b7';
+ * 35e0264c49 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-35e0264c49';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png', '/fonts/roboto-400.woff2', '/fonts/roboto-500.woff2'];
 
 self.addEventListener('install', e => {
