@@ -1684,6 +1684,21 @@ const h0=(location.hash||'').slice(1);if(['spk','snd','lat','sys'].includes(h0))
 drawNamesForm(true);loadStatus().then(loadNodes);updLat();loadProfiles();loadFw();lvLoop();
 setInterval(loadStatus,5000);setInterval(()=>{if(!document.hidden&&!$('p_lat').hidden)updLat();},3000);setInterval(loadNodes,2500);
 </script>
+<script>
+/* Diagnóstico temporal: abrir con ?debug=safe para ver zonas seguras y medidas del riel */
+(function(){try{if(!/[?&]debug=safe\b/.test(location.search))return;
+const p=document.createElement('div');p.style.cssText='position:fixed;left:50%;bottom:8px;transform:translateX(-50%);z-index:99999;background:#000;color:#0f0;font:12px/1.4 monospace;padding:8px 10px;white-space:pre;max-width:90vw;pointer-events:none';
+document.body.appendChild(p);
+const pr=document.createElement('div');pr.style.cssText='position:fixed;visibility:hidden;left:0;top:0;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)';document.body.appendChild(pr);
+function u(){const c=getComputedStyle(pr),t=document.querySelector('.tabs'),a=document.querySelector('.tab'),r=t.getBoundingClientRect(),q=a.getBoundingClientRect(),b=getComputedStyle(document.body),tc=getComputedStyle(t);
+p.textContent='safe T/R/B/L: '+c.paddingTop+' / '+c.paddingRight+' / '+c.paddingBottom+' / '+c.paddingLeft+'\n'+
+'ventana: '+innerWidth+'x'+innerHeight+'  dpr '+devicePixelRatio+'\n'+
+'riel: x '+r.left.toFixed(1)+' ancho '+r.width.toFixed(1)+'  pad-izq '+tc.paddingLeft+'\n'+
+'1ª pestaña: x '+q.left.toFixed(1)+' ancho '+q.width.toFixed(1)+'\n'+
+'body pad-izq '+b.paddingLeft+'  --sal '+b.getPropertyValue('--sal')+'\n'+
+'orient: '+(matchMedia('(orientation:landscape)').matches?'horizontal':'vertical');}
+u();addEventListener('resize',u);addEventListener('orientationchange',()=>setTimeout(u,300));setInterval(u,1000);}catch(e){}})();
+</script>
 </body></html>)HTML";
 
 static const char PAGE_CAL[] = R"HTML(<!DOCTYPE html>
@@ -2584,8 +2599,8 @@ static const char PWA_MANIFEST[] = R"HTML({
 static const char PWA_SW[] = R"HTML(/* Service worker de AStream. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * 3bf7334ab9 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-3bf7334ab9';
+ * 71540123b7 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-71540123b7';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png', '/fonts/roboto-400.woff2', '/fonts/roboto-500.woff2'];
 
 self.addEventListener('install', e => {
