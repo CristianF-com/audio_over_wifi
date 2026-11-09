@@ -115,7 +115,7 @@ Las tres páginas se rediseñaron (negro + azul `#4aa3ff`). Las fuentes están e
 * Pruebas: `tests/run_tests.sh` (batería completa) y `tests/run_ui_tests.sh [carpeta]` (Playwright: autoguardado, pass-through, Web Bluetooth simulado, calibración con resultados inyectados, móvil sin scroll horizontal).
 
 ## ESP32 normal (WROOM-32D, solo 2.4 GHz) y aspecto de la interfaz
-* **`esp32_wroom/`** es un repuesto del C5: el mismo firmware (compila los fuentes de `esp32/`), con target `esp32`, pines I2S 26/25/22 y sin banda 5 GHz. Detalles, cableado y comandos en `esp32_wroom/README.md`. Necesita una red en 2.4 GHz. Compila y se flashea, y la RPi lo configura por Bluetooth (confirmado por el usuario); el audio, el sync y la OTA en placa **siguen sin probar**. Si reemplazas un C5, grábale el mismo ID y conserva su configuración.
+* **`esp32_wroom/`** es un repuesto del C5: el mismo firmware (compila los fuentes de `esp32/`), con target `esp32`, pines I2S 26/25/22 y sin banda 5 GHz. Detalles, cableado y comandos en `esp32_wroom/README.md`. Necesita una red en 2.4 GHz. Compila y se flashea, y la RPi lo configura por Bluetooth (confirmado por el usuario); el audio, la latencia Auto y la actualización por WiFi (OTA) funcionan en placa (confirmado por el usuario). Si reemplazas un C5, grábale el mismo ID y conserva su configuración.
 * **Altavoces del plano:** solo aparecen los ESP que se conectaron alguna vez (la Raspberry lo recuerda); un ESP nuevo se habilita solo al conectarse. Cada ESP elige **estéreo o mono** en su cajón, así que puedes mezclar (p. ej. 1 estéreo y 2 mono); se eliminó el selector «5 estéreo / 10 mono». «Quitar este ESP del panel» (en su cajón, solo apagado) lo olvida; si vuelve a conectarse, reaparece con su configuración. API: `GET /api/nodes` trae `known`; `POST /api/node {"id":N,"forget":true}`. (`/api/layout` sigue existiendo para quien lo use por API.)
 * **Aspecto:** botones, selectores y pestañas en forma de píldora; tarjetas y cajones con esquinas grandes; deslizadores gruesos con pulgar de píldora; interruptores tipo iOS; barra de pestañas flotante en el móvil; cifras grandes en monoespaciada ligera. Todo sale de variables en `shared.css` y funciona igual en los tres temas.
 
@@ -146,7 +146,7 @@ En el panel, **Añadir altavoces** (botón +): pulsas **Buscar altavoces por Blu
 * **Graves del LFE en los frontales** (sin subwoofer): suma el canal LFE (pasa-bajos de 120 Hz, nivel −12…+10 dB) a los canales 0/1 de los altavoces de rango completo, solo si ningún altavoz activo reproduce el canal 3. `POST /api/dsp {"lfe":true,"lfe_db":0}`; `lfe_active` en `/api/status` indica si se está mezclando.
 * **Perfiles**: guardan volumen maestro, procesado (crossover, EQ, modo noche, LFE) y, por altavoz, volumen, rol, retardo y EQ (no canales ni posiciones). Hasta 12, en `<config>.profiles`. `GET/POST /api/profiles` con `{"save":"nombre"}`, `{"load":N}` o `{"delete":N}`.
 * **Salud de cada altavoz**: la tabla de Latencia añade **WiFi** (RSSI del último informe; ámbar por debajo de −75 dBm, rojo por debajo de −82) y **Firmware** (versión y chip que anuncia el ESP), y el panel avisa cuando un altavoz habilitado se desconecta o vuelve. Los contadores perdidos/tarde/vacíos son totales acumulados (sin tasa por minuto).
-* **Actualizar firmware por WiFi (OTA)**: en Latencia, sube `receiver.bin` (se comprueba que sea una imagen de aplicación de ESP-IDF y que el chip coincida) y pulsa «Actualizar» en cada altavoz (hay que pulsar dos veces). La RPi manda por UDP el puerto, el tamaño y un token de un solo uso (5 min); el ESP descarga `GET /fw/ota.bin?t=<token>` por HTTP (sin contraseña, solo con token), graba en la otra partición y se reinicia; si el firmware nuevo no llega a conectarse y sincronizar, el bootloader vuelve al anterior. El binario se guarda solo en memoria (hay que subirlo otra vez tras reiniciar la RPi). **La primera vez que pongas este firmware (v6) hay que flashear cada ESP por cable**, porque cambian la tabla de particiones (dos copias de 1,5 MB, flash de 4 MB o más) y el bootloader con rollback. Los ESP con firmware anterior (sin versión en el HELLO) se rechazan. **El lado del ESP no se ha compilado con ESP-IDF real ni probado en hardware** y no hay firma del firmware (solo el token): usar solo en una LAN de confianza.
+* **Actualizar firmware por WiFi (OTA)**: en Latencia, sube `receiver.bin` (se comprueba que sea una imagen de aplicación de ESP-IDF y que el chip coincida) y pulsa «Actualizar» en cada altavoz (hay que pulsar dos veces). La RPi manda por UDP el puerto, el tamaño y un token de un solo uso (5 min); el ESP descarga `GET /fw/ota.bin?t=<token>` por HTTP (sin contraseña, solo con token), graba en la otra partición y se reinicia; si el firmware nuevo no llega a conectarse y sincronizar, el bootloader vuelve al anterior. El binario se guarda solo en memoria (hay que subirlo otra vez tras reiniciar la RPi). **La primera vez que pongas este firmware (v6) hay que flashear cada ESP por cable**, porque cambian la tabla de particiones (dos copias de 1,5 MB, flash de 4 MB o más) y el bootloader con rollback. Los ESP con firmware anterior (sin versión en el HELLO) se rechazan. La OTA funciona en placa (confirmado por el usuario). No hay firma del firmware (solo el token): usar solo en una LAN de confianza.
 * **Desarrollo de la interfaz sin recompilar**: `sonos_wifi -w rpi/web` lee `panel.html`, `calibrate.html` y `ble.html` del disco en cada petición (mismo montaje que `gen_web_pages.py`; los recursos PWA siguen incrustados).
 
 ## Estado de la transmisión y vúmetros
@@ -204,6 +204,17 @@ Log normal del ESP (cada 2 s):
 * Alineación fina: mide con micrófono y ajusta "Ajuste de latencia (ms)" por nodo en la web.
   Retraso fino por debajo de 1 ms: ajustar `DMA_LAT_US`/offset por nodo (no es parte de este código).
 
+## Interfaces de audio USB extra (además de la Traktor)
+
+Se pueden capturar otras interfaces USB a la vez que la Traktor (o sin ella). **Sin interfaces extra todo sigue exactamente igual**: solo la Traktor, 10 canales, el mismo camino de captura.
+
+* Se configuran en la web: **Sistema → Entradas → Interfaces de audio USB extra** (elige la tarjeta y cuántos canales usar, «Agregar», «Guardar y reiniciar»). Queda en `<config>.inputs` (una línea `dispositivo|canales`) y el servicio se reinicia solo (el audio se corta unos segundos). También se puede pasar `-x hw:2,0:8` (repetible) a `sonos_wifi`.
+* Cada interfaz debe capturar a **48 kHz**, 32 bits (S32_LE) y con el número de canales pedido. La tarjeta se guarda por nombre si es único (no cambia al reenchufarla) o por `hw:N,0`. La Traktor no se puede agregar como extra; con ella caben 22 canales extra en total (32 entradas como máximo), sin ella 32.
+* Con la Traktor, los canales extra siguen a los 10 suyos: entradas 11, 12… (`USB1-1`…). **Sin la Traktor, las interfaces extra toman las entradas desde la 1** (hasta 32 canales). Cualquier altavoz los puede elegir en su cajón, y aparecen en los indicadores y vúmetros. Los 10 nombres editables (FL, FR…) son siempre los de las entradas 1 a 10. Al cambiar entre Traktor presente/ausente, las entradas se corren: revisa qué canal usa cada altavoz.
+* Si la Traktor no está al arrancar, la Raspberry sigue solo con las extra (reloj propio). Si la Traktor se desconecta con el servicio en marcha, se reinicia como siempre. Si una interfaz extra se desconecta, sus canales quedan en silencio, la Traktor sigue sonando y se reintenta cada 3 s.
+* Cada interfaz tiene su propio reloj: un colchón elástico por interfaz (objetivo 10 ms) recorta o rellena con silencio para que la deriva no acumule retardo (la web muestra cortes y recortes).
+* **Sin probar en placa**: solo está probado con el simulador (unión de canales, deriva, desconexión, API y web). Si PipeWire/PulseAudio ocupa la tarjeta, no abre (se ve el error en la lista).
+
 ## Pruebas (sin hardware)
 
 ```bash
@@ -211,7 +222,7 @@ tests/run_tests.sh        # firmware (unidades, reordenación/NACK, tarea RX rea
 tests/check_pages_js.sh   # sintaxis del JavaScript de las páginas
 python3 tests/sim_sync.py # controlador de sincronía: ±150 ppm, pérdidas con/sin PLC, cambio de latencia en caliente
 ```
-El firmware ESP **no** se ha compilado con ESP-IDF real (solo chequeo de sintaxis con stubs). Ver PROYECTO_RESUMEN.md.
+El firmware ESP (C5 y WROOM) compila, se flashea y funciona en placa (confirmado por el usuario); las pruebas del PC solo cubren la lógica (unidades, reordenación, tarea RX). Ver PROYECTO_RESUMEN.md.
 
 ## Seguridad
 La web UI/API no tiene autenticación ni CORS: úsala solo en una LAN de confianza. El HTTPS usa un certificado

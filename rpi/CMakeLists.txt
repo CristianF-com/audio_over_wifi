@@ -15,6 +15,7 @@ include_directories(include ../common ${ALSA_INCLUDE_DIRS})
 add_executable(sonos_wifi
     src/main.cpp
     src/audio_capture.cpp
+    src/input_mixer.cpp
     src/udp_streamer.cpp
     src/web_server.cpp
     src/ble_manager.cpp

@@ -324,7 +324,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
     ok('Actualizar servidor: al cambiar la versión la página se recarga sola',await nav);
     await p.unroute('**/api/system');await p.waitForSelector('.tab[data-tab="sys"]');await p.click('.tab[data-tab="sys"]');await p.click('#sy_rpi');}
    await p.click('.tab[data-tab="sys"]');await p.click('#sy_fw');await sleep(300);
-   ok('firmware: aviso de «sin probar en hardware» y de flashear la primera vez por cable',(await p.textContent('#fwwarn')).includes('sin probar')&&(await p.textContent('#fwwarn')).includes('por cable'));
+   ok('firmware: avisa de flashear la primera vez por cable y ya no dice «sin probar»',(await p.textContent('#fwwarn')).includes('por cable')&&!(await p.textContent('#fwwarn')).toLowerCase().includes('sin probar'));
    await p.click('#fwup');
    ok('firmware: subir sin elegir archivo avisa',await p.locator('#tb .toast.bad').count()>=1);
    await p.evaluate(()=>document.querySelectorAll('#tb .toast').forEach(t=>t.remove()));
@@ -337,6 +337,14 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
     await p.click('#fwlist [data-ota]');
     await p.evaluate(()=>{drawFw();drawFw();});await sleep(300);
     ok('firmware: «Actualizar» pide confirmación («¿Seguro?») y la conserva aunque el panel se redibuje con los refrescos',await p.evaluate(()=>/Seguro/.test(document.querySelector('#fwlist [data-ota]').textContent)));
+    await p.evaluate(()=>{otaArm=null;otaPend=nodes[0].id;otaPendT=Date.now();drawFw();});
+    ok('firmware: al confirmar, mientras se envía la orden ya muestra «Actualizando…» (botón desactivado) y no vuelve a «Actualizar»',await p.evaluate(()=>{const b=document.querySelector('#fwlist [data-ota]');return b.disabled&&b.textContent==='Iniciando…'&&document.getElementById('fwlist').textContent.includes('Actualizando…');}));
+    await p.evaluate(()=>{drawFw();drawFw();});
+    ok('firmware: los refrescos del panel no borran el estado «Actualizando…» mientras se envía',await p.evaluate(()=>document.getElementById('fwlist').textContent.includes('Actualizando…')&&document.querySelector('#fwlist [data-ota]').disabled));
+    await p.evaluate(()=>{nodes[0].ota_busy=true;drawFw();});
+    ok('firmware: cuando el altavoz informa que actualiza, pasa al «Actualizando…» real con «Cancelar»',await p.evaluate(()=>otaPend===null&&!!document.querySelector('#fwlist [data-ocancel]')&&document.getElementById('fwlist').textContent.includes('Actualizando…')));
+    await p.evaluate(()=>{nodes[0].ota_busy=false;otaPend=nodes[0].id;otaPendT=Date.now()-21000;drawFw();});
+    ok('firmware: si la orden no llega a verse en 20 s, el botón vuelve a «Actualizar»',await p.evaluate(()=>otaPend===null&&document.querySelector('#fwlist [data-ota]').textContent==='Actualizar'));
     await p.evaluate(()=>{otaArm=null;drawFw();});
     ok('firmware: sin confirmar, el botón vuelve a «Actualizar»',await p.evaluate(()=>document.querySelector('#fwlist [data-ota]').textContent==='Actualizar'));
     await p.evaluate(()=>{loadNodes();loadFw();});await until(async()=>await p.evaluate(()=>document.querySelectorAll('#fwlist [data-ota]').length===5&&[...document.querySelectorAll('#fwlist [data-ota]')].every(b=>b.disabled)));}
@@ -722,6 +730,39 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('Panel sin errores de JS (tema y plano)',errs.length===0,errs);
 
   // /calibrate con resultado inyectado
+  {// Interfaces USB de audio extra: lista de interfaces, agregar/quitar, guardado y canales extra en medidores y selectores
+   const up=await ctx.newPage();const uerr=[];up.on('pageerror',e=>uerr.push(String(e)));
+   let saved=null,state={saved:[],restart:false};
+   const names=['FL','FR','C','LFE','SL','SR','SBL','SBR','AUX-L','AUX-R','USB1-1','USB1-2','USB1-3','USB1-4','USB2-1','USB2-2'];
+   await up.route('**/api/inputs',async r=>{
+     if(r.request().method()==='POST'){saved=JSON.parse(r.request().postData());state.saved=saved.extras;state.restart=true;return r.fulfill({contentType:'application/json',body:'{"ok":true,"restarting":false}'});}
+     r.fulfill({contentType:'application/json',body:JSON.stringify({traktor:{present:true,channels:10},max_extra:22,cards:[
+       {id:'hw:0,0',name:'Traktor Audio 10',max_channels:10,traktor:true,busy:true},{id:'hw:2,0',name:'Scarlett 18i20',max_channels:18,traktor:false,busy:false},{id:'hw:3,0',name:'USB Audio Device',max_channels:2,traktor:false,busy:false}],
+       saved:state.saved,running:{extras:state.saved.map((e,i)=>({device:e.device,channels:e.channels,online:i===0,error:i===0?'':'no se pudo abrir',underruns:0})),total:10},restart_needed:state.restart})});});
+   await up.route('**/api/status',async r=>{const resp=await r.fetch();const j=await resp.json();j.ch_names=names;j.input_channels=16;r.fulfill({response:resp,contentType:'application/json',body:JSON.stringify(j)});});
+   await up.route('**/api/levels',async r=>{const resp=await r.fetch();const j=await resp.json();j.db=names.map((_,i)=>i===11?-12:(j.db[i]===undefined?-90:j.db[i]));r.fulfill({response:resp,contentType:'application/json',body:JSON.stringify(j)});});
+   await up.goto(BASE+'/');await up.waitForSelector('#spks .spk');await sleep(1500);
+   ok('USB extra: con 16 entradas hay 16 indicadores en la tarjeta de entrada',await until(async()=>(await up.locator('#mb .mc').count())===16),await up.locator('#mb .mc').count());
+   ok('USB extra: los indicadores extra llevan su nombre y el canal con señal se enciende',await up.evaluate(()=>{const l=[...document.querySelectorAll('#mb .lab')].map(x=>x.textContent);return l[10]==='USB1-1'&&l[15]==='USB2-2'&&document.getElementById('lp11').dataset.st==='sig';}));
+   await up.click('.tab[data-tab="sys"]');await up.click('#sy_in');await sleep(500);
+   ok('USB extra: sin interfaces guardadas dice que solo se captura la Traktor',(await up.textContent('#usb_list')).includes('solo se captura la Traktor'));
+   ok('USB extra: el selector no ofrece la Traktor y sí las demás tarjetas',await up.evaluate(()=>{const o=[...document.querySelectorAll('#usb_card option')].map(x=>x.textContent);return o.length===2&&!o.some(x=>/Traktor/.test(x))&&/Scarlett/.test(o[0]);}));
+   ok('USB extra: los canales llegan hasta el máximo de la tarjeta (18)',await up.evaluate(()=>document.querySelectorAll('#usb_ch option').length===18));
+   ok('USB extra: «Guardar y reiniciar» está desactivado sin cambios',await up.isDisabled('#usb_save'));
+   await up.selectOption('#usb_ch','8');await up.click('#usb_add');
+   ok('USB extra: al agregar aparece en la lista como pendiente y se activa Guardar',(await up.textContent('#usb_list')).includes('Scarlett 18i20')&&(await up.textContent('#usb_list')).includes('8 canales')&&(await up.textContent('#usb_list')).includes('Pendiente')&&!(await up.isDisabled('#usb_save')));
+   ok('USB extra: la interfaz agregada ya no se ofrece y el máximo baja a lo que queda (la otra tarjeta: 2)',await up.evaluate(()=>{const o=[...document.querySelectorAll('#usb_card option')];return o.length===1&&/USB Audio Device/.test(o[0].textContent)&&document.querySelectorAll('#usb_ch option').length===2;}));
+   await up.click('#usb_add');
+   ok('USB extra: se pueden agregar varias interfaces (2 en la lista, 8 + 2 canales)',(await up.textContent('#usb_list')).includes('USB Audio Device · 2 canales')&&(await up.locator('#usb_list .usbrow').count())===2);
+   await up.click('#usb_list [data-rm="1"]');
+   ok('USB extra: «Quitar» la saca de la lista',!(await up.textContent('#usb_list')).includes('USB Audio Device'));
+   await up.click('#usb_save');
+   ok('USB extra: guardar envía la lista a la Raspberry',await until(async()=>saved&&saved.extras.length===1&&saved.extras[0].device==='Scarlett 18i20'&&saved.extras[0].channels===8),saved);
+   ok('USB extra: tras guardar se avisa que hace falta reiniciar',await until(async()=>(await up.textContent('#usb_msg')).includes('Reinicia')),await up.textContent('#usb_msg'));
+   await up.click('.tab[data-tab="spk"]');await up.click('#spks .spk[data-id="0"]');await up.waitForSelector('#drawer.on');await adv(up);
+   ok('USB extra: el altavoz puede elegir los canales extra (nombre + «Interfaz USB»)',await up.evaluate(()=>{const o=[...document.querySelectorAll('#d_cl option')].map(x=>x.textContent);return o.length===16&&/USB1-1 · Interfaz USB/.test(o[10]);}));
+   ok('USB extra: sin errores de JS',uerr.length===0,uerr);
+   await up.close();}
   const cp=await ctx.newPage();const cerr=[];cp.on('pageerror',e=>cerr.push(String(e)));
   await cp.goto(BASE+'/calibrate');
   if(SHOTS)await cp.screenshot({path:SHOTS+'/calibrar_inicio.png',fullPage:true});

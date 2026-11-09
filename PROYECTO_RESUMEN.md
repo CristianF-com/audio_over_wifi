@@ -15,6 +15,7 @@ rpi/CMakeLists.txt           include_directories(include ../common); sin depende
 rpi/include/*.h, rpi/src/
   main.cpp                   args -d/-p/-P/-S/-C/-K, arranque, heartbeat; sale con rc=1 si la captura muere (systemd reinicia)
   audio_capture.cpp          ALSA S32_LE 10ch, período 240 fr (5 ms), hilo SCHED_FIFO 80, findCard("traktor")
+  input_mixer.cpp            (v9.20) interfaces USB extra opcionales: una captura por interfaz + colchón elástico; une Traktor (0-9) + extras (10…) y llama a pushFrames con N canales
   udp_streamer.cpp           control UDP :5005 (HELLO/REPORT/SYNC), pushFrames() hot path, config de nodos
   web_server.cpp             HTTP :8080 + HTTPS :8443 (OpenSSL, opcional WITH_TLS), SPA embebida, API REST validada (sin excepciones, sin CORS)
   web_pages.h                PAGE_CAL (/calibrate) y PAGE_BLE (/ble); el análisis de audio está entre /*ANALYSIS_BEGIN*/ y /*ANALYSIS_END*/
@@ -107,7 +108,7 @@ Constantes clave (`protocol.h`): `FRAMES_PER_PACKET=120`, `PLAYOUT_DELAY_US=8000
 | Audio reales en WiFi (C5 y WROOM) y latencia Auto | ✅ en placa | confirmado por el usuario (nov 2026); en 2.4 GHz el canal 11 tenía interferencia y se pasó al 1; los contadores recientes (10 min) ayudan a ajustar el colchón |
 | EQ propuesto con móvil/altavoces reales | ❌ no probado | solo con respuestas sintéticas conocidas (error < 1 dB) |
 | OTA por WiFi (lado RPi: subida, token, orden UDP, pausa de audio, retorno) | ✅ | `tests/fake_esp.py` con ESP simulado |
-| OTA por WiFi (lado ESP: descarga, particiones, rollback, bootloader) | ⚠️ compila en C5 | compila y flashea en el C5; la descarga OTA, el rollback y `CONFIG_ESP_HTTPS_OTA_ALLOW_HTTP` sin probar en placa; WROOM sin compilar |
+| OTA por WiFi (lado ESP: descarga, particiones, bootloader) | ✅ en placa | el usuario confirma (nov 2026) que la actualización por WiFi funciona; el rollback ante un firmware que no arranca no consta como provocado a propósito |
 | Mezcla LFE→frontales, modo noche, tono de prueba | ✅ | `tests/test_lfe.py`, `tests/fake_esp.py` (señales sintéticas; no escuchado en altavoces reales) |
 | Script mpv en mpv real | ⚠️ | probado con un mpv simulado contra la API real, no con mpv |
 
@@ -160,3 +161,11 @@ Ver sección «Historial v7». Archivos tocados: common/protocol.h, rpi/{udp_str
 ## Emparejamiento BLE desde la Raspberry (agente BlueZ)
 * Verificado en hardware real (log del usuario): sin agente, BlueZ rechaza el Just Works y el ESP registra `cifrado FALLÓ (status 1292)` (SM 0x0C); con `agent NoInputNoOutput` a mano, `pair` funciona.
 * `sonos_ble_prov.py` registra un agente `NoInputNoOutput` (dbus_fast, dependencia de bleak) durante `provision`/`identify`, borra antes un emparejamiento viejo (el ESP no hace bonding) y muestra el error real de `pair()` si luego la escritura es rechazada. Probado solo con bleak falso y comprobando la clase del agente; el flujo completo con BlueZ real está sin verificar.
+
+## v9.20 — Interfaces USB de audio extra (sin probar en placa)
+* `UdpStreamer::pushFrames` usa un nº de canales de entrada en tiempo de ejecución (`in_ch_`, 10 por defecto = Traktor sola; `MAX_INPUTS`=32 en `protocol.h`). El protocolo con los ESP no cambia (siguen siendo paquetes de 2 canales).
+* `InputMixer` (`rpi/src/input_mixer.cpp`): entradas 0-9 = Traktor y 10… = extras (`USB1-1`…); si la Traktor falta, las extras toman desde la entrada 0 (hasta 32 canales; mínimo 10 entradas, las que sobran en silencio). Cada extra: `AudioCapture` propio (48 kHz S32_LE, nº de canales pedido) → buffer elástico (objetivo 2 bloques; recorta si pasa de 6, rellena con silencio y se vuelve a llenar si falta). Hilo de vigilancia: reabre una interfaz desconectada cada 3 s. Sin Traktor: reloj propio cada bloque (5 ms).
+* Sin interfaces extra `main.cpp` conserva el camino original (callback → `pushFrames`, sale con rc=1 si la captura muere). Con extras: la Traktor puede faltar al arrancar.
+* Configuración: `<config>.inputs` (`dispositivo|canales`) y `-x dispositivo:canales`; `GET/POST /api/inputs` (tarjetas ALSA, guardado validado, reinicio pedido a systemd saliendo limpio). `/api/status` → `ch_names` con todas las entradas e `input_channels`; `/api/levels` → `db` con todas; `/api/names` sigue con las 10 editables.
+* Web: Sistema → Entradas → «Interfaces de audio USB extra»; indicadores y selectores de canal con las entradas extra (`ensureCh`).
+* Pruebas: `tests/test_inputs.cpp` (validación, fichero, unión de canales, deriva, silencio), `fake_esp.py` (API) y `test_ui.js` (pantalla con tarjetas simuladas). **No verificado con interfaces reales**: relojes distintos de verdad, desenchufar en caliente, PipeWire ocupando la tarjeta, USB compartiendo ancho de banda con la Traktor en la Pi 400.

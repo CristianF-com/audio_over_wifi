@@ -371,7 +371,7 @@ void UdpStreamer::handleSync(const uint8_t* b, int n, const sockaddr_in& src, ui
 static uint64_t rawNowUs() { timespec ts; clock_gettime(CLOCK_MONOTONIC_RAW, &ts); return (uint64_t)ts.tv_sec * 1000000ull + (uint64_t)ts.tv_nsec / 1000ull; }
 
 float UdpStreamer::meterDb(int ch) const {
-    if (ch < 0 || ch >= AUDIO_CHANNELS) return -90.0f;
+    if (ch < 0 || ch >= MAX_INPUTS) return -90.0f;
     const uint32_t v = meter_[ch].load(std::memory_order_relaxed);
     if (v == 0) return -90.0f;
     const float db = 20.0f * log10f((float)v / 2147483648.0f);
@@ -381,12 +381,13 @@ int64_t UdpStreamer::signalAgeMs() const { const uint64_t t = last_signal_us_.lo
 int64_t UdpStreamer::captureAgeMs() const { const uint64_t t = last_block_us_.load(std::memory_order_relaxed); return t ? (int64_t)((rawNowUs() - t) / 1000) : -1; }
 
 void UdpStreamer::pushFrames(const int32_t* s32, uint32_t frames, uint64_t capture_ts) {
+    const int NC = in_ch_.load(std::memory_order_relaxed);   // canales de entrada (10 = Traktor sola; más si hay interfaces USB extra)
     {   // Medidores de entrada: pico por canal en este bloque; caída ~300 ms (exp(-t/0.3 s)) para que la web vea los picos entre consultas
         static constexpr uint32_t SIGNAL_THRESH = 679000;   // ≈ -70 dBFS sobre 2^31
-        uint32_t pk[AUDIO_CHANNELS] = {0};
+        uint32_t pk[MAX_INPUTS] = {0};
         for (uint32_t f = 0; f < frames; f++) {
-            const int32_t* r = s32 + (size_t)f * AUDIO_CHANNELS;
-            for (int c = 0; c < AUDIO_CHANNELS; c++) {
+            const int32_t* r = s32 + (size_t)f * NC;
+            for (int c = 0; c < NC; c++) {
                 const int64_t v = r[c];
                 const uint32_t a = (uint32_t)(v < 0 ? -v : v);
                 if (a > pk[c]) pk[c] = a;
@@ -394,7 +395,7 @@ void UdpStreamer::pushFrames(const int32_t* s32, uint32_t frames, uint64_t captu
         }
         const float decay = expf(-(float)frames / (float)AUDIO_SAMPLE_RATE / 0.3f);
         bool sig = false;
-        for (int c = 0; c < AUDIO_CHANNELS; c++) {
+        for (int c = 0; c < NC; c++) {
             const uint32_t held = (uint32_t)((float)meter_[c].load(std::memory_order_relaxed) * decay);
             meter_[c].store(pk[c] > held ? pk[c] : held, std::memory_order_relaxed);
             if (pk[c] > SIGNAL_THRESH) sig = true;
@@ -520,26 +521,26 @@ void UdpStreamer::pushFrames(const int32_t* s32, uint32_t frames, uint64_t captu
             lpMask |= satMask;
             const float fc = xover_hz_.load(std::memory_order_relaxed);
             if (fc != (float)dsp_.xo_fc) {
-                for (int c = 0; c < AUDIO_CHANNELS; c++) { dsp_.hp[c].setHighpass(FS, fc); dsp_.lp[c].setLowpass(FS, fc); }
+                for (int c = 0; c < NC; c++) { dsp_.hp[c].setHighpass(FS, fc); dsp_.lp[c].setLowpass(FS, fc); }
                 dsp_.xo_fc = fc;
             }
-            for (int c = 0; c < AUDIO_CHANNELS; c++) {                 // canal que entra en uso: estado limpio (sin transitorio)
+            for (int c = 0; c < NC; c++) {                 // canal que entra en uso: estado limpio (sin transitorio)
                 if (((satMask & ~dsp_.prev_hp) >> c) & 1u) dsp_.hp[c].reset();
                 if (((lpMask  & ~dsp_.prev_lp) >> c) & 1u) dsp_.lp[c].reset();
             }
             dsp_.prev_hp = satMask; dsp_.prev_lp = lpMask;
-            const size_t need = (size_t)frames * AUDIO_CHANNELS;
+            const size_t need = (size_t)frames * NC;
             if (dsp_hp_.size() < need) { dsp_hp_.resize(need); dsp_lp_.resize(need); }
             if (dsp_bass_.size() < frames) dsp_bass_.resize(frames);
             for (uint32_t f = 0; f < frames; f++) {
-                const int32_t* fr = s32 + (size_t)f * AUDIO_CHANNELS;
+                const int32_t* fr = s32 + (size_t)f * NC;
                 double bass = 0;
-                for (int c = 0; c < AUDIO_CHANNELS; c++) {
+                for (int c = 0; c < NC; c++) {
                     if (!((lpMask >> c) & 1u)) continue;
                     double x = (double)(fr[c] >> 16);                 // Traktor: 24 bits en [31:8]
                     double l = dsp_.lp[c].run(x);
-                    dsp_lp_[(size_t)f * AUDIO_CHANNELS + c] = (float)l;
-                    if ((satMask >> c) & 1u) { bass += l; dsp_hp_[(size_t)f * AUDIO_CHANNELS + c] = (float)dsp_.hp[c].run(x); }
+                    dsp_lp_[(size_t)f * NC + c] = (float)l;
+                    if ((satMask >> c) & 1u) { bass += l; dsp_hp_[(size_t)f * NC + c] = (float)dsp_.hp[c].run(x); }
                 }
                 dsp_bass_[f] = (float)bass;
             }
@@ -562,7 +563,7 @@ void UdpStreamer::pushFrames(const int32_t* s32, uint32_t frames, uint64_t captu
         lfe_g = pow(10.0, (double)lfe_db_.load(std::memory_order_relaxed) / 20.0);
         if (!dsp_.lfe_prev) { dsp_.lfe_lp.reset(); dsp_.lfe_lp.setLowpass(FS, 120.0); }
         if (dsp_lfe_.size() < frames) dsp_lfe_.resize(frames);
-        for (uint32_t f = 0; f < frames; f++) dsp_lfe_[f] = (float)dsp_.lfe_lp.run((double)(s32[(size_t)f * AUDIO_CHANNELS + 3] >> 16));
+        for (uint32_t f = 0; f < frames; f++) dsp_lfe_[f] = (float)dsp_.lfe_lp.run((double)(s32[(size_t)f * NC + 3] >> 16));
     }
     dsp_.lfe_prev = lfe_mix;
     // Modo noche: compresor enlazado sobre la salida (detector = pico de los 10 canales de entrada)
@@ -575,9 +576,9 @@ void UdpStreamer::pushFrames(const int32_t* s32, uint32_t frames, uint64_t captu
         if (dsp_night_.size() < frames) dsp_night_.resize(frames);
         double env = dsp_.night_env_db;
         for (uint32_t f = 0; f < frames; f++) {
-            const int32_t* fr = s32 + (size_t)f * AUDIO_CHANNELS;
+            const int32_t* fr = s32 + (size_t)f * NC;
             int32_t pk = 0;
-            for (int c = 0; c < AUDIO_CHANNELS; c++) { int32_t v = fr[c] >> 16; if (v < 0) v = -v; if (v > pk) pk = v; }
+            for (int c = 0; c < NC; c++) { int32_t v = fr[c] >> 16; if (v < 0) v = -v; if (v > pk) pk = v; }
             const double db = 20.0 * log10((pk < 1 ? 1.0 : (double)pk) / 32768.0);
             const double target = db > T ? (db - T) * (1.0 - 1.0 / R) : 0.0;
             env += (target - env) * (target > env ? aa : ar);
@@ -594,10 +595,10 @@ void UdpStreamer::pushFrames(const int32_t* s32, uint32_t frames, uint64_t captu
     // Muestra de entrada (antes del EQ y del volumen) para el canal `ch` de la ruta `r` en el frame `f`.
     auto srcv = [&](const Route& r, uint32_t f, const int32_t* fr, uint8_t ch) -> double {
         if (use_xo) {
-            if (r.role == ROLE_SAT) return (double)dsp_hp_[(size_t)f * AUDIO_CHANNELS + ch];
+            if (r.role == ROLE_SAT) return (double)dsp_hp_[(size_t)f * NC + ch];
             if (r.role == ROLE_SUB) {
                 double b = (double)dsp_bass_[f];
-                return ((satMask >> ch) & 1u) ? b : b + (double)dsp_lp_[(size_t)f * AUDIO_CHANNELS + ch];
+                return ((satMask >> ch) & 1u) ? b : b + (double)dsp_lp_[(size_t)f * NC + ch];
             }
         }
         double v = (double)(fr[ch] >> 16);
@@ -631,7 +632,7 @@ void UdpStreamer::pushFrames(const int32_t* s32, uint32_t frames, uint64_t captu
                 if (tx.mono) tx.pkt.samples[tx.n] = v;
                 else         tx.pkt.samples[tx.n * 2] = tx.pkt.samples[tx.n * 2 + 1] = v;
             } else {
-                const int32_t* fr = s32 + (size_t)f * AUDIO_CHANNELS;
+                const int32_t* fr = s32 + (size_t)f * NC;
                 const double ng = night_on ? (double)dsp_night_[f] : 1.0;
                 double l = dsp_.eq[i][0].run(srcv(rt[i], f, fr, rt[i].chl)) * rt[i].gl * ng;
                 if (tx.mono) {
@@ -679,7 +680,7 @@ std::array<ESPNode, MAX_NODES> UdpStreamer::getNodes() const {
 
 bool UdpStreamer::setNodeConfig(uint8_t id, uint8_t ch_l, uint8_t ch_r,
                                 uint8_t vol_l, uint8_t vol_r, bool enabled, bool mono) {
-    if (id >= MAX_NODES || ch_l >= AUDIO_CHANNELS || ch_r >= AUDIO_CHANNELS) return false;
+    if (id >= MAX_NODES || ch_l >= in_ch_.load() || ch_r >= in_ch_.load()) return false;
     if (mono) { ch_r = ch_l; vol_r = vol_l; }            // mono: un solo canal y un solo volumen
     ESPNode snap; bool structural = false;
     {
@@ -921,8 +922,8 @@ bool UdpStreamer::loadConfig() {
         if (sscanf(key, "node%d.%31s", &id, field) != 2 || id < 0 || id >= MAX_NODES) continue;
         ESPNode& n = nodes_[id];
         long v = (long)dv;
-        if      (!strcmp(field, "ch_left")  && v >= 0 && v < AUDIO_CHANNELS) { n.ch_left  = (uint8_t)v; applied++; }
-        else if (!strcmp(field, "ch_right") && v >= 0 && v < AUDIO_CHANNELS) { n.ch_right = (uint8_t)v; applied++; }
+        if      (!strcmp(field, "ch_left")  && v >= 0 && v < in_ch_.load()) { n.ch_left  = (uint8_t)v; applied++; }
+        else if (!strcmp(field, "ch_right") && v >= 0 && v < in_ch_.load()) { n.ch_right = (uint8_t)v; applied++; }
         else if (!strcmp(field, "volume_l") && v >= 0 && v <= 255) { n.volume_l = (uint8_t)v; applied++; }
         else if (!strcmp(field, "volume_r") && v >= 0 && v <= 255) { n.volume_r = (uint8_t)v; applied++; }
         else if (!strcmp(field, "known"))    { n.known = (v != 0); applied++; }
@@ -1037,6 +1038,22 @@ std::vector<std::string> UdpStreamer::channelNames() const {
     std::vector<std::string> v;
     for (int i = 0; i < 10; i++) v.push_back(ch_names_[i].empty() ? defaultChannelName(i) : ch_names_[i]);
     return v;
+}
+std::vector<std::string> UdpStreamer::allChannelNames() const {      // las 10 de la Traktor + las de las interfaces USB extra
+    std::vector<std::string> v = channelNames();
+    std::lock_guard<std::mutex> lk(names_mtx_);
+    for (const auto& s : extra_names_) v.push_back(s);
+    return v;
+}
+void UdpStreamer::setInputChannels(int n, const std::vector<std::string>& extra_names) {
+    if (n < AUDIO_CHANNELS) n = AUDIO_CHANNELS;
+    if (n > MAX_INPUTS) n = MAX_INPUTS;
+    {
+        std::lock_guard<std::mutex> lk(names_mtx_);
+        extra_names_ = extra_names;
+        extra_names_.resize((size_t)(n - AUDIO_CHANNELS));
+    }
+    in_ch_.store(n);
 }
 // Limpia un nombre: sin espacios sobrantes ni caracteres de control, ni < > " & (se muestran en HTML); máximo 12 caracteres.
 static bool cleanChannelName(const std::string& in, std::string& out, std::string& err) {

@@ -202,7 +202,11 @@ public:
 
     // ── Nombres de las 10 entradas de audio (FL, FR, C…), editables; fichero aparte <config>.chnames ──
     static const char* defaultChannelName(int ch);
-    std::vector<std::string> channelNames() const;
+    std::vector<std::string> channelNames() const;       // solo las 10 editables de la Traktor
+    std::vector<std::string> allChannelNames() const;    // + las de las interfaces USB extra
+    // Total de canales de entrada que recibe pushFrames (10 por defecto; Traktor + interfaces extra) y nombres de los extra.
+    void setInputChannels(int n, const std::vector<std::string>& extra_names);
+    int  inputChannels() const { return in_ch_.load(); }
     bool setChannelNames(const std::vector<std::string>& names, std::string& err);   // vacío = nombre por defecto
     bool loadChannelNames();
     // ── Nombre de cada altavoz (p. ej. «Frontal»); fichero aparte <config>.spknames; vacío = sin nombre ──
@@ -279,6 +283,8 @@ private:
         struct N { uint8_t vl = 255, vr = 255, role = ROLE_FULL; int32_t lat = 0; float eq[EQ_BANDS] = {0, 0, 0, 0, 0, 0}; } n[MAX_NODES];
     };
     mutable std::mutex    names_mtx_;
+    std::vector<std::string> extra_names_;                 // nombres de las entradas extra (interfaces USB)
+    std::atomic<int>      in_ch_{AUDIO_CHANNELS};
     std::string           ch_names_[MAX_NODES];            // nombre elegido por el usuario; vacío = el de fábrica
     bool saveChannelNames();
     std::string           spk_names_[MAX_NODES];
@@ -298,7 +304,7 @@ private:
     // DSP (solo hilo de captura)
     struct Dsp {
         double   xo_fc = 0;
-        Lr4      hp[AUDIO_CHANNELS], lp[AUDIO_CHANNELS];
+        Lr4      hp[MAX_INPUTS], lp[MAX_INPUTS];
         EqChain  eq[MAX_NODES][2];
         uint32_t prev_hp = 0, prev_lp = 0;
         Lr4      lfe_lp;                     // pasa-bajos de 120 Hz del canal LFE (graves a los frontales)
@@ -309,7 +315,7 @@ private:
     uint64_t              last_save_us_ = 0;
     void sendConfig(const ESPNode& n);
     std::atomic<uint64_t> send_errors_{0};
-    std::array<std::atomic<uint32_t>, AUDIO_CHANNELS> meter_{};   // pico con caída, escala S32 (0..2^31)
+    std::array<std::atomic<uint32_t>, MAX_INPUTS> meter_{};   // pico con caída, escala S32 (0..2^31)
     std::atomic<uint64_t> last_signal_us_{0}, last_block_us_{0}, pkts_sent_{0};
     std::atomic<uint32_t> pps_{0};
     uint64_t              pps_t_ = 0, pps_n_ = 0;                // solo hilo de captura

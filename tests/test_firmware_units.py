@@ -54,7 +54,7 @@ check("wroom: pines I2S por defecto 26/25/22", pins == {"BCK": 26, "WS": 25, "DO
 check("wroom: sin selección de banda 5 GHz (solo 2.4)", "SONOS_WIFI_BAND" not in wk and 'default "AR"' in wk)
 wc = open(f"{w}/main/CMakeLists.txt").read()
 check("wroom: compila los mismos fuentes que el C5", "../../esp32/main/receiver_main.c" in wc and "../../esp32/main/ble_prov.c" in wc and "../../esp32/main/ota_update.c" in wc and "../../common" in wc)
-check("wroom: README con pines y aviso de lo que sigue sin probar en placa", "GPIO26" in open(f"{w}/README.md").read() and "Sin probar en placa" in open(f"{w}/README.md").read())
+check("wroom: README con pines y estado confirmado en placa (audio y OTA)", "GPIO26" in open(f"{w}/README.md").read() and "OTA" in open(f"{w}/README.md").read() and "confirmado por el usuario" in open(f"{w}/README.md").read())
 src = open(f"{here}/../esp32/main/receiver_main.c").read()
 check("C5 y WROOM: apply_band_mode protegido por el chip (C5 igual que antes)", "#if CONFIG_IDF_TARGET_ESP32C5" in src and src.count("static void apply_band_mode") == 2 and src.count("esp_wifi_set_band_mode") == 1)
 def _balanced(t):

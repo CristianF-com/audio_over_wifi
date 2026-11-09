@@ -390,6 +390,7 @@ std::string WebServer::handleGET(const std::string& p, int& code) {
     if (p == "/api/firmware") return firmwareInfo();
     if (p == "/api/profiles") return profilesList();
     if (p == "/api/names") return namesList();
+    if (p == "/api/inputs") return inputsGet();
     code = 404; return "{\"error\":\"not found\"}";
 }
 std::string WebServer::handlePOST(const std::string& p, const std::string& b, int& code) {
@@ -407,6 +408,7 @@ std::string WebServer::handlePOST(const std::string& p, const std::string& b, in
     else if (p == "/api/tone/stop") { streamer_.toneStop(); r = "{\"ok\":true}"; }
     else if (p == "/api/profiles")  r = profilesPost(b);
     else if (p == "/api/names")     r = namesPost(b);
+    else if (p == "/api/inputs")    r = inputsPost(b);
     else if (p == "/api/firmware")  r = firmwareUpload(b);
     else if (p == "/api/ota")       r = otaStart(b);
     else if (p == "/api/ota/cancel") r = otaCancel(b);
@@ -517,7 +519,7 @@ std::string WebServer::getLevels() {
       << jnum("signal_age_ms", (double)sig) << "," << jnum("pps", pps) << ","
       << jbool("sending", capturing && online > 0 && pps > 0) << "," << jnum("nodes_online", online) << ",\"db\":[";
     char b[16];
-    for (int c = 0; c < AUDIO_CHANNELS; c++) { snprintf(b, sizeof(b), "%s%.1f", c ? "," : "", streamer_.meterDb(c)); o << b; }
+    for (int c = 0; c < streamer_.inputChannels(); c++) { snprintf(b, sizeof(b), "%s%.1f", c ? "," : "", streamer_.meterDb(c)); o << b; }
     o << "]}";
     return o.str();
 }
@@ -526,7 +528,7 @@ std::string WebServer::getStatus() {
     std::ostringstream o;
     o << "{" << jstr("device", c.device) << ","
       << jnum("sample_rate", c.sample_rate) << ","
-      << "\"ch_names\":" << [&] { std::string r = "["; auto v = streamer_.channelNames(); for (size_t i = 0; i < v.size(); i++) r += (i ? ",\"" : "\"") + jesc(v[i]) + "\""; return r + "]"; }() << ","
+      << "\"ch_names\":" << [&] { std::string r = "["; auto v = streamer_.allChannelNames(); for (size_t i = 0; i < v.size(); i++) r += (i ? ",\"" : "\"") + jesc(v[i]) + "\""; return r + "]"; }() << ","
       << jnum("channels", c.channels) << ","
       << jnum("period_frames", c.period_size) << ","
       << jnum("playout_ms", streamer_.playoutUs() / 1000.0) << ","
@@ -535,7 +537,7 @@ std::string WebServer::getStatus() {
       << jnum("max_nodes", MAX_NODES) << "," << jnum("layout", streamer_.layout()) << ","
       << jnum("xover_hz", streamer_.xoverHz()) << ","
       << jbool("dsp_xover", streamer_.xoverOn()) << "," << jbool("dsp_eq", streamer_.eqOn()) << "," << jnum("lipsync_extra_ms", streamer_.lipsyncExtraMs()) << ","
-      << jbool("running", capture_.isRunning()) << ","
+      << jbool("running", capture_.isRunning() || (mixer_ && mixer_->active())) << "," << jnum("input_channels", streamer_.inputChannels()) << ","
       << jbool("lfe_front", streamer_.lfeFront()) << "," << jnum("lfe_db", streamer_.lfeDb()) << "," << jbool("lfe_active", streamer_.lfeActive()) << ","
       << jnum("night", streamer_.nightLevel()) << "," << jnum("profile_active", streamer_.profileActive()) << ","
       << jnum("master_volume", streamer_.masterVolume()) << "}";
@@ -605,8 +607,8 @@ std::string WebServer::setNode(const std::string& b) {
     long chl = cur.ch_left, chr = cur.ch_right, vl = cur.volume_l, vr = cur.volume_r;
     bool enabled = cur.enabled, mono = cur.mono;
     std::string s;
-    if (!(s = jsonGet(b, "ch_left")).empty()  && !parseInt(s, 0, AUDIO_CHANNELS - 1, chl)) return BAD;
-    if (!(s = jsonGet(b, "ch_right")).empty() && !parseInt(s, 0, AUDIO_CHANNELS - 1, chr)) return BAD;
+    if (!(s = jsonGet(b, "ch_left")).empty()  && !parseInt(s, 0, streamer_.inputChannels() - 1, chl)) return BAD;
+    if (!(s = jsonGet(b, "ch_right")).empty() && !parseInt(s, 0, streamer_.inputChannels() - 1, chr)) return BAD;
     if (!(s = jsonGet(b, "volume_l")).empty() && !parseInt(s, 0, 255, vl)) return BAD;
     if (!(s = jsonGet(b, "volume_r")).empty() && !parseInt(s, 0, 255, vr)) return BAD;
     if (!(s = jsonGet(b, "enabled")).empty()) enabled = (s != "false" && s != "0");
@@ -764,6 +766,32 @@ std::string WebServer::serveFirmware(const std::string& path, int& code) {
     std::lock_guard<std::mutex> lk(fw_mtx_);
     if (!tok || !end || *end || tok != fw_token_ || nowUs() > fw_token_until_us_ || fw_data_.empty()) { code = 403; return "{\"error\":\"token no válido\"}"; }
     return fw_data_;
+}
+// Interfaces USB de audio extra (además de la Traktor): GET lista tarjetas + estado; POST {"extras":[{"device","channels"}]} guarda y reinicia el servicio
+std::string WebServer::inputsGet() {
+    std::ostringstream o;
+    o << "{\"traktor\":{\"present\":" << (traktor_present_ ? "true" : "false") << ",\"channels\":" << AUDIO_CHANNELS << "},\"max_extra\":" << (traktor_present_ ? MAX_INPUTS - AUDIO_CHANNELS : MAX_INPUTS) << ",\"cards\":[";
+    const auto cards = InputMixer::listCards();
+    for (size_t i = 0; i < cards.size(); i++)
+        o << (i ? "," : "") << "{" << jstr("id", cards[i].id) << "," << jstr("name", cards[i].name) << "," << jnum("max_channels", cards[i].max_channels) << ","
+          << jbool("traktor", cards[i].traktor) << "," << jbool("busy", cards[i].busy) << "}";
+    o << "],\"saved\":[";
+    const auto saved = InputMixer::loadFile(inputs_path_);
+    for (size_t i = 0; i < saved.size(); i++) o << (i ? "," : "") << "{" << jstr("device", saved[i].device) << "," << jnum("channels", saved[i].channels) << "}";
+    bool same = saved.size() == inputs_running_.size();
+    for (size_t i = 0; same && i < saved.size(); i++) same = saved[i].device == inputs_running_[i].device && saved[i].channels == inputs_running_[i].channels;
+    o << "],\"running\":" << (mixer_ ? mixer_->statusJson() : std::string("{\"extras\":[],\"total\":") + std::to_string(AUDIO_CHANNELS) + "}")
+      << "," << jbool("restart_needed", !same) << "}";
+    return o.str();
+}
+std::string WebServer::inputsPost(const std::string& b) {
+    if (inputs_path_.empty()) return "{\"error\":\"esta Raspberry no guarda configuración\"}";
+    std::vector<ExtraSpec> v; std::string err;
+    if (!InputMixer::parseJson(b, v, err, traktor_present_)) return "{" + jstr("error", err) + "}";
+    if (!InputMixer::saveFile(inputs_path_, v)) return "{\"error\":\"no se pudo guardar en la Raspberry\"}";
+    const bool restart = (jsonGet(b, "restart") != "false");
+    if (restart && restart_cb_) restart_cb_();
+    return std::string("{\"ok\":true,") + jbool("restarting", restart && (bool)restart_cb_) + "}";
 }
 // Nombres de las 10 entradas: GET {"names":[10 nombres]}; POST {"names":[...10]} o {"reset":true}
 std::string WebServer::namesList() {

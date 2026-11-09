@@ -3,6 +3,9 @@
 #include "audio_capture.h"
 #include "ble_manager.h"
 #include "system_manager.h"
+#include "input_mixer.h"
+#include <functional>
+#include <vector>
 #include <thread>
 #include <atomic>
 #include <string>
@@ -10,6 +13,10 @@
 
 class WebServer {
 public:
+    // Interfaces USB extra: mezclador (puede ser null si no hay), fichero de configuración, las que están en marcha y cómo reiniciar el servicio
+    void setInputs(InputMixer* m, const std::string& path, const std::vector<ExtraSpec>& running, bool traktor_present, std::function<void()> restart) {
+        mixer_ = m; inputs_path_ = path; inputs_running_ = running; traktor_present_ = traktor_present; restart_cb_ = std::move(restart);
+    }
     WebServer(UdpStreamer& s, AudioCapture& c, uint16_t port = 8080);
     ~WebServer();
     void setTLS(uint16_t port, const std::string& cert, const std::string& key);   // antes de start()
@@ -61,6 +68,13 @@ private:
     std::string bleProvision(const std::string& body);
     std::string bleIdentify(const std::string& body);
 
+    std::string inputsGet();
+    std::string inputsPost(const std::string& body);
+    InputMixer*       mixer_ = nullptr;
+    std::string       inputs_path_;
+    std::vector<ExtraSpec> inputs_running_;
+    bool              traktor_present_ = true;
+    std::function<void()> restart_cb_;
     BleManager        ble_;
     SystemManager     sys_;
     UdpStreamer&      streamer_;

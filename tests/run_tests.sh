@@ -5,7 +5,7 @@ cd "$(dirname "$0")"
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=test" \
     -keyout /tmp/sonos_test_key.pem -out /tmp/sonos_test_cert.pem 2>/dev/null
 g++ -std=c++17 -O1 -Wall -Wextra -DWITH_TLS -I../rpi/include -I../common harness.cpp \
-    ../rpi/src/udp_streamer.cpp ../rpi/src/web_server.cpp ../rpi/src/ble_manager.cpp ../rpi/src/system_manager.cpp ../rpi/src/audio_capture.cpp \
+    ../rpi/src/udp_streamer.cpp ../rpi/src/web_server.cpp ../rpi/src/ble_manager.cpp ../rpi/src/system_manager.cpp ../rpi/src/audio_capture.cpp ../rpi/src/input_mixer.cpp \
     -lasound -lpthread -lssl -lcrypto -o /tmp/sonos_harness
 g++ -std=c++17 -O1 -Wall -Wextra -I../rpi/include -I../common test_config.cpp ../rpi/src/udp_streamer.cpp -lpthread -o /tmp/sonos_test_config
 echo "== Firmware (unidades sin ESP-IDF) =="; python3 test_firmware_units.py || exit 1
@@ -17,6 +17,8 @@ gcc -std=gnu11 -Wall -Wextra -Wno-unused-parameter -Wno-cast-function-type -I../
 echo; echo "== DSP (crossover LR4 + EQ) =="
 g++ -std=c++17 -O2 -Wall -Wextra -I../rpi/include test_dsp.cpp -o /tmp/sonos_test_dsp && /tmp/sonos_test_dsp || exit 1
 echo; echo "== Persistencia de configuración =="; /tmp/sonos_test_config || exit 1
+echo; echo "== Interfaces USB extra (unión de canales + colchón) =="
+g++ -std=c++17 -O1 -Wall -Wextra -I../rpi/include -I../common test_inputs.cpp ../rpi/src/input_mixer.cpp ../rpi/src/audio_capture.cpp ../rpi/src/udp_streamer.cpp -lasound -lpthread -o /tmp/sonos_test_inputs && /tmp/sonos_test_inputs || exit 1
 echo; echo "== Ayudante Bluetooth (bleak simulado) =="; python3 test_ble_helper.py || exit 1
 echo; echo "== Autenticación web =="
 rm -rf /tmp/sonos_upd_auth /tmp/fake_nmcli.log; SONOS_UPDATE_DIR=/tmp/sonos_upd_auth SONOS_UPDATE_CMD="$PWD/fake_update.sh" SONOS_NMCLI="$PWD/fake_nmcli.sh" /tmp/sonos_harness auth & AP=$!

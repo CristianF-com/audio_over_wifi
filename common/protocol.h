@@ -43,6 +43,7 @@
 
 #define AUDIO_SAMPLE_RATE   48000
 #define AUDIO_CHANNELS      10            /* canales ALSA de la Traktor */
+#define MAX_INPUTS          32            /* máximo de canales de entrada: Traktor (10) + interfaces USB extra */
 #define MAX_NODES           10            /* 5 pares estéreo ó 10 ESP mono */
 
 /* 120 frames = 2.5 ms; 120 divide exacto a 240/480 (períodos ALSA de 5/10 ms) */

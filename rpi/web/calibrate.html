@@ -134,7 +134,7 @@ async function runCal(){
     if(!cfg.ok){stream.getTracks().forEach(t=>t.stop());await ctx.close();
       view(1);showErr('<b>'+(cfg.error||'No se pudo empezar')+'</b>');$('go').disabled=false;return;}
     try{const ni=await (await fetch('/api/nodes')).json();for(const n of ni)if(n.role===2){if(volIncl[n.id]===undefined)volIncl[n.id]=false;if(eqIncl[n.id]===undefined)eqIncl[n.id]=false;}}catch(e){}
-    try{const sj=await (await fetch('/api/status')).json();eqOn=!!sj.dsp_eq;if(Array.isArray(sj.ch_names)&&sj.ch_names.length===10)sj.ch_names.forEach((x,i)=>{CH[i]=x;});}catch(e){}
+    try{const sj=await (await fetch('/api/status')).json();eqOn=!!sj.dsp_eq;if(Array.isArray(sj.ch_names)&&sj.ch_names.length>=10)sj.ch_names.slice(0,10).forEach((x,i)=>{CH[i]=x;});}catch(e){}
     log('Secuencia: altavoces '+cfg.sequence.join(', ')+' ('+(cfg.total_ms/1000).toFixed(1)+' s)');
     const t0=Date.now(),tot=cfg.total_ms+900;
     $('msg').textContent='Midiendo cada altavoz. No hagas ruido.';

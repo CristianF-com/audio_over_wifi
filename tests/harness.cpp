@@ -42,6 +42,7 @@ int main(int argc, char** argv) {
     WebServer web(s, cap, 18080);
     if (const char* d = getenv("SONOS_UPDATE_DIR")) web.setStateDir(d);
     if (const char* h = getenv("SONOS_BLE_HELPER")) web.setBle(h, "/tmp/sonos_harness_ble.txt");   // Bluetooth simulado (SONOS_BLE_MOCK)
+    web.setInputs(nullptr, "/tmp/sonos_harness_inputs.txt", {}, true, [] { fprintf(stderr, "[harness] reinicio solicitado\n"); });   // interfaces USB extra: solo guarda el fichero
     web.setTLS(18443, "/tmp/sonos_test_cert.pem", "/tmp/sonos_test_key.pem");
     if (!s.init() || !web.start()) return 1;
 

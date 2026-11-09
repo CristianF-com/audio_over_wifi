@@ -329,6 +329,9 @@ details.adv>.advbody{display:grid;gap:14px;padding-top:6px}
 .mb{display:grid;grid-template-columns:repeat(10,1fr);gap:8px}
 .mc{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
 .mc .lab{font-size:.72rem;font-weight:600;color:var(--mut);line-height:1;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.usbrow{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bd)}
+.usbrow .nm{min-width:0}.usbrow .nm b{display:block;overflow-wrap:anywhere}
+.usbrow .nm span{font-size:.78rem;color:var(--mut)}.usbrow .nm span.bad{color:var(--bad)}
 .nmgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .nmgrid label{display:block;font-size:.78rem;color:var(--mut);margin-bottom:4px}
 .nmgrid .txt{width:100%}
@@ -685,11 +688,19 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
           <div class="nmgrid" id="nmgrid"></div>
           <div class="nmbtns"><button class="btn sm" id="nmsave" type="button">Guardar nombres</button><button class="btn sm" id="nmreset" type="button">Restablecer</button></div>
         </div>
+    <div class="card" id="c_usb">
+          <div><b>Interfaces de audio USB extra</b><span class="hint">Además de la Traktor puedes capturar otras interfaces USB (a 48 kHz); cualquier altavoz puede usar sus canales. Con la Traktor, sus 10 canales son las entradas 1 a 10 y las extras siguen a partir de la 11. Si la Traktor no está conectada, las interfaces extra toman las entradas desde la 1.</span></div>
+          <div id="usb_list" class="usblist" aria-live="polite"></div>
+          <div class="two"><div class="fld"><label for="usb_card">Interfaz</label><select class="sel" id="usb_card"></select></div>
+            <div class="fld"><label for="usb_ch">Canales</label><select class="sel" id="usb_ch"></select></div></div>
+          <div class="nmbtns"><button class="btn sm" id="usb_add" type="button">Agregar interfaz</button><button class="btn sm" id="usb_save" type="button" disabled>Guardar y reiniciar</button></div>
+          <p class="hint" id="usb_msg" aria-live="polite" style="margin-top:8px"></p>
+        </div>
   </div></div>
   <div class="subpane" id="sp_fw" role="tabpanel" aria-labelledby="sy_fw" hidden><div class="cards">
     <div class="card" id="c_fw">
       <div><b>Actualizar firmware por WiFi</b><span class="hint">Sube el archivo <code>receiver.bin</code> compilado y mándalo a cada altavoz sin cables</span></div>
-      <p class="fwwarn" id="fwwarn">Función sin probar en hardware real. La primera vez que pongas este firmware, flashea el altavoz por cable: hace falta la tabla de particiones con dos copias. Después ya se actualiza por WiFi y, si el nuevo no arranca, vuelve solo al anterior.</p>
+      <p class="fwwarn" id="fwwarn">La primera vez que pongas este firmware, flashea el altavoz por cable: hace falta la tabla de particiones con dos copias. Después ya se actualiza por WiFi y, si el nuevo no arranca, vuelve solo al anterior.</p>
       <div class="fld"><label for="fwfile">Archivo de firmware (.bin)</label>
         <div class="pfnew"><input class="txt" id="fwfile" type="file" accept=".bin,application/octet-stream"><button class="btn sm" id="fwup" type="button">Subir</button></div></div>
       <p id="fwinfo">Todavía no hay ningún firmware cargado.</p>
@@ -1246,21 +1257,22 @@ $('distapply').onclick=async()=>{const pl=distPlan();if(!pl)return;let ok=true;
 
 /* Actualización de firmware (OTA) */
 let fw={loaded:false,size:0,chip:0,version:''};
-let otaArm=null,otaArmT=0;   // altavoz cuyo «Actualizar» espera la segunda pulsación
+let otaArm=null,otaArmT=0,otaPend=null,otaPendT=0;   // altavoz cuyo «Actualizar» espera la segunda pulsación
 async function loadFw(){try{fw=await (await fetch('/api/firmware')).json();}catch(e){}drawFw();}
 function drawFw(){
+  if(otaPend!==null&&(Date.now()-otaPendT>20000||nodes.some(n=>n.id===otaPend&&n.ota_busy)))otaPend=null;   // la orden ya se ve en el altavoz (o pasó demasiado tiempo)
   $('fwinfo').textContent=fw.loaded?'Cargado: versión '+(fw.version||'?')+' · '+Math.round(fw.size/1024)+' KB · '+(CHIPN[fw.chip]?'para '+CHIPN[fw.chip]:'chip sin identificar')+'.':'Todavía no hay ningún firmware cargado.';
   const vis=nodes.filter(n=>isKnown(n)&&n.online);
   $('fwlist').innerHTML=vis.length?vis.map(n=>{
-    const cant=!n.fw_version?'Firmware antiguo: primero por cable':n.ota_busy?'Actualizando…':'';
-    const dis=!fw.loaded||n.ota_busy||!n.fw_version||(fw.chip>0&&n.chip>0&&fw.chip!==n.chip);
-    return '<div class="pfrow"><b>#'+n.id+' · '+nodeLabel(n)+'</b><span class="hint">'+fwTxt(n)+'</span>'+(cant?'<span class="chip'+(n.ota_busy?' ac':'')+'">'+cant+'</span>':'')+
-      (n.ota_busy?'<button class="btn danger sm" data-ocancel="'+n.id+'" type="button">Cancelar</button>':'<button class="btn ghost sm" data-ota="'+n.id+'" type="button"'+(dis?' disabled':'')+' aria-label="'+(otaArm===n.id?'Confirmar: actualizar el firmware del altavoz ':'Actualizar el firmware del altavoz ')+n.id+'">'+(otaArm===n.id?'¿Seguro? No lo apagues':'Actualizar')+'</button>')+'</div>';}).join(''):'<p>No hay altavoces en línea.</p>';
+    const pend=otaPend===n.id&&!n.ota_busy,cant=!n.fw_version?'Firmware antiguo: primero por cable':(n.ota_busy||pend)?'Actualizando…':'';
+    const dis=!fw.loaded||n.ota_busy||pend||!n.fw_version||(fw.chip>0&&n.chip>0&&fw.chip!==n.chip);
+    return '<div class="pfrow"><b>#'+n.id+' · '+nodeLabel(n)+'</b><span class="hint">'+fwTxt(n)+'</span>'+(cant?'<span class="chip'+((n.ota_busy||pend)?' ac':'')+'">'+cant+'</span>':'')+
+      (n.ota_busy?'<button class="btn danger sm" data-ocancel="'+n.id+'" type="button">Cancelar</button>':'<button class="btn ghost sm" data-ota="'+n.id+'" type="button"'+(dis?' disabled':'')+' aria-label="'+(otaArm===n.id?'Confirmar: actualizar el firmware del altavoz ':'Actualizar el firmware del altavoz ')+n.id+'">'+(pend?'Iniciando…':otaArm===n.id?'¿Seguro? No lo apagues':'Actualizar')+'</button>')+'</div>';}).join(''):'<p>No hay altavoces en línea.</p>';
   $('fwlist').querySelectorAll('[data-ota]').forEach(b=>b.onclick=async()=>{
     const id=+b.dataset.ota;
     if(otaArm!==id){otaArm=id;clearTimeout(otaArmT);otaArmT=setTimeout(()=>{otaArm=null;drawFw();},8000);drawFw();return;}   // el estado vive fuera del botón: drawFw() se repite en cada refresco y lo recrearía
-    otaArm=null;clearTimeout(otaArmT);drawFw();
-    const r=await J('/api/ota',{id});if(r.ok){toast('Actualizando el altavoz #'+b.dataset.ota+'. No lo apagues.');log('OTA enviada al altavoz #'+b.dataset.ota);loadNodes();}else toast(r.error||'No se pudo iniciar la actualización.',false);});
+    otaArm=null;clearTimeout(otaArmT);otaPend=id;otaPendT=Date.now();drawFw();   // mientras se envía la orden el botón no vuelve a «Actualizar»
+    const r=await J('/api/ota',{id});if(r.ok){toast('Actualizando el altavoz #'+id+'. No lo apagues.');log('OTA enviada al altavoz #'+id);loadNodes();}else{otaPend=null;drawFw();toast(r.error||'No se pudo iniciar la actualización.',false);}});
   $('fwlist').querySelectorAll('[data-ocancel]').forEach(b=>b.onclick=async()=>{await J('/api/ota/cancel',{id:+b.dataset.ocancel});toast('Actualización cancelada en el panel');loadNodes();});
 }
 $('fwup').onclick=async()=>{const f=$('fwfile').files[0];if(!f){toast('Elige primero el archivo receiver.bin.',false);return;}
@@ -1484,29 +1496,92 @@ function bleProvAll(){wmOpen(bdevs.filter(d=>d.new&&d.status&&!(bres[d.address]|
 
 /* Estado de la transmisión y vúmetros (consulta ligera /api/levels) */
 const MDB=60;                                   // la escala va de −60 a 0 dBFS
-let lvOK=false,lastDraw=0,lvTxt='',holdV=new Array(10).fill(-90),holdT=new Array(10).fill(0);
+let lvOK=false,lastDraw=0,lvTxt='',chBuiltN=10,holdV=new Array(10).fill(-90),holdT=new Array(10).fill(0);
 const NSEG=12,SEGDB=MDB/NSEG;                  // 12 LED por altavoz, 5 dB cada uno
 const segCls=i=>{const top=-MDB+SEGDB*(i+1);return top<=-20?'g':top<=-10?'y':'r';};   // verde hasta −20 dB, amarillo hasta −10 dB, rojo por encima
 const VUSEGS=Array.from({length:NSEG},(_,k)=>'<i class="led '+segCls(k)+'"></i>').join('');
 const vuHtml=ch=>'<span class="vu" aria-hidden="true" data-ch="'+ch+'">'+VUSEGS+'</span>';
-$('mb').innerHTML=CH.map((c,i)=>'<div class="mc" title="'+CH[i]+' · '+CHN[i]+'"><span class="lab">'+c+'</span><i class="lamp" id="lp'+i+'" data-st="off"></i><span class="lvn" id="nm'+i+'">—</span></div>').join('');
+function buildMeters(){$('mb').innerHTML=CH.map((c,i)=>'<div class="mc" title="'+CH[i]+' · '+CHN[i]+'"><span class="lab">'+c+'</span><i class="lamp" id="lp'+i+'" data-st="off"></i><span class="lvn" id="nm'+i+'">—</span></div>').join('');}
+buildMeters();
+function ensureCh(n){   // entradas extra (interfaces USB): amplía nombres, medidores y estado hasta n canales
+  while(CH.length<n){const i=CH.length;CH.push('USB'+(i-9));CHN.push('Interfaz USB');CH_DEF.push('USB'+(i-9));}
+  while(CH.length>n&&CH.length>10){CH.pop();CHN.pop();CH_DEF.pop();}
+  while(LV.length<n){LV.push(-1);PK.push(-1);LAMPS.push({ref:-90,until:0,tm:0});holdV.push(-90);holdT.push(0);}
+  LV.length=PK.length=LAMPS.length=holdV.length=holdT.length=n;
+}
 function drawChLabels(){document.querySelectorAll('#mb .mc').forEach((m,i)=>{m.title=CH[i]+' · '+CHN[i];m.querySelector('.lab').textContent=CH[i];});}
 function drawNamesForm(force){
   const g=$('nmgrid');if(!g||(!force&&g.contains(document.activeElement)))return;      // no pisar lo que se está escribiendo
-  g.innerHTML=CH.map((c,i)=>'<div><label for="chn_'+i+'">Entrada '+(i+1)+' · '+CHN[i]+'</label><input class="txt" id="chn_'+i+'" type="text" maxlength="12" value="'+c+'" placeholder="'+CH_DEF[i]+'" autocomplete="off"></div>').join('');
+  g.innerHTML=CH.slice(0,10).map((c,i)=>'<div><label for="chn_'+i+'">Entrada '+(i+1)+' · '+CHN[i]+'</label><input class="txt" id="chn_'+i+'" type="text" maxlength="12" value="'+c+'" placeholder="'+CH_DEF[i]+'" autocomplete="off"></div>').join('');
 }
 function setChNames(a){   // aplica los nombres que llegan de la Raspberry; devuelve true si cambió alguno
-  if(!Array.isArray(a)||a.length!==10||a.every((x,i)=>x===CH[i]))return false;
-  a.forEach((x,i)=>{CH[i]=x;});drawChLabels();drawNamesForm();sig='';return true;
+  if(!Array.isArray(a)||a.length<10||a.length>32)return false;
+  const grew=a.length!==CH.length;
+  if(!grew&&a.every((x,i)=>x===CH[i]))return false;
+  if(grew){ensureCh(a.length);}
+  a.forEach((x,i)=>{CH[i]=x;});
+  if(grew){buildMeters();chBuiltN=a.length;}else drawChLabels();
+  drawNamesForm();sig='';return true;
 }
 $('nmsave').onclick=async()=>{
-  const r=await J('/api/names',{names:CH.map((_,i)=>$('chn_'+i).value)});
+  const r=await J('/api/names',{names:CH.slice(0,10).map((_,i)=>$('chn_'+i).value)});
   if(r.names){setChNames(r.names);drawNamesForm(true);toast('Nombres guardados');log('Nombres de las entradas guardados');loadNodes();}else toast(r.error||'No se pudieron guardar los nombres.',false);
 };
 $('nmreset').onclick=async()=>{
   const r=await J('/api/names',{reset:true});
   if(r.names){setChNames(r.names);drawNamesForm(true);toast('Nombres restablecidos');loadNodes();}else toast(r.error||'No se pudo restablecer.',false);
 };
+/* ── Interfaces USB de audio extra (Sistema → Entradas) ── */
+let usbCards=[],usbSel=[],usbRun=[],usbMax=22,usbBase=10,usbDirty=false;   // usbBase: primera entrada de las extras (10 con Traktor, 0 sin ella)
+const usbUsed=()=>usbSel.reduce((s,e)=>s+e.channels,0);
+function usbKey(c){return usbCards.filter(x=>x.name===c.name).length===1?c.name:c.id;}   // por nombre si es único (no cambia al reenchufar); si no, hw:N,0
+function usbDraw(){
+  const run=usbRun,L=$('usb_list');
+  L.innerHTML=usbSel.length?usbSel.map((e,i)=>{
+    const r=run.find(x=>x.device===e.device&&x.channels===e.channels),first=usbBase+usbSel.slice(0,i).reduce((s,x)=>s+x.channels,0);
+    const st=r?(r.online?'En línea · entradas '+(first+1)+'–'+(first+e.channels)+(r.underruns?' · '+r.underruns+' cortes':''):'<span class="bad">'+esc(r.error||'sin conexión')+'</span>'):'Pendiente: se aplica al guardar y reiniciar';
+    return '<div class="usbrow"><div class="nm"><b>'+esc(e.device)+' · '+e.channels+(e.channels===1?' canal':' canales')+'</b><span>'+st+'</span></div><button class="btn sm" type="button" data-rm="'+i+'" aria-label="Quitar '+esc(e.device)+'">Quitar</button></div>';
+  }).join(''):'<p class="hint">Sin interfaces extra: solo se captura la Traktor.</p>';
+  L.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{usbSel.splice(+b.dataset.rm,1);usbDirty=true;usbDraw();});
+  const free=usbMax-usbUsed(),taken=new Set(usbSel.map(e=>e.device));
+  const opts=usbCards.filter(c=>!c.traktor&&!taken.has(usbKey(c))&&!taken.has(c.id));
+  $('usb_card').innerHTML=opts.length?opts.map(c=>'<option value="'+esc(usbKey(c))+'" data-max="'+c.max_channels+'">'+esc(c.name)+' ('+esc(c.id)+(c.busy?', en uso':'')+')</option>').join(''):'<option value="">No hay otras interfaces</option>';
+  usbCh();
+  $('usb_add').disabled=!opts.length||free<1;
+  $('usb_save').disabled=!usbDirty;
+}
+function usbCh(){
+  const o=$('usb_card').selectedOptions[0],mx=o&&+o.dataset.max?+o.dataset.max:usbMax,top=Math.max(1,Math.min(mx,usbMax-usbUsed())),prev=+$('usb_ch').value||0;
+  $('usb_ch').innerHTML=Array.from({length:top},(_,k)=>'<option value="'+(k+1)+'">'+(k+1)+'</option>').join('');
+  $('usb_ch').value=String(Math.min(prev||top,top));
+}
+async function usbLoad(){
+  try{
+    const d=await (await fetch('/api/inputs')).json();
+    usbCards=d.cards||[];usbMax=d.max_extra||22;usbBase=d.traktor&&d.traktor.present===false?0:10;usbRun=(d.running&&d.running.extras)||[];
+    if(!usbDirty)usbSel=(d.saved||[]).map(e=>({device:e.device,channels:e.channels}));
+    usbDraw();
+    if(d.restart_needed&&!usbDirty)$('usb_msg').textContent='Hay cambios guardados que se aplican al reiniciar el servicio.';
+  }catch(e){}
+}
+$('usb_card').onchange=usbCh;
+$('usb_add').onclick=()=>{
+  const dev=$('usb_card').value,ch=+$('usb_ch').value;
+  if(!dev||!ch)return;
+  usbSel.push({device:dev,channels:ch});usbDirty=true;usbDraw();
+};
+$('usb_save').onclick=async()=>{
+  $('usb_save').disabled=true;$('usb_msg').textContent='Guardando…';
+  const r=await J('/api/inputs',{extras:usbSel});
+  if(!r.ok){$('usb_msg').textContent=r.error||'No se pudo guardar.';toast(r.error||'No se pudo guardar las interfaces.',false);$('usb_save').disabled=false;return;}
+  usbDirty=false;log('Interfaces USB extra guardadas ('+usbSel.length+')');
+  if(!r.restarting){$('usb_msg').textContent='Guardado. Reinicia el servicio para aplicarlo.';usbDraw();return;}
+  $('usb_msg').textContent='Reiniciando el servicio… el audio se corta unos segundos.';
+  await sleep(2500);
+  for(let k=0;k<40;k++){try{const s=await fetch('/api/status',{cache:'no-store'});if(s.ok){location.reload();return;}}catch(e){}await sleep(1000);}
+  $('usb_msg').textContent='El servicio tarda en volver; recarga la página en unos segundos.';
+};
+$('sy_in').addEventListener('click',()=>setTimeout(usbLoad,0));
 const segIdx=db=>db<=-MDB?-1:Math.min(NSEG-1,Math.ceil((db+MDB)/SEGDB)-1);
 const LV=new Array(10).fill(-1),PK=new Array(10).fill(-1);
 /* Estado del indicador de cada canal. Umbrales en dBFS; LAMP_STEP = subida que dispara un destello. */
@@ -1530,8 +1605,9 @@ function setTx(dot,txt,title){const t=txt;if(t!==lvTxt){lvTxt=t;$('hs').textCont
 function drawMeters(d){
   const now=performance.now(),on=d.capturing,dt=Math.min(0.5,(now-lastDraw)/1000);
   $('meters').classList.toggle('off',!on);
-  for(let i=0;i<10;i++){
-    const db=on?d.db[i]:-90,sig=on&&db>=LAMP_CABLE;
+  if(d.db.length!==CH.length&&d.db.length>=10){ensureCh(d.db.length);buildMeters();}
+  for(let i=0;i<CH.length;i++){
+    const db=on?(d.db[i]===undefined?-90:d.db[i]):-90,sig=on&&db>=LAMP_CABLE;
     if(db>=holdV[i]){holdV[i]=db;holdT[i]=now;}else if(now-holdT[i]>1200)holdV[i]=Math.max(db,holdV[i]-20*dt);   // el pico se mantiene 1,2 s y baja a 20 dB/s
     LV[i]=segIdx(db);PK[i]=segIdx(holdV[i]);
     const lp=$('lp'+i),ls=LAMPS[i],z=lampStep(ls,db,now);
@@ -2014,7 +2090,7 @@ async function runCal(){
     if(!cfg.ok){stream.getTracks().forEach(t=>t.stop());await ctx.close();
       view(1);showErr('<b>'+(cfg.error||'No se pudo empezar')+'</b>');$('go').disabled=false;return;}
     try{const ni=await (await fetch('/api/nodes')).json();for(const n of ni)if(n.role===2){if(volIncl[n.id]===undefined)volIncl[n.id]=false;if(eqIncl[n.id]===undefined)eqIncl[n.id]=false;}}catch(e){}
-    try{const sj=await (await fetch('/api/status')).json();eqOn=!!sj.dsp_eq;if(Array.isArray(sj.ch_names)&&sj.ch_names.length===10)sj.ch_names.forEach((x,i)=>{CH[i]=x;});}catch(e){}
+    try{const sj=await (await fetch('/api/status')).json();eqOn=!!sj.dsp_eq;if(Array.isArray(sj.ch_names)&&sj.ch_names.length>=10)sj.ch_names.slice(0,10).forEach((x,i)=>{CH[i]=x;});}catch(e){}
     log('Secuencia: altavoces '+cfg.sequence.join(', ')+' ('+(cfg.total_ms/1000).toFixed(1)+' s)');
     const t0=Date.now(),tot=cfg.total_ms+900;
     $('msg').textContent='Midiendo cada altavoz. No hagas ruido.';
@@ -2458,8 +2534,8 @@ static const char PWA_MANIFEST[] = R"HTML({
 static const char PWA_SW[] = R"HTML(/* Service worker de AStream. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * 8cc4b7d3d6 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-8cc4b7d3d6';
+ * ec1d52156d lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-ec1d52156d';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png', '/fonts/roboto-400.woff2', '/fonts/roboto-500.woff2'];
 
 self.addEventListener('install', e => {

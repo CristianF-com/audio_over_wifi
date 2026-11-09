@@ -780,5 +780,29 @@ c, b = http("POST", "/api/names", {"names": mine}); c2, b2 = http("POST", "/api/
 check("nombres: «reset» vuelve a los de fábrica", c2 == 200 and json.loads(b2)["names"] == DEF, (c2, b2))
 c, b = http("POST", "/api/names", {"names": mine})   # se deja personalizado: la interfaz lo comprueba después
 
+# ── Interfaces USB de audio extra ──
+import os
+try: os.remove("/tmp/sonos_harness_inputs.txt")
+except FileNotFoundError: pass
+c, b = http("GET", "/api/inputs"); j = json.loads(b) if c == 200 else {}
+check("inputs: GET sin interfaces extra (solo Traktor, 10 entradas)", c == 200 and j.get("traktor", {}).get("present") is True and j.get("saved") == [] and j.get("running", {}).get("total") == 10 and j.get("max_extra") == 22 and isinstance(j.get("cards"), list) and j.get("restart_needed") is False, (c, b))
+c, b = http("GET", "/api/status"); st = json.loads(b)
+check("inputs: /api/status sigue con 10 nombres y 10 canales", len(st["ch_names"]) == 10 and st["input_channels"] == 10, st.get("input_channels"))
+c, b = http("GET", "/api/levels"); check("inputs: /api/levels con 10 medidores", len(json.loads(b)["db"]) == 10, b[:80])
+c, b = http("POST", "/api/inputs", {"extras": [{"device": "hw:2,0", "channels": 8}, {"device": "Scarlett", "channels": 2}]})
+check("inputs: POST guarda y pide reiniciar", c == 200 and json.loads(b).get("ok") is True and json.loads(b).get("restarting") is True, (c, b))
+c, b = http("GET", "/api/inputs"); j = json.loads(b)
+check("inputs: lo guardado se lista y marca reinicio pendiente", j["saved"] == [{"device": "hw:2,0", "channels": 8}, {"device": "Scarlett", "channels": 2}] and j["restart_needed"] is True, b[:300])
+check("inputs: el fichero tiene una línea por interfaz", open("/tmp/sonos_harness_inputs.txt").read() == "hw:2,0|8\nScarlett|2\n")
+for bad, why in (({"extras": [{"device": "hw:2,0", "channels": 0}]}, "0 canales"), ({"extras": [{"device": "hw:2,0", "channels": 23}]}, "23 canales"),
+                 ({"extras": [{"device": "hw:2,0", "channels": 12}, {"device": "hw:3,0", "channels": 12}]}, "más de 22 en total"),
+                 ({"extras": [{"device": "hw:2,0", "channels": 2}, {"device": "hw:2,0", "channels": 2}]}, "repetida"),
+                 ({"extras": [{"device": "Traktor Audio 10", "channels": 2}]}, "la Traktor como extra"), ({"extras": [{"device": "a|b", "channels": 2}]}, "con |"), ({}, "sin lista")):
+    c, b = http("POST", "/api/inputs", bad); check("inputs: se rechaza " + why, c == 400 and "error" in json.loads(b), (c, b))
+c, b = http("GET", "/api/inputs"); check("inputs: los rechazos no tocan lo guardado", len(json.loads(b)["saved"]) == 2)
+c, b = http("POST", "/api/inputs", {"extras": []}); c2, b2 = http("GET", "/api/inputs")
+check("inputs: lista vacía vuelve a solo Traktor", json.loads(b).get("ok") is True and json.loads(b2)["saved"] == [] and json.loads(b2)["restart_needed"] is False, b2[:200])
+c, b = http("POST", "/api/node", {"id": 1, "ch_left": 10, "ch_right": 11}); check("inputs: sin interfaces extra un altavoz no puede usar el canal 11", "error" in b or c >= 400, (c, b))
+
 print("\nRESULTADO:", "TODO OK" if ok else "HAY FALLOS")
 sys.exit(0 if ok else 1)
