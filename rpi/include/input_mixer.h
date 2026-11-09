@@ -23,13 +23,21 @@ public:
     ~InputMixer();
     // Ficheros de configuración: una línea «dispositivo|canales» por interfaz
     static std::vector<ExtraSpec> loadFile(const std::string& path);
-    static bool saveFile(const std::string& path, const std::vector<ExtraSpec>& v);
+    static bool saveFile(const std::string& path, const std::vector<ExtraSpec>& v, int traktor_pos = 0, bool traktor_master = true);
+    // Posición de la Traktor entre las interfaces (0 = primera) y si es el reloj principal; línea «@traktor|pos|master» del mismo fichero
+    static void loadTraktor(const std::string& path, int& pos, bool& master);
+    static void parseTraktor(const std::string& body, int& pos, bool& master);   // {"traktor":{"pos":N,"master":true|false}}; si falta, no toca los valores
     // Valida la lista (canales 1..32, total ≤ MAX_INPUTS-10, sin la Traktor ni repetidas); err en español
     static bool validate(std::vector<ExtraSpec>& v, std::string& err, bool traktor_present = true);
     // Extrae la lista de {"extras":[{"device":"…","channels":N},…]}
     static bool parseJson(const std::string& body, std::vector<ExtraSpec>& out, std::string& err, bool traktor_present = true);
     static std::vector<CardInfo> listCards();
 
+    // Posición de la Traktor en el orden de entradas y reloj: master=true → la Traktor manda el reloj (camino de siempre);
+    // master=false → la Traktor entra por un colchón como las demás y el mezclador usa su propio reloj. Antes de setExtras().
+    void setTraktorLayout(int pos, bool master) { trk_pos_ = pos < 0 ? 0 : pos; trk_master_ = master; }
+    int  traktorFirst() const { return trk_first_; }
+    void tickForTest(uint32_t frames, uint64_t ts) { mix(nullptr, frames, ts); }
     void setTraktorPresent(bool p) { traktor_ = p; }           // ANTES de setExtras(): sin Traktor las extras empiezan en la entrada 1
     void setExtras(const std::vector<ExtraSpec>& v);          // antes de start()
     int  totalChannels() const { return total_; }
@@ -59,6 +67,7 @@ private:
         bool      test = false;                   // alimentada a mano (pruebas)
     };
     void push(Extra& e, const int32_t* d, uint32_t frames);
+    void pull(Extra& e, uint32_t frames, int T);
     void mix(const int32_t* traktor, uint32_t frames, uint64_t ts);
     bool openExtra(Extra& e);
     void setErr(Extra& e, const std::string& s);
@@ -68,6 +77,9 @@ private:
     bool          traktor_ = true;
     int           total_ = AUDIO_CHANNELS;
     std::vector<std::unique_ptr<Extra>> ex_;
+    std::unique_ptr<Extra> trk_;                 // Traktor con colchón (solo si no es el reloj principal)
+    int  trk_pos_ = 0, trk_first_ = 0;
+    bool trk_master_ = true;
     std::vector<int32_t> out_, zero_;
     std::atomic<bool> running_{false};
     std::thread   watch_, clock_;

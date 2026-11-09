@@ -745,7 +745,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
    ok('USB extra: con 16 entradas hay 16 indicadores en la tarjeta de entrada',await until(async()=>(await up.locator('#mb .mc').count())===16),await up.locator('#mb .mc').count());
    ok('USB extra: los indicadores extra llevan su nombre y el canal con señal se enciende',await up.evaluate(()=>{const l=[...document.querySelectorAll('#mb .lab')].map(x=>x.textContent);return l[10]==='USB1-1'&&l[15]==='USB2-2'&&document.getElementById('lp11').dataset.st==='sig';}));
    await up.click('.tab[data-tab="sys"]');await up.click('#sy_in');await sleep(500);
-   ok('USB extra: sin interfaces guardadas dice que solo se captura la Traktor',(await up.textContent('#usb_list')).includes('solo se captura la Traktor'));
+   ok('USB extra: la Traktor aparece en la lista como una placa más (entradas 1–10, reloj principal, sin botón Quitar) y sin extras lo dice',(await up.textContent('#usb_trk')).includes('Traktor Audio 10 · 10 canales')&&(await up.textContent('#usb_trk')).includes('entradas 1–10')&&(await up.locator('#usb_trk [data-rm]').count())===0&&(await up.textContent('#usb_list')).includes('solo se captura la Traktor'));
    ok('USB extra: el selector no ofrece la Traktor y sí las demás tarjetas',await up.evaluate(()=>{const o=[...document.querySelectorAll('#usb_card option')].map(x=>x.textContent);return o.length===2&&!o.some(x=>/Traktor/.test(x))&&/Scarlett/.test(o[0]);}));
    ok('USB extra: los canales llegan hasta el máximo de la tarjeta (18)',await up.evaluate(()=>document.querySelectorAll('#usb_ch option').length===18));
    ok('USB extra: «Guardar y reiniciar» está desactivado sin cambios',await up.isDisabled('#usb_save'));
@@ -753,10 +753,17 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
    ok('USB extra: al agregar aparece en la lista como pendiente y se activa Guardar',(await up.textContent('#usb_list')).includes('Scarlett 18i20')&&(await up.textContent('#usb_list')).includes('8 canales')&&(await up.textContent('#usb_list')).includes('Pendiente')&&!(await up.isDisabled('#usb_save')));
    ok('USB extra: la interfaz agregada ya no se ofrece y el máximo baja a lo que queda (la otra tarjeta: 2)',await up.evaluate(()=>{const o=[...document.querySelectorAll('#usb_card option')];return o.length===1&&/USB Audio Device/.test(o[0].textContent)&&document.querySelectorAll('#usb_ch option').length===2;}));
    await up.click('#usb_add');
-   ok('USB extra: se pueden agregar varias interfaces (2 en la lista, 8 + 2 canales)',(await up.textContent('#usb_list')).includes('USB Audio Device · 2 canales')&&(await up.locator('#usb_list .usbrow').count())===2);
+   ok('USB extra: se pueden agregar varias interfaces (2 en la lista, 8 + 2 canales)',(await up.textContent('#usb_list')).includes('USB Audio Device · 2 canales')&&(await up.locator('#usb_list .usbrow').count())===3);
    await up.click('#usb_list [data-rm="1"]');
    ok('USB extra: «Quitar» la saca de la lista',!(await up.textContent('#usb_list')).includes('USB Audio Device'));
+   ok('USB extra: el interruptor «Reloj principal» de la Traktor está activado por defecto',(await up.getAttribute('#usb_master','aria-checked'))==='true');
+   ok('USB extra: la Traktor no puede subir (es la primera) y sí bajar',await up.isDisabled('#usb_trk [data-mv$=":-1"]')&&!(await up.isDisabled('#usb_trk [data-mv$=":1"]')));
+   await up.click('#usb_trk [data-mv$=":1"]');
+   ok('USB extra: «Bajar» la Traktor la pasa detrás de la Scarlett y las entradas se renumeran (Scarlett 1–8, Traktor 9–18)',await up.evaluate(()=>{const r=[...document.querySelectorAll('#usb_list .usbrow')].map(x=>x.textContent);return /Scarlett/.test(r[0])&&r[1].includes('Traktor')&&r[1].includes('entradas 9–18');}));
+   await up.click('#usb_master');
+   ok('USB extra: apagar «Reloj principal» lo refleja en el interruptor y en la fila',(await up.getAttribute('#usb_master','aria-checked'))==='false'&&(await up.textContent('#usb_trk')).includes('con colchón'));
    await up.click('#usb_save');
+   ok('USB extra: guardar envía también la posición de la Traktor y el reloj',await until(async()=>saved&&saved.traktor&&saved.traktor.pos===1&&saved.traktor.master===false),saved);
    ok('USB extra: guardar envía la lista a la Raspberry',await until(async()=>saved&&saved.extras.length===1&&saved.extras[0].device==='Scarlett 18i20'&&saved.extras[0].channels===8),saved);
    ok('USB extra: tras guardar se avisa que hace falta reiniciar',await until(async()=>(await up.textContent('#usb_msg')).includes('Reinicia')),await up.textContent('#usb_msg'));
    await up.click('.tab[data-tab="spk"]');await up.click('#spks .spk[data-id="0"]');await up.waitForSelector('#drawer.on');await adv(up);

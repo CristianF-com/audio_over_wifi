@@ -770,7 +770,9 @@ std::string WebServer::serveFirmware(const std::string& path, int& code) {
 // Interfaces USB de audio extra (además de la Traktor): GET lista tarjetas + estado; POST {"extras":[{"device","channels"}]} guarda y reinicia el servicio
 std::string WebServer::inputsGet() {
     std::ostringstream o;
-    o << "{\"traktor\":{\"present\":" << (traktor_present_ ? "true" : "false") << ",\"channels\":" << AUDIO_CHANNELS << "},\"max_extra\":" << (traktor_present_ ? MAX_INPUTS - AUDIO_CHANNELS : MAX_INPUTS) << ",\"cards\":[";
+    int tpos = 0; bool tmaster = true;
+    InputMixer::loadTraktor(inputs_path_, tpos, tmaster);
+    o << "{\"traktor\":{\"present\":" << (traktor_present_ ? "true" : "false") << ",\"channels\":" << AUDIO_CHANNELS << ",\"pos\":" << tpos << ",\"master\":" << (tmaster ? "true" : "false") << "},\"max_extra\":" << (traktor_present_ ? MAX_INPUTS - AUDIO_CHANNELS : MAX_INPUTS) << ",\"cards\":[";
     const auto cards = InputMixer::listCards();
     for (size_t i = 0; i < cards.size(); i++)
         o << (i ? "," : "") << "{" << jstr("id", cards[i].id) << "," << jstr("name", cards[i].name) << "," << jnum("max_channels", cards[i].max_channels) << ","
@@ -780,6 +782,7 @@ std::string WebServer::inputsGet() {
     for (size_t i = 0; i < saved.size(); i++) o << (i ? "," : "") << "{" << jstr("device", saved[i].device) << "," << jnum("channels", saved[i].channels) << "}";
     bool same = saved.size() == inputs_running_.size();
     for (size_t i = 0; same && i < saved.size(); i++) same = saved[i].device == inputs_running_[i].device && saved[i].channels == inputs_running_[i].channels;
+    same = same && tpos == run_tpos_ && tmaster == run_tmaster_;
     o << "],\"running\":" << (mixer_ ? mixer_->statusJson() : std::string("{\"extras\":[],\"total\":") + std::to_string(AUDIO_CHANNELS) + "}")
       << "," << jbool("restart_needed", !same) << "}";
     return o.str();
@@ -788,7 +791,11 @@ std::string WebServer::inputsPost(const std::string& b) {
     if (inputs_path_.empty()) return "{\"error\":\"esta Raspberry no guarda configuración\"}";
     std::vector<ExtraSpec> v; std::string err;
     if (!InputMixer::parseJson(b, v, err, traktor_present_)) return "{" + jstr("error", err) + "}";
-    if (!InputMixer::saveFile(inputs_path_, v)) return "{\"error\":\"no se pudo guardar en la Raspberry\"}";
+    int tpos = 0; bool tmaster = true;
+    InputMixer::loadTraktor(inputs_path_, tpos, tmaster);
+    InputMixer::parseTraktor(b, tpos, tmaster);
+    if (tpos > (int)v.size()) tpos = (int)v.size();
+    if (!InputMixer::saveFile(inputs_path_, v, tpos, tmaster)) return "{\"error\":\"no se pudo guardar en la Raspberry\"}";
     const bool restart = (jsonGet(b, "restart") != "false");
     if (restart && restart_cb_) restart_cb_();
     return std::string("{\"ok\":true,") + jbool("restarting", restart && (bool)restart_cb_) + "}";

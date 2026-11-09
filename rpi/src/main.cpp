@@ -103,13 +103,15 @@ int main(int argc, char* argv[]) {
     const std::string inputs_path = cfgfile.empty() ? std::string() : cfgfile + ".inputs";
     std::vector<ExtraSpec> extras = inputs_path.empty() ? std::vector<ExtraSpec>() : InputMixer::loadFile(inputs_path);
     for (const auto& e : extras_cli) extras.push_back(e);
+    int trk_pos = 0; bool trk_master = true;
+    if (!inputs_path.empty()) InputMixer::loadTraktor(inputs_path, trk_pos, trk_master);
     const bool traktor_ok = capture.open();
     { std::string verr; if (!extras.empty() && !InputMixer::validate(extras, verr, traktor_ok)) { fprintf(stderr, "[Main] Interfaces extra ignoradas: %s\n", verr.c_str()); extras.clear(); } }
     if (!traktor_ok && extras.empty()) { fprintf(stderr, "[Main] Cannot open ALSA device\n");  return 1; }
     if (!traktor_ok) fprintf(stderr, "[Main] Sin Traktor: sigo con las interfaces extra (toman las entradas desde la 1)\n");
     InputMixer mixer(streamer, acfg.period_size);
-    if (!extras.empty()) { mixer.setTraktorPresent(traktor_ok); mixer.setExtras(extras); }
-    web.setInputs(extras.empty() ? nullptr : &mixer, inputs_path, extras, traktor_ok, [] { g_running.store(false); });   // reiniciar = salir limpio (systemd lo levanta)
+    if (!extras.empty()) { mixer.setTraktorPresent(traktor_ok); mixer.setTraktorLayout(trk_pos, trk_master); mixer.setExtras(extras); }
+    web.setInputs(extras.empty() ? nullptr : &mixer, inputs_path, extras, traktor_ok, trk_pos, trk_master, [] { g_running.store(false); });   // reiniciar = salir limpio (systemd lo levanta)
 
     if (extras.empty())
         capture.setCallback([&](const int32_t* data, uint32_t frames, uint64_t ts) {

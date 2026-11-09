@@ -32,6 +32,7 @@ std::vector<ExtraSpec> InputMixer::loadFile(const std::string& path) {
     char line[256];
     while (fgets(line, sizeof(line), f)) {
         std::string l(line);
+        if (!l.empty() && l[0] == '@') continue;                 // @traktor|pos|master
         while (!l.empty() && (l.back() == '\n' || l.back() == '\r')) l.pop_back();
         const size_t bar = l.rfind('|');
         if (bar == std::string::npos || bar == 0) continue;
@@ -42,10 +43,33 @@ std::vector<ExtraSpec> InputMixer::loadFile(const std::string& path) {
     fclose(f);
     return v;
 }
-bool InputMixer::saveFile(const std::string& path, const std::vector<ExtraSpec>& v) {
+void InputMixer::loadTraktor(const std::string& path, int& pos, bool& master) {
+    pos = 0; master = true;
+    FILE* f = fopen(path.c_str(), "r");
+    if (!f) return;
+    char line[256];
+    while (fgets(line, sizeof(line), f)) {
+        int p = 0, m = 1;
+        if (sscanf(line, "@traktor|%d|%d", &p, &m) == 2) { pos = p < 0 ? 0 : (p > 8 ? 8 : p); master = m != 0; }
+    }
+    fclose(f);
+}
+void InputMixer::parseTraktor(const std::string& b, int& pos, bool& master) {
+    const size_t k = b.find("\"traktor\"");
+    if (k == std::string::npos) return;
+    const size_t ob = b.find('{', k), cb = ob == std::string::npos ? ob : b.find('}', ob);
+    if (cb == std::string::npos) return;
+    const std::string o = b.substr(ob, cb - ob + 1);
+    size_t q = o.find("\"pos\"");
+    if (q != std::string::npos) { const long v = strtol(o.c_str() + o.find(':', q) + 1, nullptr, 10); pos = v < 0 ? 0 : (v > 8 ? 8 : (int)v); }
+    q = o.find("\"master\"");
+    if (q != std::string::npos) master = o.find("true", q) != std::string::npos;
+}
+bool InputMixer::saveFile(const std::string& path, const std::vector<ExtraSpec>& v, int traktor_pos, bool traktor_master) {
     const std::string tmp = path + ".tmp";
     FILE* f = fopen(tmp.c_str(), "w");
     if (!f) return false;
+    if (traktor_pos != 0 || !traktor_master) fprintf(f, "@traktor|%d|%d\n", traktor_pos, traktor_master ? 1 : 0);
     for (const auto& e : v) fprintf(f, "%s|%u\n", e.device.c_str(), e.channels);
     const bool ok = (fflush(f) == 0) & (ferror(f) == 0);
     fclose(f);
@@ -114,21 +138,41 @@ std::vector<CardInfo> InputMixer::listCards() {
 }
 
 void InputMixer::setExtras(const std::vector<ExtraSpec>& v) {
-    ex_.clear();
-    int first = traktor_ ? AUDIO_CHANNELS : 0;     // sin Traktor, las interfaces extra toman las entradas 1, 2, 3…
-    for (const auto& s : v) {
-        if (first + (int)s.channels > MAX_INPUTS) break;
-        auto e = std::make_unique<Extra>();
-        e->spec = s; e->first = first;
-        e->ring.assign((size_t)48000 / 5 * s.channels, 0);       // 200 ms
-        first += (int)s.channels;
-        ex_.push_back(std::move(e));
+    ex_.clear(); trk_.reset();
+    // Orden de entradas: las extras en el orden de la lista y la Traktor insertada en su posición (si está conectada).
+    // Sin Traktor, las extras toman las entradas 1, 2, 3…
+    std::vector<int> order;                                       // índice en v, o -1 = Traktor
+    for (size_t i = 0; i < v.size(); i++) order.push_back((int)i);
+    if (traktor_) order.insert(order.begin() + std::min<size_t>((size_t)trk_pos_, order.size()), -1);
+    int first = 0;
+    std::vector<std::unique_ptr<Extra>> byspec(v.size());
+    std::vector<std::string> glob;                                // nombre de cada entrada global (las 10 primeras usan los editables)
+    for (int o : order) {
+        const int n = o < 0 ? AUDIO_CHANNELS : (int)v[(size_t)o].channels;
+        if (first + n > MAX_INPUTS) continue;
+        if (o < 0) {
+            trk_first_ = first;
+            for (int c = 0; c < n; c++) glob.push_back("TK" + std::to_string(c + 1));
+            if (!trk_master_) {
+                trk_ = std::make_unique<Extra>();
+                trk_->spec.device = "@traktor"; trk_->spec.channels = AUDIO_CHANNELS; trk_->first = first; trk_->test = true;
+                trk_->ring.assign((size_t)48000 / 5 * AUDIO_CHANNELS, 0);
+                trk_->online = true;
+            }
+        } else {
+            auto e = std::make_unique<Extra>();
+            e->spec = v[(size_t)o]; e->first = first;
+            e->ring.assign((size_t)48000 / 5 * e->spec.channels, 0);       // 200 ms
+            for (int c = 0; c < n; c++) glob.push_back("USB" + std::to_string(o + 1) + "-" + std::to_string(c + 1));
+            byspec[(size_t)o] = std::move(e);
+        }
+        first += n;
     }
+    for (auto& e : byspec) if (e) ex_.push_back(std::move(e));
+    if (!traktor_) trk_first_ = 0;
     total_ = first < AUDIO_CHANNELS ? AUDIO_CHANNELS : first;    // mínimo 10 entradas (las que sobren, en silencio)
-    std::vector<std::string> names;                                // nombres de las entradas ≥ 10 (las 10 primeras conservan los editables FL, FR…)
-    for (size_t i = 0; i < ex_.size(); i++)
-        for (unsigned c = 0; c < ex_[i]->spec.channels; c++)
-            if (ex_[i]->first + (int)c >= AUDIO_CHANNELS) names.push_back("USB" + std::to_string(i + 1) + "-" + std::to_string(c + 1));
+    std::vector<std::string> names;                                // nombres de las entradas ≥ 10
+    for (size_t g = AUDIO_CHANNELS; g < glob.size(); g++) names.push_back(glob[g]);
     s_.setInputChannels(total_, names);
     out_.assign((size_t)block_ * total_, 0);
 }
@@ -174,6 +218,26 @@ void InputMixer::injectForTest(size_t idx, const int32_t* data, uint32_t frames)
     push(*ex_[idx], data, frames);
 }
 
+void InputMixer::pull(Extra& e, uint32_t frames, int T) {
+    const unsigned ch = e.spec.channels;
+    std::lock_guard<std::mutex> lk(e.mtx);
+    // Objetivo de colchón: 2 bloques. Si hay de más (su reloj va más rápido) se recorta hasta el objetivo;
+    // si falta, se rellena con silencio y se vuelve a llenar el colchón antes de seguir.
+    const size_t target = (size_t)frames * 2, high = (size_t)frames * 6;
+    if (!e.primed && e.fill >= target) e.primed = true;
+    if (e.primed && e.fill > high) { const size_t drop = e.fill - target; memmove(e.ring.data(), e.ring.data() + drop * ch, (e.fill - drop) * ch * sizeof(int32_t)); e.fill -= drop; e.dropped += drop; }
+    size_t take = 0;
+    if (e.primed) {
+        take = std::min<size_t>(frames, e.fill);
+        if (take < frames) { e.underruns++; e.primed = false; }
+    }
+    for (uint32_t f = 0; f < frames; f++) {
+        int32_t* o = &out_[(size_t)f * T + e.first];
+        if (f < take) memcpy(o, e.ring.data() + (size_t)f * ch, ch * sizeof(int32_t));
+        else memset(o, 0, ch * sizeof(int32_t));
+    }
+    if (take) { memmove(e.ring.data(), e.ring.data() + take * ch, (e.fill - take) * ch * sizeof(int32_t)); e.fill -= take; e.blocks++; }
+}
 void InputMixer::mix(const int32_t* trk, uint32_t frames, uint64_t ts) {
     std::lock_guard<std::mutex> mk(mix_mtx_);
     if (out_.size() < (size_t)frames * total_) out_.assign((size_t)frames * total_, 0);
@@ -181,33 +245,16 @@ void InputMixer::mix(const int32_t* trk, uint32_t frames, uint64_t ts) {
     for (uint32_t f = 0; f < frames; f++) {
         int32_t* o = &out_[(size_t)f * T];
         memset(o, 0, (size_t)T * sizeof(int32_t));
-        if (trk) memcpy(o, trk + (size_t)f * AUDIO_CHANNELS, AUDIO_CHANNELS * sizeof(int32_t));
+        if (trk) memcpy(o + trk_first_, trk + (size_t)f * AUDIO_CHANNELS, AUDIO_CHANNELS * sizeof(int32_t));
     }
-    for (auto& ep : ex_) {
-        Extra& e = *ep; const unsigned ch = e.spec.channels;
-        std::lock_guard<std::mutex> lk(e.mtx);
-        // Objetivo de colchón: 2 bloques. Si hay de más (su reloj va más rápido) se recorta hasta el objetivo;
-        // si falta, se rellena con silencio y se vuelve a llenar el colchón antes de seguir.
-        const size_t target = (size_t)frames * 2, high = (size_t)frames * 6;
-        if (!e.primed && e.fill >= target) e.primed = true;
-        if (e.primed && e.fill > high) { const size_t drop = e.fill - target; memmove(e.ring.data(), e.ring.data() + drop * ch, (e.fill - drop) * ch * sizeof(int32_t)); e.fill -= drop; e.dropped += drop; }
-        size_t take = 0;
-        if (e.primed) {
-            take = std::min<size_t>(frames, e.fill);
-            if (take < frames) { e.underruns++; e.primed = false; }
-        }
-        for (uint32_t f = 0; f < frames; f++) {
-            int32_t* o = &out_[(size_t)f * T + e.first];
-            if (f < take) memcpy(o, e.ring.data() + (size_t)f * ch, ch * sizeof(int32_t));
-            else memset(o, 0, ch * sizeof(int32_t));
-        }
-        if (take) { memmove(e.ring.data(), e.ring.data() + take * ch, (e.fill - take) * ch * sizeof(int32_t)); e.fill -= take; e.blocks++; }
-    }
+    if (trk_) pull(*trk_, frames, T);
+    for (auto& ep : ex_) pull(*ep, frames, T);
     s_.pushFrames(out_.data(), frames, ts);
 }
 
 void InputMixer::onTraktor(const int32_t* data, uint32_t frames, uint64_t ts) {
     last_traktor_us_.store(nowUs(), std::memory_order_relaxed);
+    if (trk_) { push(*trk_, data, frames); return; }               // Traktor sin ser el reloj: entra por su colchón
     mix(data, frames, ts);
 }
 
@@ -216,7 +263,7 @@ bool InputMixer::start() {
     running_ = true;
     for (auto& e : ex_) openExtra(*e);                     // las que fallen se reintentan en el hilo de vigilancia
     watch_ = std::thread(&InputMixer::watchLoop, this);
-    if (!traktor_) {                                       // sin Traktor: reloj propio cada bloque
+    if (!traktor_ || trk_) {                               // sin Traktor, o Traktor que no manda el reloj: reloj propio cada bloque
         clock_ = std::thread([this] {
             sched_param sp{}; sp.sched_priority = 70; pthread_setschedparam(pthread_self(), SCHED_FIFO, &sp);
             uint64_t next = nowUs();
@@ -224,7 +271,7 @@ bool InputMixer::start() {
                 const uint64_t n = nowUs();
                 if (next > n) { timespec ts{0, (long)((next - n) * 1000)}; nanosleep(&ts, nullptr); }
                 if (!running_) break;
-                if (last_traktor_us_.load() == 0 || nowUs() - last_traktor_us_.load() > 100000) mix(nullptr, block_, next);
+                if (trk_ || last_traktor_us_.load() == 0 || nowUs() - last_traktor_us_.load() > 100000) mix(nullptr, block_, next);
                 next += (uint64_t)block_ * 1000000ull / AUDIO_SAMPLE_RATE;
                 if (nowUs() > next + 100000) next = nowUs();
             }
@@ -265,6 +312,8 @@ std::string InputMixer::statusJson() const {
           << ",\"resolved\":\"" << jesc2(e.resolved) << "\",\"error\":\"" << jesc2(e.error) << "\""
           << ",\"fill_ms\":" << (e.fill * 1000.0 / AUDIO_SAMPLE_RATE) << ",\"underruns\":" << e.underruns << ",\"dropped_ms\":" << (e.dropped * 1000.0 / AUDIO_SAMPLE_RATE) << "}";
     }
-    o << "],\"total\":" << total_ << "}";
+    o << "],\"traktor\":{\"first\":" << trk_first_ << ",\"master\":" << (trk_master_ ? "true" : "false");
+    if (trk_) { std::lock_guard<std::mutex> lk(trk_->mtx); o << ",\"underruns\":" << trk_->underruns << ",\"dropped_ms\":" << (trk_->dropped * 1000.0 / AUDIO_SAMPLE_RATE); }
+    o << "},\"total\":" << total_ << "}";
     return o.str();
 }

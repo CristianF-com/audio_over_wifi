@@ -86,6 +86,51 @@ int main() {
         UdpStreamer s3; InputMixer m3(s3, 240); m3.setTraktorPresent(false); m3.setExtras({{"hw:2,0", 2}});
         CHECK("sin Traktor y pocas extras: mínimo 10 entradas (resto en silencio)", m3.totalChannels() == 10 && s3.inputChannels() == 10);
     }
+    // ── Traktor editable: posición y reloj ──
+    {
+        const char* pth = "/tmp/sonos_inputs_trk.inputs"; remove(pth);
+        int tp = 5; bool tm = false;
+        InputMixer::loadTraktor(pth, tp, tm);
+        CHECK("sin @traktor: posición 0 y reloj principal por defecto", tp == 0 && tm);
+        CHECK("guardar con posición y reloj", InputMixer::saveFile(pth, {{"hw:2,0", 2}}, 1, false));
+        InputMixer::loadTraktor(pth, tp, tm);
+        CHECK("recargar posición 1 y reloj secundario; la línea @traktor no se lee como interfaz", tp == 1 && !tm && InputMixer::loadFile(pth).size() == 1);
+        InputMixer::saveFile(pth, {{"hw:2,0", 2}});
+        { std::string txt; FILE* f = fopen(pth, "r"); char b[128]; while (fgets(b, sizeof b, f)) txt += b; fclose(f); CHECK("valores por defecto: el fichero no lleva @traktor", txt == "hw:2,0|2\n"); }
+        int p2 = 0; bool m2 = true; InputMixer::parseTraktor("{\"extras\":[],\"traktor\":{\"pos\":2,\"master\":false}}", p2, m2);
+        CHECK("JSON traktor: pos 2, master false", p2 == 2 && !m2);
+        p2 = 3; m2 = false; InputMixer::parseTraktor("{\"extras\":[]}", p2, m2);
+        CHECK("JSON sin traktor no toca los valores", p2 == 3 && !m2);
+
+        // Traktor en el medio (pos 1), sigue siendo el reloj: A(2) | Traktor(10) | B(2)
+        UdpStreamer s4; InputMixer m4(s4, 240);
+        m4.setTraktorLayout(1, true); m4.setExtras({{"hw:2,0", 2}, {"hw:3,0", 2}});
+        CHECK("Traktor en el medio: 14 entradas y sus canales empiezan en la 3", m4.totalChannels() == 14 && m4.traktorFirst() == 2);
+        { auto n = s4.allChannelNames(); CHECK("nombres: TK en las entradas ≥ 10 de la Traktor, USB en las otras", n.size() == 14 && n[10] == "TK9" && n[11] == "TK10" && n[12] == "USB2-1" && n[13] == "USB2-2"); }
+        std::vector<int32_t> a((size_t)P * 2, 0), b((size_t)P * 2, 0), k((size_t)P * 10, 0);
+        for (uint32_t f = 0; f < P; f++) { a[(size_t)f * 2] = 0x40000000; b[(size_t)f * 2 + 1] = 0x40000000; k[(size_t)f * 10] = 0x20000000; }
+        for (int i = 0; i < 3; i++) { m4.injectForTest(0, a.data(), P); m4.injectForTest(1, b.data(), P); }
+        for (int i = 0; i < 20; i++) { m4.injectForTest(0, a.data(), P); m4.injectForTest(1, b.data(), P); m4.onTraktor(k.data(), P, (uint64_t)i * 5000); }
+        CHECK("Traktor en el medio: A.1 = entrada 1 (−6 dB)", s4.meterDb(0) > -7 && s4.meterDb(0) < -5);
+        CHECK("Traktor en el medio: Traktor FL = entrada 3 (−12 dB)", s4.meterDb(2) > -13 && s4.meterDb(2) < -11 && s4.meterDb(3) <= -89);
+        CHECK("Traktor en el medio: B.2 = entrada 14 (−6 dB)", s4.meterDb(13) > -7 && s4.meterDb(13) < -5 && s4.meterDb(12) <= -89);
+
+        // Traktor sin ser el reloj: entra por colchón y manda el reloj del mezclador (tickForTest)
+        UdpStreamer s5; InputMixer m5(s5, 240);
+        m5.setTraktorLayout(0, false); m5.setExtras({{"hw:2,0", 2}});
+        CHECK("Traktor secundaria al principio: 12 entradas, Traktor en la 1", m5.totalChannels() == 12 && m5.traktorFirst() == 0);
+        for (int i = 0; i < 3; i++) { m5.injectForTest(0, a.data(), P); m5.onTraktor(k.data(), P, 0); }
+        for (int i = 0; i < 20; i++) { m5.injectForTest(0, a.data(), P); m5.onTraktor(k.data(), P, 0); m5.tickForTest(P, (uint64_t)i * 5000); }
+        CHECK("Traktor secundaria: la Traktor suena por su colchón (entrada 1, −12 dB)", s5.meterDb(0) > -13 && s5.meterDb(0) < -11);
+        CHECK("Traktor secundaria: la extra queda en las entradas 11–12 (A.1 = 11, −6 dB)", s5.meterDb(10) > -7 && s5.meterDb(10) < -5);
+        CHECK("Traktor secundaria: el estado informa underruns de la Traktor", m5.statusJson().find("\"master\":false") != std::string::npos && m5.statusJson().find("\"traktor\":{") != std::string::npos);
+        for (int i = 0; i < 250; i++) m5.tickForTest(P, 200000 + (uint64_t)i * 5000);
+        CHECK("Traktor secundaria: si deja de entregar, silencio y la extra también sigue su colchón", s5.meterDb(0) < -30);
+        // Traktor ausente: su hueco no existe aunque tenga posición
+        UdpStreamer s6; InputMixer m6(s6, 240);
+        m6.setTraktorPresent(false); m6.setTraktorLayout(1, true); m6.setExtras({{"hw:2,0", 2}, {"hw:3,0", 2}});
+        CHECK("Traktor ausente: las extras ocupan desde la entrada 1 sin hueco (10 entradas mínimo)", m6.totalChannels() == 10);
+    }
     printf("%s\n", fails ? "RESULTADO: FALLOS" : "RESULTADO: TODO OK");
     return fails ? 1 : 0;
 }
