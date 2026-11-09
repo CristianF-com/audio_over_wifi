@@ -10,7 +10,7 @@ static const char PAGE_PANEL[] = R"HTML(<!DOCTYPE html>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1c1c1e"><meta name="color-scheme" content="dark light">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="AStream"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AStream"><meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
@@ -105,9 +105,9 @@ html[data-theme=light]{
   color-scheme:light;
 }
 /* Zonas seguras laterales: en el navegador (pestaña de Safari/Chrome) el propio navegador ya aparta la página de la isla/muesca
-   y env() puede devolver un valor que no hace falta (hueco de ~47 px); solo en app instalada/pantalla completa se aplican. */
+   y env() puede devolver un valor que no hace falta (hueco de ~47 px); solo en app instalada/pantalla completa se aplican (a la izquierda restando 24 px: el margen de la isla es más ancho que lo que tapa). */
 :root{--sal:0px;--sar:0px}
-@media (display-mode:standalone),(display-mode:fullscreen){:root{--sal:env(safe-area-inset-left);--sar:env(safe-area-inset-right)}}
+@media (display-mode:standalone),(display-mode:fullscreen){:root{--sal:max(0px,calc(env(safe-area-inset-left) - 24px));--sar:env(safe-area-inset-right)}}
 *{box-sizing:border-box;margin:0}
 html{font-size:106.25%}html[data-size=s]{font-size:96%}html[data-size=l]{font-size:120%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
 body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
@@ -1711,7 +1711,7 @@ static const char PAGE_CAL[] = R"HTML(<!DOCTYPE html>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1c1c1e"><meta name="color-scheme" content="dark light">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="AStream"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AStream"><meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
@@ -1806,9 +1806,9 @@ html[data-theme=light]{
   color-scheme:light;
 }
 /* Zonas seguras laterales: en el navegador (pestaña de Safari/Chrome) el propio navegador ya aparta la página de la isla/muesca
-   y env() puede devolver un valor que no hace falta (hueco de ~47 px); solo en app instalada/pantalla completa se aplican. */
+   y env() puede devolver un valor que no hace falta (hueco de ~47 px); solo en app instalada/pantalla completa se aplican (a la izquierda restando 24 px: el margen de la isla es más ancho que lo que tapa). */
 :root{--sal:0px;--sar:0px}
-@media (display-mode:standalone),(display-mode:fullscreen){:root{--sal:env(safe-area-inset-left);--sar:env(safe-area-inset-right)}}
+@media (display-mode:standalone),(display-mode:fullscreen){:root{--sal:max(0px,calc(env(safe-area-inset-left) - 24px));--sar:env(safe-area-inset-right)}}
 *{box-sizing:border-box;margin:0}
 html{font-size:106.25%}html[data-size=s]{font-size:96%}html[data-size=l]{font-size:120%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
 body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
@@ -2236,7 +2236,7 @@ static const char PAGE_BLE[] = R"HTML(<!DOCTYPE html>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1c1c1e"><meta name="color-scheme" content="dark light">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="AStream"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AStream"><meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
@@ -2331,9 +2331,9 @@ html[data-theme=light]{
   color-scheme:light;
 }
 /* Zonas seguras laterales: en el navegador (pestaña de Safari/Chrome) el propio navegador ya aparta la página de la isla/muesca
-   y env() puede devolver un valor que no hace falta (hueco de ~47 px); solo en app instalada/pantalla completa se aplican. */
+   y env() puede devolver un valor que no hace falta (hueco de ~47 px); solo en app instalada/pantalla completa se aplican (a la izquierda restando 24 px: el margen de la isla es más ancho que lo que tapa). */
 :root{--sal:0px;--sar:0px}
-@media (display-mode:standalone),(display-mode:fullscreen){:root{--sal:env(safe-area-inset-left);--sar:env(safe-area-inset-right)}}
+@media (display-mode:standalone),(display-mode:fullscreen){:root{--sal:max(0px,calc(env(safe-area-inset-left) - 24px));--sar:env(safe-area-inset-right)}}
 *{box-sizing:border-box;margin:0}
 html{font-size:106.25%}html[data-size=s]{font-size:96%}html[data-size=l]{font-size:120%}          /* 17 px: tamaño de texto por defecto de iOS; todo lo demás va en rem y sigue el ajuste del navegador */
 body{background:var(--bg);color:var(--fg);font:1rem/1.45 var(--font);-webkit-font-smoothing:antialiased;
@@ -2612,8 +2612,8 @@ static const char PWA_MANIFEST[] = R"HTML({
 static const char PWA_SW[] = R"HTML(/* Service worker de AStream. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * 35e0264c49 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-35e0264c49';
+ * d3642b4ee8 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-d3642b4ee8';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png', '/fonts/roboto-400.woff2', '/fonts/roboto-500.woff2'];
 
 self.addEventListener('install', e => {
