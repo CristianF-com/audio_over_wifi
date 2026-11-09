@@ -90,7 +90,7 @@ static const char* TAG = "RECV";
 #ifndef CONFIG_SONOS_BLE_WINDOW_S
   #define CONFIG_SONOS_BLE_WINDOW_S 15
 #endif
-#define FW_VERSION          15  /* 15: LED de estado (GPIO27 en el C5). 14: cambio de red WiFi por WiFi (PKT_WIFI) con vuelta a la anterior si no conecta. 13: el BLE se apaga a los 15 s de tener Wi-Fi (sin Wi-Fi sigue activo). 12: ventana BLE de 60 s (v13 la reemplaza). 11: vuelve a las prioridades 15/14 (la v10 con 20/19 empeoró en placa). 10: prioridades de las tareas I2S (20) y recepción (19) sobre lwIP (18). 9: vuelve a la cola DMA de 6 y al mínimo de 40 ms (la de 4 daba cortes en placa; v8 fue ese experimento). 7: ID automático por MAC (HELLO con ESP_ID_AUTO, WELCOME_F_ASSIGNED). 6: OTA por WiFi, versión/chip en el HELLO y RSSI en el REPORT (protocolo sin cambios: v5) */
+#define FW_VERSION          16  /* 16: ajustes por WiFi (PKT_SETTINGS: LED, ventana BLE, potencia WiFi, reiniciar, abrir BLE, olvidar WiFi). 15: LED de estado (GPIO27 en el C5). 14: cambio de red WiFi por WiFi (PKT_WIFI) con vuelta a la anterior si no conecta. 13: el BLE se apaga a los 15 s de tener Wi-Fi (sin Wi-Fi sigue activo). 12: ventana BLE de 60 s (v13 la reemplaza). 11: vuelve a las prioridades 15/14 (la v10 con 20/19 empeoró en placa). 10: prioridades de las tareas I2S (20) y recepción (19) sobre lwIP (18). 9: vuelve a la cola DMA de 6 y al mínimo de 40 ms (la de 4 daba cortes en placa; v8 fue ese experimento). 7: ID automático por MAC (HELLO con ESP_ID_AUTO, WELCOME_F_ASSIGNED). 6: OTA por WiFi, versión/chip en el HELLO y RSSI en el REPORT (protocolo sin cambios: v5) */
 #if CONFIG_IDF_TARGET_ESP32C5
 #define FW_CHIP_ID          FW_CHIP_C5
 #else
@@ -117,6 +117,11 @@ typedef struct { uint64_t ts; int16_t s[AUDIO_PKT_SAMPLES]; } qitem_t;
 
 static uint8_t  g_receiver_id = CONFIG_RECEIVER_ID;   /* ESP_ID_AUTO (255) = sin número: lo asigna la RPi por MAC (solo en RAM) */
 static char     g_ssid[33], g_pass[65], g_rpi_ip_cfg[16];
+static volatile uint8_t  g_led_mode = SET_LED_STATUS;   /* SET_LED_OFF / SET_LED_STATUS (NVS «led») */
+static volatile uint16_t g_ble_window_s = CONFIG_SONOS_BLE_WINDOW_S;   /* NVS «ble_win» */
+static volatile int64_t  g_ble_open_until_us = 0;         /* «abrir BLE»: no se apaga hasta esta hora */
+static volatile bool     g_ble_open_req = false;
+static uint8_t  g_tx_dbm = 0;                             /* 0 = por defecto del chip (NVS «txpwr») */
 static bool     g_wifi_trial = false;        /* probando una red nueva recibida por WiFi (PKT_WIFI): si no conecta, vuelve a la anterior */
 
 static portMUX_TYPE g_mux = portMUX_INITIALIZER_UNLOCKED;
@@ -274,6 +279,10 @@ static void load_config(void)
         nvs_get_str(nh, "wifi_pass", g_pass, &pl);
         size_t rl = sizeof(g_rpi_ip_cfg);
         nvs_get_str(nh, "rpi_ip", g_rpi_ip_cfg, &rl);
+        { uint8_t u8 = 0; uint16_t u16 = 0;
+          if (nvs_get_u8(nh, "led", &u8) == ESP_OK && u8 <= SET_LED_STATUS) g_led_mode = u8;
+          if (nvs_get_u16(nh, "ble_win", &u16) == ESP_OK && u16 >= 5 && u16 <= 3600) g_ble_window_s = u16;
+          if (nvs_get_u8(nh, "txpwr", &u8) == ESP_OK && u8 >= 2 && u8 <= 20) g_tx_dbm = u8; }
         {   /* red nueva pendiente de confirmar (PKT_WIFI): se prueba; la anterior sigue guardada */
             char ps[33] = {0}, pp[65] = {0}; size_t a = sizeof(ps), b = sizeof(pp);
             if (nvs_get_str(nh, "pend_ssid", ps, &a) == ESP_OK && ps[0]) {
@@ -317,6 +326,7 @@ static void wifi_start(void)
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wc));
     ESP_ERROR_CHECK(esp_wifi_start());
     ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));      /* imprescindible para baja jitter */
+    if (g_tx_dbm) esp_wifi_set_max_tx_power((int8_t)(g_tx_dbm * 4));     /* unidades de 0,25 dBm; solo si el usuario la fijó */
 
     ESP_LOGI(TAG, "Conectando a WiFi '%s'...", g_ssid);
 }
@@ -376,6 +386,16 @@ static void cfg_reboot(void)                              /* diferido: deja sali
     const esp_timer_create_args_t ta = { .callback = restart_cb, .name = "restart" };
     if (!t && esp_timer_create(&ta, &t) != ESP_OK) { esp_restart(); return; }
     esp_timer_start_once(t, 800000);
+}
+/* Ajustes recibidos por WiFi (PKT_SETTINGS): se guardan en NVS y valen desde ya (la potencia, tras reiniciar). */
+static void cfg_settings_save(uint8_t led, uint16_t ble_win, uint8_t tx)
+{
+    nvs_handle_t nh;
+    if (nvs_open("config", NVS_READWRITE, &nh) != ESP_OK) return;
+    if (led <= SET_LED_STATUS)               { nvs_set_u8(nh, "led", led); g_led_mode = led; }
+    if (ble_win >= 5 && ble_win <= 3600)     { nvs_set_u16(nh, "ble_win", ble_win); g_ble_window_s = ble_win; }
+    if (tx >= 2 && tx <= 20)                 { nvs_set_u8(nh, "txpwr", tx); g_tx_dbm = tx; esp_wifi_set_max_tx_power((int8_t)(tx * 4)); }
+    nvs_commit(nh); nvs_close(nh);
 }
 static void cfg_identify(void) { g_identify_until_us = esp_timer_get_time() + 1500000; }
 static size_t status_json(char* buf, size_t len)
@@ -585,6 +605,16 @@ static void control_task(void* pv)
                 ESP_LOGI(TAG, "WIFI: red nueva '%s' recibida; reinicio para probarla (si no conecta en 60 s vuelvo a la anterior)", w.ssid);
                 cfg_reboot();
             }
+            break;
+        }
+        case PKT_SETTINGS: {                                  /* ajustes y acciones: solo de la RPi con la que hablamos */
+            if (n < (int)sizeof(SettingsPacket) || !g_welcomed) break;
+            SettingsPacket s; memcpy(&s, buf, sizeof(s));
+            if (s.esp_id != g_receiver_id || src.sin_addr.s_addr != g_rpi_addr.sin_addr.s_addr) break;
+            cfg_settings_save(s.led, s.ble_window_s, s.tx_power_dbm);
+            if (s.action == SET_ACT_BLE_OPEN) { g_ble_open_until_us = esp_timer_get_time() + 300000000LL; g_ble_open_req = true; }
+            else if (s.action == SET_ACT_FORGET) { if (cfg_factory() == 0) { ESP_LOGW(TAG, "AJUSTES: WiFi olvidada; reinicio en modo Bluetooth"); cfg_reboot(); } }
+            else if (s.action == SET_ACT_REBOOT) cfg_reboot();
             break;
         }
         default: break;
@@ -820,6 +850,7 @@ static void led_task(void* pv)
         else if (!g_welcomed)                     on = ((tick / 10) & 1);                /* 1 Hz */
         else if (last_audio && now - last_audio < 1000000) on = true;                    /* recibiendo audio */
         else                                      on = ((tick % 40) < 2);                /* destello de 100 ms cada 2 s */
+        if (g_led_mode == SET_LED_OFF && now >= g_identify_until_us) on = false;                       /* LED apagado por ajuste (identificar sigue parpadeando) */
         gpio_set_level(CONFIG_SONOS_LED_GPIO, on ? LED_ON_LEVEL : !LED_ON_LEVEL);
     }
 }
@@ -845,9 +876,12 @@ static void report_task(void* pv)
             int64_t now = esp_timer_get_time();
             if (g_wifi_up) { if (!up_since) up_since = now; } else up_since = 0;
             if (!ble_off) {
-                if (g_wifi_up && !ble_prov_connected() && now - up_since > (int64_t)CONFIG_SONOS_BLE_WINDOW_S * 1000000) {
+                g_ble_open_req = false;                       /* ya está encendido */
+                if (g_wifi_up && !ble_prov_connected() && now > g_ble_open_until_us && now - up_since > (int64_t)g_ble_window_s * 1000000) {
                     ble_prov_stop(); ble_off = true;
                 }
+            } else if (g_ble_open_req) {                      /* «abrir BLE» desde la web */
+                g_ble_open_req = false; ble_prov_resume(); ble_off = false; up_since = now;
             } else if (!g_wifi_up) {
                 if (!down_since) down_since = now;
                 else if (now - down_since > 60000000) { ble_prov_resume(); ble_off = false; down_since = 0; }

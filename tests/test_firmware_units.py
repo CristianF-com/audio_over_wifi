@@ -70,7 +70,11 @@ check("receiver_main.c: #if/#endif balanceados", _balanced(src))
 # ── OTA por WiFi, versión/chip en el HELLO y RSSI en el REPORT (NO compilado con ESP-IDF real: solo comprobaciones de coherencia) ──
 ou = open(f"{here}/../esp32/main/ota_update.c").read()
 fwv = int(_re.search(r"#define FW_VERSION\s+(\d+)", src).group(1))
-check("FW_VERSION = 15 y cabe en 6 bits del HELLO (≤ 63)", fwv == 15 and fwv <= 63, fwv)
+check("FW_VERSION = 16 y cabe en 6 bits del HELLO (≤ 63)", fwv == 16 and fwv <= 63, fwv)
+check("PKT_SETTINGS: el ESP la acepta solo de la RPi con id propio, guarda en NVS (led, ble_win, txpwr) y ejecuta la acción",
+      all(t in src for t in ("case PKT_SETTINGS:", "s.esp_id != g_receiver_id", "cfg_settings_save(s.led, s.ble_window_s, s.tx_power_dbm)", 'nvs_set_u8(nh, "led"', 'nvs_set_u16(nh, "ble_win"', 'nvs_set_u8(nh, "txpwr"', "SET_ACT_BLE_OPEN", "SET_ACT_FORGET", "cfg_factory()", "SET_ACT_REBOOT")))
+check("PKT_SETTINGS: rangos validados (ble 5..3600, potencia 2..20) y el LED apagado respeta «identificar»", all(t in src for t in ("ble_win >= 5 && ble_win <= 3600", "tx >= 2 && tx <= 20", "g_led_mode == SET_LED_OFF && now >= g_identify_until_us")))
+check("PKT_SETTINGS: la ventana BLE sale de g_ble_window_s y «abrir BLE» la mantiene 5 min", "now - up_since > (int64_t)g_ble_window_s * 1000000" in src and "now > g_ble_open_until_us" in src and "300000000LL" in src)
 for _k in ("esp32", "esp32_wroom"):
     _kc = open(f"{here}/../{_k}/main/Kconfig.projbuild", encoding="utf-8").read()
     check(f"{_k}: el BLE se apaga a los 15 s de tener WiFi (no 300)", re.search(r"config SONOS_BLE_WINDOW_S.*?default (\d+)", _kc, re.S).group(1) == "15")
@@ -82,6 +86,7 @@ for _k, _g in (("esp32", "27"), ("esp32_wroom", "-1")):
     _kc2 = open(f"{here}/../{_k}/main/Kconfig.projbuild", encoding="utf-8").read()
     check(f"{_k}: LED de estado en GPIO {_g} por defecto", re.search(r"config SONOS_LED_GPIO.*?default (-?\d+)", _kc2, re.S).group(1) == _g)
 _pk = open(f"{here}/../common/protocol.h", encoding="utf-8").read()
+check("PKT_SETTINGS = 0x0C y SettingsPacket de 12 bytes", "#define PKT_SETTINGS    0x0C" in _pk and "sizeof(SettingsPacket) == 12" in _pk)
 check("PKT_WIFI = 0x0B y WifiPacket de 112 bytes con ssid[36] y pass[68]", "#define PKT_WIFI        0x0B" in _pk and 'sizeof(WifiPacket)    == 112' in _pk and "char     ssid[36]" in _pk and "char     pass[68]" in _pk)
 _pr = {m.group(1): int(m.group(2)) for m in _re.finditer(r'xTaskCreate\((\w+),\s*"\w+",\s*\d+,\s*NULL,\s*(\d+),', src)}
 check("prioridades: I2S (15) y recepción (14) bajo lwIP (18) y el WiFi (23), como cuando funcionaba mejor", _pr.get("i2s_task") == 15 and _pr.get("audio_rx_task") == 14 and _pr.get("control_task") == 12, _pr)

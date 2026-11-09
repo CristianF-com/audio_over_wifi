@@ -470,6 +470,11 @@ std::string WebServer::handlePOST(const std::string& p, const std::string& b, in
     else if (p == "/api/inputs")    r = inputsPost(b);
     else if (p == "/api/firmware")  r = firmwareUpload(b);
     else if (p == "/api/ota")       r = otaStart(b);
+    else if (p == "/api/esp/settings") {
+        // olvidar la WiFi deja el altavoz sin red hasta reconfigurarlo por Bluetooth: solo con contraseña configurada
+        if (jsonGet(b, "action") == "forget" && password_.empty()) { code = 403; return "{\"error\":\"Configura una contraseña para usar esto: sudo ./scripts/set_password.sh \\\"tu clave\\\"\"}"; }
+        r = espSettings(b);
+    }
     else if (p == "/api/wifi/push") {
         // cambia la red WiFi de un altavoz: manda la clave por la red local, solo con contraseña configurada
         if (password_.empty()) { code = 403; return "{\"error\":\"Configura una contraseña para usar esto: sudo ./scripts/set_password.sh \\\"tu clave\\\"\"}"; }
@@ -805,6 +810,24 @@ std::string WebServer::wifiPush(const std::string& b) {
     if (!nodes[id].online) return "{\"error\":\"El altavoz no está en línea\"}";
     if (nodes[id].fw_version < 14) return "{\"error\":\"Este altavoz tiene un firmware sin cambio de red por WiFi (hace falta la versión 14): actualízalo primero\"}";
     if (!streamer_.sendWifi((uint8_t)id, ssid, pass)) return "{\"error\":\"No se pudo enviar la orden (el altavoz se está actualizando o no está en línea)\"}";
+    return "{\"ok\":true}";
+}
+std::string WebServer::espSettings(const std::string& b) {
+    long id;
+    if (!parseInt(jsonGet(b, "id"), 0, MAX_NODES - 1, id)) return "{\"error\":\"id fuera de rango (0-9)\"}";
+    uint8_t act = SET_ACT_NONE, led = SET_LED_KEEP, tx = 0; uint16_t win = 0; long v;
+    const std::string a = jsonGet(b, "action");
+    if (a == "reboot") act = SET_ACT_REBOOT; else if (a == "ble_open") act = SET_ACT_BLE_OPEN; else if (a == "forget") act = SET_ACT_FORGET;
+    else if (!a.empty()) return "{\"error\":\"Acción desconocida\"}";
+    std::string s;
+    if (!(s = jsonGet(b, "led")).empty()) { if (s != "off" && s != "status") return "{\"error\":\"led: off o status\"}"; led = s == "off" ? SET_LED_OFF : SET_LED_STATUS; }
+    if (!(s = jsonGet(b, "ble_window")).empty()) { if (!parseInt(s, 5, 3600, v)) return "{\"error\":\"La ventana del BLE debe estar entre 5 y 3600 s\"}"; win = (uint16_t)v; }
+    if (!(s = jsonGet(b, "tx_power")).empty()) { if (!parseInt(s, 2, 20, v)) return "{\"error\":\"La potencia debe estar entre 2 y 20 dBm\"}"; tx = (uint8_t)v; }
+    if (act == SET_ACT_NONE && led == SET_LED_KEEP && !win && !tx) return "{\"error\":\"No hay nada que cambiar\"}";
+    const auto nodes = streamer_.getNodes();
+    if (!nodes[id].online) return "{\"error\":\"El altavoz no está en línea\"}";
+    if (nodes[id].fw_version < 16) return "{\"error\":\"Este altavoz tiene un firmware sin ajustes por WiFi (hace falta la versión 16): actualízalo primero\"}";
+    if (!streamer_.sendSettings((uint8_t)id, act, led, win, tx)) return "{\"error\":\"No se pudo enviar (el altavoz se está actualizando o no está en línea)\"}";
     return "{\"ok\":true}";
 }
 std::string WebServer::otaStart(const std::string& b) {

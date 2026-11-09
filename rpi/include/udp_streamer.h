@@ -222,6 +222,7 @@ public:
     void cancelOta(uint8_t id);
     // Cambia la red WiFi de un ESP en línea (PKT_WIFI): el ESP la prueba y, si no conecta en 60 s, vuelve a la anterior. false si no está en línea.
     bool sendWifi(uint8_t id, const std::string& ssid, const std::string& pass);
+    bool sendSettings(uint8_t id, uint8_t action, uint8_t led, uint16_t ble_window_s, uint8_t tx_power_dbm);   // PKT_SETTINGS (FW >= 16)
 
 private:
     void controlLoop();                       // HELLO / REPORT / SYNC_REQ

@@ -151,6 +151,10 @@ c, b = http("GET", "/api/system"); si = json.loads(b) if c == 200 else {}
 check("/api/system sin contraseña: protected=false y WiFi actual de la RPi", c == 200 and si.get("protected") is False and si.get("wifi", {}).get("ssid") == "CasaHogar", si)
 c, _ = http("POST", "/api/update", {});               check("sin contraseña no se puede actualizar el servidor -> 403", c == 403, c)
 c, _ = http("POST", "/api/rpi/wifi", {"ssid": "X"});  check("sin contraseña no se puede cambiar la WiFi de la RPi -> 403", c == 403, c)
+c, _ = http("POST", "/api/esp/settings", {"id": 0, "action": "forget"}); check("sin contraseña no se puede olvidar la WiFi de un altavoz -> 403", c == 403, c)
+for _b, _n in (({"id": 0, "led": "x"}, "led inválido"), ({"id": 0}, "sin nada que cambiar"), ({"id": 0, "tx_power": 99}, "potencia fuera de rango"),
+               ({"id": 0, "ble_window": 2}, "ventana BLE fuera de rango"), ({"id": 0, "action": "boom"}, "acción desconocida"), ({"id": 99, "led": "off"}, "id fuera de rango")):
+    c, _ = http("POST", "/api/esp/settings", _b); check(f"/api/esp/settings: {_n} -> 400", c == 400, c)
 c, _ = http("POST", "/api/wifi/push", {"id": 0, "ssid": "X", "pass": "12345678"}); check("sin contraseña no se puede cambiar la WiFi de un altavoz -> 403", c == 403, c)
 c, _ = http("POST", "/api/node", {"id": 0, "name": "Sofá"});          check("nombre del altavoz -> 200", c == 200, c)
 c, b = http("GET", "/api/nodes"); n0 = [n for n in json.loads(b) if n["id"] == 0][0] if c == 200 else {}

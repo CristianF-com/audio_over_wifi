@@ -262,6 +262,23 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
     ok('Cambiar red: el primer toque pide confirmar y no envía nada',sent===null&&/otra vez/.test(await p.textContent('#d_wsb')));
     await p.click('#d_wsb');await sleep(250);
     ok('Cambiar red: el segundo toque envía id, nombre y clave a /api/wifi/push y limpia la clave del campo',sent&&sent.id===3&&sent.ssid==='CasaNueva'&&sent.pass==='claveLarga123'&&await p.inputValue('#d_wsp')==='',JSON.stringify(sent));
+    // Ajustes del ESP (PKT_SETTINGS vía /api/esp/settings): con FW 14 siguen desactivados; con 16 se activan y envían
+    ok('Ajustes ESP: con firmware 14 todo desactivado y se pide la versión 16',await p.evaluate(()=>['d_esl','d_esb','d_est','d_esa','d_esr','d_eso','d_esf'].every(i=>document.getElementById(i).disabled)&&/versión 16/.test(document.getElementById('d_esh').textContent)));
+    await p.keyboard.press('Escape');await sleep(250);
+    await openN(16);
+    ok('Ajustes ESP: con firmware 16 se activan',await p.evaluate(()=>['d_esl','d_esb','d_est','d_esa','d_esr','d_eso','d_esf'].every(i=>!document.getElementById(i).disabled)));
+    const sets=[];await p.route('**/api/esp/settings',async r=>{sets.push(JSON.parse(r.request().postData()));await r.fulfill({contentType:'application/json',body:'{"ok":true}'});});
+    await p.selectOption('#d_esl','off');await p.fill('#d_esb','30');await p.selectOption('#d_est','14');await p.click('#d_esa');await sleep(250);
+    ok('Ajustes ESP: «Aplicar» envía led, ventana BLE y potencia',sets.length===1&&sets[0].id===3&&sets[0].led==='off'&&sets[0].ble_window==='30'&&sets[0].tx_power==='14',JSON.stringify(sets));
+    await p.click('#d_eso');await sleep(250);
+    ok('Ajustes ESP: «Abrir Bluetooth 5 min» envía action ble_open',sets.length===2&&sets[1].action==='ble_open',JSON.stringify(sets));
+    await p.click('#d_esf');await sleep(100);
+    ok('Ajustes ESP: «Olvidar WiFi» pide confirmar con un segundo toque y no envía en el primero',sets.length===2&&/otra vez/.test(await p.textContent('#d_esf')));
+    await p.click('#d_esf');await sleep(250);
+    ok('Ajustes ESP: el segundo toque envía action forget',sets.length===3&&sets[2].action==='forget',JSON.stringify(sets));
+    await p.click('#d_esr');await p.click('#d_esr');await sleep(250);
+    ok('Ajustes ESP: «Reiniciar» (dos toques) envía action reboot',sets.length===4&&sets[3].action==='reboot',JSON.stringify(sets));
+    await p.unroute('**/api/esp/settings');
     await p.unroute('**/api/wifi/push');await p.unroute('**/api/nodes');await p.keyboard.press('Escape');await sleep(250);
   }
   await p.focus('.tab[data-tab="spk"]');await p.keyboard.press('ArrowRight');

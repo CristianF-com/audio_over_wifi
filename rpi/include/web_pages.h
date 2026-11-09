@@ -1179,6 +1179,13 @@ function buildDrawer(){
    '<input class="txt" id="d_wsp" type="password" maxlength="64" autocomplete="new-password" placeholder="Clave (vacía si la red es abierta)" style="margin-top:8px">'+
    '<button class="btn ghost sm" id="d_wsb" type="button" style="margin-top:8px">Cambiar red</button>'+
    '<p class="hint" style="margin-top:6px" id="d_wsh"></p></div>'+
+   '<hr class="sep"><div class="fld wide" id="d_esw"><b>Ajustes del altavoz (ESP)</b>'+
+   '<label for="d_esl" style="margin-top:8px">LED de estado</label><select class="sel" id="d_esl"><option value="status">Encendido (muestra el estado)</option><option value="off">Apagado</option></select>'+
+   '<label for="d_esb" style="margin-top:8px">Segundos con WiFi antes de apagar el Bluetooth (5–3600)</label><input class="num" id="d_esb" type="number" min="5" max="3600" step="1" placeholder="15">'+
+   '<label for="d_est" style="margin-top:8px">Potencia de transmisión WiFi</label><select class="sel" id="d_est"><option value="">Sin cambio (la del chip)</option><option value="8">Baja · 8 dBm</option><option value="14">Media · 14 dBm</option><option value="20">Máxima · 20 dBm</option></select>'+
+   '<button class="btn ghost sm" id="d_esa" type="button" style="margin-top:10px">Aplicar ajustes</button>'+
+   '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn ghost sm" id="d_esr" type="button">Reiniciar</button><button class="btn ghost sm" id="d_eso" type="button">Abrir Bluetooth 5 min</button><button class="btn danger sm" id="d_esf" type="button">Olvidar WiFi</button></div>'+
+   '<p class="hint" style="margin-top:6px" id="d_esh"></p></div>'+
    '<div class="fld wide" id="d_fgw"><button class="btn danger sm" id="d_fg" type="button">Quitar este ESP del panel</button><p class="hint" style="margin-top:6px">Solo si está apagado. Si vuelve a conectarse, aparece de nuevo con su configuración.</p></div></div></details>'+
    '<div class="hint wide" id="d_stats"></div><div class="savestate wide" id="d_ss"></div>';
   wireDrawer();modeUI();rolHint();eqHint();document.querySelectorAll('#dbody .rng').forEach(fillRng);for(let i=0;i<6;i++)eqOut(i);updDrawerStats();
@@ -1228,6 +1235,16 @@ function wireDrawer(){
       const r=await J('/api/wifi/push',{id:openId,ssid,pass});wb.disabled=false;
       if(r.ok){$('d_wsp').value='';toast('Orden enviada: el altavoz probará la red «'+ssid+'»');log('ESP '+openId+': cambio de red a «'+ssid+'»');}
       else toast(r.error||'No se pudo enviar la orden',false);};}
+  {const en=find(openId),ok=!!(en&&en.online&&en.fw_version>=16),ids=['d_esl','d_esb','d_est','d_esa','d_esr','d_eso','d_esf'];
+    ids.forEach(i=>$(i).disabled=!ok);
+    $('d_esh').textContent=ok?'Los cambios se guardan en el altavoz. La potencia se aplica al reiniciarlo. «Olvidar WiFi» lo deja sin red hasta configurarlo de nuevo por Bluetooth con «+».':!(en&&en.online)?'El altavoz tiene que estar en línea.':'Este altavoz tiene un firmware sin esta función (hace falta la versión 16): actualízalo primero.';
+    const send=async(body,okmsg)=>{const r=await J('/api/esp/settings',Object.assign({id:openId},body));
+      if(r.ok){toast(okmsg);log('ESP '+openId+': '+okmsg);}else toast(r.error||'No se pudo enviar',false);return r;};
+    $('d_esa').onclick=()=>{const b={led:$('d_esl').value};if($('d_esb').value.trim())b.ble_window=$('d_esb').value.trim();if($('d_est').value)b.tx_power=$('d_est').value;send(b,'Ajustes enviados al altavoz');};
+    $('d_eso').onclick=()=>send({action:'ble_open'},'Bluetooth abierto 5 minutos');
+    const arm=(btn,txt,fn)=>{btn.onclick=()=>{if(!btn.dataset.arm){btn.dataset.arm='1';btn.textContent='Pulsa otra vez';setTimeout(()=>{delete btn.dataset.arm;btn.textContent=txt;},4000);return;}delete btn.dataset.arm;btn.textContent=txt;fn();};};
+    arm($('d_esr'),'Reiniciar',()=>send({action:'reboot'},'Reiniciando el altavoz'));
+    arm($('d_esf'),'Olvidar WiFi',()=>send({action:'forget'},'El altavoz olvidó la WiFi y queda en modo Bluetooth'));}
   const fg=$('d_fg'),nn=find(openId);if(nn&&nn.online)fg.disabled=true;
   fg.onclick=async()=>{
     if(!fg.dataset.arm){fg.dataset.arm='1';fg.textContent='Pulsa otra vez para quitarlo';setTimeout(()=>{delete fg.dataset.arm;fg.textContent='Quitar este ESP del panel';},4000);return;}
@@ -2809,8 +2826,8 @@ static const char PWA_MANIFEST[] = R"HTML({
 static const char PWA_SW[] = R"HTML(/* Service worker de AStream. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * 8d30004d73 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-8d30004d73';
+ * 8b58ca97fe lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-8b58ca97fe';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png', '/fonts/roboto-400.woff2', '/fonts/roboto-500.woff2'];
 
 self.addEventListener('install', e => {

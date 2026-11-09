@@ -23,6 +23,7 @@
  *   - REPORT.reserved[0] = RSSI WiFi en dBm (int8; 0 = desconocido).
  *   - PKT_OTA (RPi -> ESP:5005): orden de actualizar el firmware por WiFi (el ESP la ignora si no la entiende).
  *   - PKT_WIFI (RPi -> ESP:5005): cambiar la red WiFi del ESP por WiFi (el ESP la ignora si no la entiende).
+ *   - PKT_SETTINGS (RPi -> ESP:5005): ajustes y acciones del altavoz (el ESP la ignora si no la entiende).
  * Volumen, crossover y ecualización: se aplican SOLO en la RPi. El ESP no toca las muestras.
  * (antes:) Volumen: se aplica SOLO en la RPi. El ESP no escala muestras.
  * Todo en little-endian (RPi y ESP32-C5 lo son). Structs empaquetados.
@@ -66,6 +67,7 @@
 #define PKT_AUDIO_MONO  0x08   /* RPi -> ESP:5006 (240 frames mono; num_samples = 240) */
 #define PKT_NACK        0x09   /* ESP -> RPi:5005 (pide reenvío de paquetes de audio)  */
 #define PKT_OTA         0x0A   /* RPi -> ESP:5005 (actualizar firmware por HTTP desde la RPi) */
+#define PKT_SETTINGS    0x0C   /* RPi -> ESP:5005 (ajustes del altavoz: LED, ventana BLE, potencia WiFi; acciones: reiniciar, abrir BLE, olvidar WiFi) */
 #define PKT_WIFI        0x0B   /* RPi -> ESP:5005 (cambiar la red WiFi: el ESP la prueba y, si no conecta, vuelve a la anterior) */
 
 #define FW_CHIP_UNKNOWN 0
@@ -180,6 +182,24 @@ typedef struct {
     char     pass[68];     /* terminada en NUL; vacía (red abierta) o 8..64 caracteres */
 } WifiPacket;              /* 112 */
 
+#define SET_ACT_NONE       0
+#define SET_ACT_REBOOT     1   /* reiniciar */
+#define SET_ACT_BLE_OPEN   2   /* encender el BLE 5 minutos (para reconfigurar sin reiniciar) */
+#define SET_ACT_FORGET     3   /* olvidar la WiFi y el ID guardados y reiniciar (queda en modo Bluetooth) */
+#define SET_LED_KEEP       255 /* en `led`: no cambiar */
+#define SET_LED_OFF        0
+#define SET_LED_STATUS     1
+typedef struct {
+    uint32_t magic;
+    uint8_t  pkt_type;     /* PKT_SETTINGS */
+    uint8_t  esp_id;
+    uint8_t  action;       /* SET_ACT_* */
+    uint8_t  led;          /* SET_LED_* (255 = sin cambio) */
+    uint16_t ble_window_s; /* segundos con WiFi tras los que se apaga el BLE (5..3600); 0 = sin cambio */
+    uint8_t  tx_power_dbm; /* potencia máxima de transmisión WiFi (2..20 dBm); 0 = sin cambio */
+    uint8_t  reserved;
+} SettingsPacket;          /* 12 */
+
 typedef struct {
     uint32_t magic;
     uint8_t  pkt_type;     /* PKT_SYNC_REQ */
@@ -208,5 +228,6 @@ PROTO_ASSERT(sizeof(ReportPacket)   == 52, "ReportPacket");
 PROTO_ASSERT(sizeof(NackPacket)     == 40, "NackPacket");
 PROTO_ASSERT(sizeof(OtaPacket)      == 24, "OtaPacket");
 PROTO_ASSERT(sizeof(WifiPacket)    == 112, "WifiPacket");
+PROTO_ASSERT(sizeof(SettingsPacket) == 12, "SettingsPacket");
 PROTO_ASSERT(sizeof(SyncReqPacket)  == 16, "SyncReqPacket");
 PROTO_ASSERT(sizeof(SyncRespPacket) == 32, "SyncRespPacket");

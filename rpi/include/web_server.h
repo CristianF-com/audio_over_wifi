@@ -52,6 +52,7 @@ private:
     std::string firmwareInfo();
     std::string otaStart(const std::string& body);
     std::string wifiPush(const std::string& body);
+    std::string espSettings(const std::string& body);
     std::string otaCancel(const std::string& body);
     std::string serveFirmware(const std::string& path, int& code);
     std::string toneStart(const std::string& body);
