@@ -78,9 +78,9 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('vúmetros: texto de pico ≈ −6 dBFS',(await p.textContent('#mtxt')).includes('−')===false&&(await p.textContent('#mtxt')).includes('-6'),await p.textContent('#mtxt'));
   const fake=async(o)=>{await p.route('**/api/levels',r=>r.fulfill({contentType:'application/json',body:JSON.stringify(Object.assign({capturing:true,signal:true,signal_age_ms:10,pps:900,sending:true,nodes_online:5,db:[-6,-6,-12,-90,-12,-90,-90,-90,-90,-90]},o))}));};
   await fake({capturing:false,signal:false,sending:false,db:[-90,-90,-90,-90,-90,-90,-90,-90,-90,-90]});
-  ok('estado: sin captura -> «Sin captura de la Traktor» (rojo) y todo apagado',await until(async()=>(await p.textContent('#hs'))==='Sin captura de la Traktor'&&(await p.getAttribute('#dot','class')).includes('bad')&&(await p.getAttribute('#meters','class')).includes('off')&&(await p.locator('#mb .lamp.on').count())===0&&(await p.locator('#spks .vu .led.on').count())===0));
+  ok('estado: sin captura -> «Sin captura de audio» (rojo) y todo apagado',await until(async()=>(await p.textContent('#hs'))==='Sin captura de audio'&&(await p.getAttribute('#dot','class')).includes('bad')&&(await p.getAttribute('#meters','class')).includes('off')&&(await p.locator('#mb .lamp.on').count())===0&&(await p.locator('#spks .vu .led.on').count())===0));
   await fake({signal:false,sending:false,db:[-90,-90,-90,-90,-90,-90,-90,-90,-90,-90]});
-  ok('estado: silencio -> «Traktor conectada, sin señal» (ámbar)',await until(async()=>(await p.textContent('#hs'))==='Traktor conectada, sin señal'&&(await p.getAttribute('#dot','class')).includes('warn')&&(await p.textContent('#mtxt'))==='Silencio'));
+  ok('estado: silencio -> «Entrada conectada, sin señal» (ámbar)',await until(async()=>(await p.textContent('#hs'))==='Entrada conectada, sin señal'&&(await p.getAttribute('#dot','class')).includes('warn')&&(await p.textContent('#mtxt'))==='Silencio'));
   await fake({sending:false,nodes_online:0});
   ok('estado: señal sin altavoces -> «Hay señal, ningún altavoz en línea»',await until(async()=>(await p.textContent('#hs'))==='Hay señal, ningún altavoz en línea'));
   await fake({db:[-0.5,-6,-12,-90,-12,-90,-90,-90,-90,-90]});
@@ -456,7 +456,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   // ── Nombres de las 10 entradas ──
   await p.click('#tab_sys');await p.click('#sy_in');await sleep(200);
   ok('Nombres: tarjeta con 10 campos, con los nombres de siempre por defecto',await p.evaluate(()=>{const v=[...document.querySelectorAll('#nmgrid input')].map(i=>i.value).join();return v==='FL,FR,C,LFE,SL,SR,SBL,SBR,AUX-L,AUX-R';}));
-  ok('Nombres: cada campo tiene etiqueta visible con su número y su función (≥ 44 px de alto)',await p.evaluate(()=>[...document.querySelectorAll('#nmgrid input')].every((i,k)=>{const l=document.querySelector('label[for="'+i.id+'"]');return l&&l.textContent.startsWith('Entrada '+(k+1))&&i.getBoundingClientRect().height>=44&&i.maxLength===12;})));
+  ok('Nombres: cada campo tiene etiqueta visible con su número y su función (≥ 44 px de alto)',await p.evaluate(()=>[...document.querySelectorAll('#nmgrid input')].every((i,k)=>{const l=document.querySelector('label[for="'+i.id+'"]');return l&&l.textContent.startsWith('A'+(k+1))&&i.getBoundingClientRect().height>=44&&i.maxLength===12;})));
   await p.fill('#chn_0','Sala TV');await p.fill('#chn_3','Sub');await p.fill('#chn_9','');
   await p.click('#nmsave');await sleep(500);
   const nmApi=await J('/api/names');
@@ -730,45 +730,47 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   ok('Panel sin errores de JS (tema y plano)',errs.length===0,errs);
 
   // /calibrate con resultado inyectado
-  {// Interfaces USB de audio extra: lista de interfaces, agregar/quitar, guardado y canales extra en medidores y selectores
+  {// Placas de entrada: lista con «Usar», reloj principal excluyente, orden, guardado e ids de canal en medidores/selectores/nombres
    const up=await ctx.newPage();const uerr=[];up.on('pageerror',e=>uerr.push(String(e)));
-   let saved=null,state={saved:[],restart:false};
-   const names=['FL','FR','C','LFE','SL','SR','SBL','SBR','AUX-L','AUX-R','USB1-1','USB1-2','USB1-3','USB1-4','USB2-1','USB2-2'];
+   let saved=null;
+   const ids=['A1','A2','A3','A4','A5','A6','A7','A8','A9','A10','B1','B2','B3','B4','B5','B6'];
+   const names=['FL','FR','C','LFE','SL','SR','SBL','SBR','AUX-L','AUX-R','FL','FR','C','LFE','SL','SR'];
    await up.route('**/api/inputs',async r=>{
-     if(r.request().method()==='POST'){saved=JSON.parse(r.request().postData());state.saved=saved.extras;state.restart=true;return r.fulfill({contentType:'application/json',body:'{"ok":true,"restarting":false}'});}
-     r.fulfill({contentType:'application/json',body:JSON.stringify({traktor:{present:true,channels:10},max_extra:22,cards:[
-       {id:'hw:0,0',name:'Traktor Audio 10',max_channels:10,traktor:true,busy:true},{id:'hw:2,0',name:'Scarlett 18i20',max_channels:18,traktor:false,busy:false},{id:'hw:3,0',name:'USB Audio Device',max_channels:2,traktor:false,busy:false}],
-       saved:state.saved,running:{extras:state.saved.map((e,i)=>({device:e.device,channels:e.channels,online:i===0,error:i===0?'':'no se pudo abrir',underruns:0})),total:10},restart_needed:state.restart})});});
-   await up.route('**/api/status',async r=>{const resp=await r.fetch();const j=await resp.json();j.ch_names=names;j.input_channels=16;r.fulfill({response:resp,contentType:'application/json',body:JSON.stringify(j)});});
-   await up.route('**/api/levels',async r=>{const resp=await r.fetch();const j=await resp.json();j.db=names.map((_,i)=>i===11?-12:(j.db[i]===undefined?-90:j.db[i]));r.fulfill({response:resp,contentType:'application/json',body:JSON.stringify(j)});});
+     if(r.request().method()==='POST'){saved=JSON.parse(r.request().postData());return r.fulfill({contentType:'application/json',body:'{"ok":true,"restarting":false}'});}
+     r.fulfill({contentType:'application/json',body:JSON.stringify({devices:[
+       {key:'Traktor',name:'Traktor Audio 10',channels:10,enabled:true,tag:'A',connected:true,card:'hw:0,0',max_channels:10,busy:true},
+       {key:'Scarlett 18i20',name:'Scarlett 18i20',channels:8,enabled:false,tag:'B',connected:true,card:'hw:2,0',max_channels:18,busy:false}],
+       cards:[{key:'USB Audio Device',name:'USB Audio Device',id:'hw:3,0',max_channels:2,busy:false}],clock:'',clock_effective:'Traktor',max_total:32,direct:true,
+       running:{devices:[{key:'Traktor',online:true,first:0,underruns:0,master:true}],clock:'Traktor',total:10},restart_needed:false})});});
+   await up.route('**/api/status',async r=>{const resp=await r.fetch();const j=await resp.json();j.ch_names=names;j.ch_ids=ids;j.input_channels=16;r.fulfill({response:resp,contentType:'application/json',body:JSON.stringify(j)});});
+   await up.route('**/api/levels',async r=>{const resp=await r.fetch();const j=await resp.json();j.db=ids.map((_,i)=>i===11?-12:(j.db[i]===undefined?-90:j.db[i]));r.fulfill({response:resp,contentType:'application/json',body:JSON.stringify(j)});});
    await up.goto(BASE+'/');await up.waitForSelector('#spks .spk');await sleep(1500);
-   ok('USB extra: con 16 entradas hay 16 indicadores en la tarjeta de entrada',await until(async()=>(await up.locator('#mb .mc').count())===16),await up.locator('#mb .mc').count());
-   ok('USB extra: los indicadores extra llevan su nombre y el canal con señal se enciende',await up.evaluate(()=>{const l=[...document.querySelectorAll('#mb .lab')].map(x=>x.textContent);return l[10]==='USB1-1'&&l[15]==='USB2-2'&&document.getElementById('lp11').dataset.st==='sig';}));
+   ok('Placas: con 16 entradas hay 16 indicadores',await until(async()=>(await up.locator('#mb .mc').count())===16),await up.locator('#mb .mc').count());
+   ok('Placas: con varias placas los indicadores llevan el id (A1…, B1…) y el canal con señal se enciende',await up.evaluate(()=>{const l=[...document.querySelectorAll('#mb .lab')].map(x=>x.textContent);return l[0]==='A1'&&l[10]==='B1'&&l[15]==='B6'&&document.getElementById('lp11').dataset.st==='sig';}));
    await up.click('.tab[data-tab="sys"]');await up.click('#sy_in');await sleep(500);
-   ok('USB extra: la Traktor aparece en la lista como una placa más (entradas 1–10, reloj principal, sin botón Quitar) y sin extras lo dice',(await up.textContent('#usb_trk')).includes('Traktor Audio 10 · 10 canales')&&(await up.textContent('#usb_trk')).includes('entradas 1–10')&&(await up.locator('#usb_trk [data-rm]').count())===0&&(await up.textContent('#usb_list')).includes('solo se captura la Traktor'));
-   ok('USB extra: el selector no ofrece la Traktor y sí las demás tarjetas',await up.evaluate(()=>{const o=[...document.querySelectorAll('#usb_card option')].map(x=>x.textContent);return o.length===2&&!o.some(x=>/Traktor/.test(x))&&/Scarlett/.test(o[0]);}));
-   ok('USB extra: los canales llegan hasta el máximo de la tarjeta (18)',await up.evaluate(()=>document.querySelectorAll('#usb_ch option').length===18));
-   ok('USB extra: «Guardar y reiniciar» está desactivado sin cambios',await up.isDisabled('#usb_save'));
-   await up.selectOption('#usb_ch','8');await up.click('#usb_add');
-   ok('USB extra: al agregar aparece en la lista como pendiente y se activa Guardar',(await up.textContent('#usb_list')).includes('Scarlett 18i20')&&(await up.textContent('#usb_list')).includes('8 canales')&&(await up.textContent('#usb_list')).includes('Pendiente')&&!(await up.isDisabled('#usb_save')));
-   ok('USB extra: la interfaz agregada ya no se ofrece y el máximo baja a lo que queda (la otra tarjeta: 2)',await up.evaluate(()=>{const o=[...document.querySelectorAll('#usb_card option')];return o.length===1&&/USB Audio Device/.test(o[0].textContent)&&document.querySelectorAll('#usb_ch option').length===2;}));
-   await up.click('#usb_add');
-   ok('USB extra: se pueden agregar varias interfaces (2 en la lista, 8 + 2 canales)',(await up.textContent('#usb_list')).includes('USB Audio Device · 2 canales')&&(await up.locator('#usb_list .usbrow').count())===3);
-   await up.click('#usb_list [data-rm="1"]');
-   ok('USB extra: «Quitar» la saca de la lista',!(await up.textContent('#usb_list')).includes('USB Audio Device'));
-   ok('USB extra: el interruptor «Reloj principal» de la Traktor está activado por defecto',(await up.getAttribute('#usb_master','aria-checked'))==='true');
-   ok('USB extra: la Traktor no puede subir (es la primera) y sí bajar',await up.isDisabled('#usb_trk [data-mv$=":-1"]')&&!(await up.isDisabled('#usb_trk [data-mv$=":1"]')));
-   await up.click('#usb_trk [data-mv$=":1"]');
-   ok('USB extra: «Bajar» la Traktor la pasa detrás de la Scarlett y las entradas se renumeran (Scarlett 1–8, Traktor 9–18)',await up.evaluate(()=>{const r=[...document.querySelectorAll('#usb_list .usbrow')].map(x=>x.textContent);return /Scarlett/.test(r[0])&&r[1].includes('Traktor')&&r[1].includes('entradas 9–18');}));
-   await up.click('#usb_master');
-   ok('USB extra: apagar «Reloj principal» lo refleja en el interruptor y en la fila',(await up.getAttribute('#usb_master','aria-checked'))==='false'&&(await up.textContent('#usb_trk')).includes('con colchón'));
+   ok('Placas: se listan la Traktor, la Scarlett (guardada) y la tarjeta detectada, más la opción de la Raspberry',await up.evaluate(()=>[...document.querySelectorAll('#usb_list .usbrow[data-i]')].map(r=>r.querySelector('b').textContent.trim().replace(/\s+/g,' ')).join('|')==='Traktor Audio 10 A|Scarlett 18i20 B|USB Audio Device C'&&!!document.getElementById('usb_clk_rpi')));
+   ok('Placas: la Traktor no es obligatoria ni especial: no hay botón «Quitar» en placas conectadas y se puede desactivar',await up.evaluate(()=>!document.querySelector('#usb_list [data-rm]')&&document.querySelector('[data-use="0"]').getAttribute('aria-checked')==='true'));
+   ok('Placas: con una sola placa activa su reloj es el principal (radio marcado) y sin usar quedan deshabilitados canales y reloj',await until(async()=>up.evaluate(()=>document.querySelector('[data-clk="0"]').checked&&!document.getElementById('usb_clk_rpi').checked&&document.querySelector('#usb_list select[data-ch="1"]').disabled&&document.querySelector('[data-clk="1"]').disabled)),await up.evaluate(()=>JSON.stringify({c0:document.querySelector('[data-clk="0"]').checked,rpi:document.getElementById('usb_clk_rpi').checked,d1:document.querySelector('#usb_list select[data-ch="1"]').disabled,k1:document.querySelector('[data-clk="1"]').disabled,rows:document.querySelectorAll('#usb_list .usbrow').length})));
+   ok('Placas: la Traktor se ve con sus entradas (en línea, 1–10)',(await up.textContent('#usb_list .usbrow[data-i="0"]')).includes('En línea · entradas 1–10'));
+   await up.click('[data-use="1"]');
+   ok('Placas: al usar la Scarlett (8 canales) ocupa 11–18 y, con dos placas activas y reloj automático, manda la Raspberry',await up.evaluate(()=>(document.querySelector('#usb_list .usbrow[data-i="1"]').textContent.includes('entradas 11–18'))&&document.getElementById('usb_clk_rpi').checked&&!document.querySelector('[data-clk="0"]').checked&&!document.querySelector('[data-clk="1"]').disabled));
+   await up.click('[data-clk="1"]');
+   ok('Placas: el reloj es excluyente: al elegir la Scarlett se desmarcan la Traktor y la Raspberry',await up.evaluate(()=>document.querySelector('[data-clk="1"]').checked&&!document.querySelector('[data-clk="0"]').checked&&!document.getElementById('usb_clk_rpi').checked));
+   await up.click('#usb_clk_rpi');
+   ok('Placas: elegir la Raspberry desmarca las placas',await up.evaluate(()=>document.getElementById('usb_clk_rpi').checked&&!document.querySelector('[data-clk="0"]').checked&&!document.querySelector('[data-clk="1"]').checked));
+   await up.click('[data-use="2"]');
+   await up.selectOption('#usb_list select[data-ch="2"]','2');
+   await up.click('[data-mv="1:-1"]');
+   ok('Placas: «↑» sube la Scarlett y las entradas se renumeran (Scarlett 1–8, Traktor 9–18, USB 19–20)',await up.evaluate(()=>{const r=[...document.querySelectorAll('#usb_list .usbrow[data-i]')].map(x=>x.textContent);return /Scarlett/.test(r[0])&&r[0].includes('entradas 1–8')&&r[1].includes('Traktor')&&r[1].includes('entradas 9–18')&&r[2].includes('entradas 19–20');}));
+   ok('Placas: se activa «Guardar y reiniciar»',!(await up.isDisabled('#usb_save')));
    await up.click('#usb_save');
-   ok('USB extra: guardar envía también la posición de la Traktor y el reloj',await until(async()=>saved&&saved.traktor&&saved.traktor.pos===1&&saved.traktor.master===false),saved);
-   ok('USB extra: guardar envía la lista a la Raspberry',await until(async()=>saved&&saved.extras.length===1&&saved.extras[0].device==='Scarlett 18i20'&&saved.extras[0].channels===8),saved);
-   ok('USB extra: tras guardar se avisa que hace falta reiniciar',await until(async()=>(await up.textContent('#usb_msg')).includes('Reinicia')),await up.textContent('#usb_msg'));
+   ok('Placas: guardar envía el orden, «Usar», canales, letras y el reloj elegido',await until(async()=>saved&&saved.clock==='rpi'&&saved.devices.length===3&&saved.devices[0].key==='Scarlett 18i20'&&saved.devices[0].enabled===true&&saved.devices[0].channels===8&&saved.devices[1].key==='Traktor'&&saved.devices[1].channels===10&&saved.devices[1].tag==='A'&&saved.devices[2].key==='USB Audio Device'&&saved.devices[2].enabled===true&&saved.devices[2].channels===2),JSON.stringify(saved));
+   ok('Placas: tras guardar se avisa que hace falta reiniciar',await until(async()=>(await up.textContent('#usb_msg')).includes('Reiniciá')),await up.textContent('#usb_msg'));
+   ok('Placas: se pueden renombrar TODOS los canales activos (16 campos con su id)',await up.evaluate(()=>{const l=[...document.querySelectorAll('#nmgrid label')].map(x=>x.textContent);return l.length===16&&l[0].startsWith('A1')&&l[10].startsWith('B1')&&document.querySelectorAll('#nmgrid input').length===16;}));
+   ok('Placas: el campo de un canal de la 2.ª placa propone su nombre de fábrica',await up.evaluate(()=>document.getElementById('chn_12').placeholder==='C'));
    await up.click('.tab[data-tab="spk"]');await up.click('#spks .spk[data-id="0"]');await up.waitForSelector('#drawer.on');await adv(up);
-   ok('USB extra: el altavoz puede elegir los canales extra (nombre + «Interfaz USB»)',await up.evaluate(()=>{const o=[...document.querySelectorAll('#d_cl option')].map(x=>x.textContent);return o.length===16&&/USB1-1 · Interfaz USB/.test(o[10]);}));
-   ok('USB extra: sin errores de JS',uerr.length===0,uerr);
+   ok('Placas: el altavoz elige entre las 16 entradas y las de la 2.ª placa llevan su id',await up.evaluate(()=>{const o=[...document.querySelectorAll('#d_cl option')].map(x=>x.textContent);return o.length===16&&/^B1 FL/.test(o[10])&&/^A1 FL/.test(o[0]);}));
+   ok('Placas: sin errores de JS',uerr.length===0,uerr);
    await up.close();}
   const cp=await ctx.newPage();const cerr=[];cp.on('pageerror',e=>cerr.push(String(e)));
   await cp.goto(BASE+'/calibrate');

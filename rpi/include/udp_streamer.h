@@ -7,6 +7,7 @@
 #include <atomic>
 #include <thread>
 #include <vector>
+#include <map>
 #include <netinet/in.h>
 #include "protocol.h"
 #include "dsp.h"
@@ -202,10 +203,12 @@ public:
 
     // ── Nombres de las 10 entradas de audio (FL, FR, C…), editables; fichero aparte <config>.chnames ──
     static const char* defaultChannelName(int ch);
-    std::vector<std::string> channelNames() const;       // solo las 10 editables de la Traktor
-    std::vector<std::string> allChannelNames() const;    // + las de las interfaces USB extra
-    // Total de canales de entrada que recibe pushFrames (10 por defecto; Traktor + interfaces extra) y nombres de los extra.
-    void setInputChannels(int n, const std::vector<std::string>& extra_names);
+    static std::string defaultNameForId(const std::string& id);   // «A3» → «C»; del canal 11 en adelante «Ch11»
+    // Cada entrada tiene un id fijo (letra de la placa + nº de canal en ella: A1, A2… B1…) y un nombre editable.
+    std::vector<std::string> channelNames() const;       // nombre de cada entrada activa (el elegido o el de fábrica: FL, FR, C… / Ch11)
+    std::vector<std::string> channelIds() const;
+    // Total de canales de entrada que recibe pushFrames (10 por defecto, ids A1…A10) y el id de cada uno.
+    void setInputChannels(int n, const std::vector<std::string>& ids);
     int  inputChannels() const { return in_ch_.load(); }
     bool setChannelNames(const std::vector<std::string>& names, std::string& err);   // vacío = nombre por defecto
     bool loadChannelNames();
@@ -283,9 +286,9 @@ private:
         struct N { uint8_t vl = 255, vr = 255, role = ROLE_FULL; int32_t lat = 0; float eq[EQ_BANDS] = {0, 0, 0, 0, 0, 0}; } n[MAX_NODES];
     };
     mutable std::mutex    names_mtx_;
-    std::vector<std::string> extra_names_;                 // nombres de las entradas extra (interfaces USB)
+    std::vector<std::string> in_ids_;                      // id de cada entrada activa
     std::atomic<int>      in_ch_{AUDIO_CHANNELS};
-    std::string           ch_names_[MAX_NODES];            // nombre elegido por el usuario; vacío = el de fábrica
+    std::map<std::string, std::string> ch_names_;            // nombre elegido por el usuario; vacío = el de fábrica
     bool saveChannelNames();
     std::string           spk_names_[MAX_NODES];
     bool saveSpkNames();

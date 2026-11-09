@@ -329,10 +329,15 @@ details.adv>.advbody{display:grid;gap:14px;padding-top:6px}
 .mb{display:grid;grid-template-columns:repeat(10,1fr);gap:8px}
 .mc{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
 .mc .lab{font-size:.72rem;font-weight:600;color:var(--mut);line-height:1;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.usbrow .sw{flex:1 0 100%;padding-top:6px}.usbmv{display:flex;gap:6px;flex:none}
-.usbrow{flex-wrap:wrap;display:flex;align-items:center;gap:10px;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bd)}
-.usbrow .nm{min-width:0}.usbrow .nm b{display:block;overflow-wrap:anywhere}
+.usbrow{display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--bd)}
+.usbrow .nm{min-width:0;flex:1 1 200px}.usbrow .nm b{display:block;overflow-wrap:anywhere}
 .usbrow .nm span{font-size:.78rem;color:var(--mut)}.usbrow .nm span.bad{color:var(--bad)}
+.usbctl{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.usbl{font-size:.82rem;color:var(--mut)}
+.usbclk{display:inline-flex;align-items:center;gap:6px;font-size:.82rem;min-height:44px}
+.usbclk input{width:20px;height:20px;accent-color:var(--ac)}
+.tagid{display:inline-block;min-width:1.6em;text-align:center;padding:0 6px;margin-left:6px;border:1px solid var(--ctl);font-size:.78rem;color:var(--ink)}
+.usbmv{display:flex;gap:6px;flex:none}
 .nmgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .nmgrid label{display:block;font-size:.78rem;color:var(--mut);margin-bottom:4px}
 .nmgrid .txt{width:100%}
@@ -684,18 +689,16 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
     </details>
   </div>
   <div class="subpane" id="sp_sin" role="tabpanel" aria-labelledby="sy_in" hidden><div class="cards">
+    <div class="card" id="c_usb">
+          <div><b>Placas de audio de entrada</b><span class="hint">Se listan las interfaces USB de audio conectadas (y las guardadas aunque no estén). Activá «Usar» en las que quieras capturar (a 48 kHz) y elegí cuál manda el reloj, o dejá que lo marque la Raspberry. Si hay una sola placa activa, se usa esa y su reloj. Las entradas se numeran en el orden de la lista y cada canal lleva el id de su placa (A1, A2… B1…).</span></div>
+          <div id="usb_list" class="usblist" aria-live="polite"></div>
+          <div class="nmbtns"><button class="btn sm" id="usb_scan" type="button">Buscar placas</button><button class="btn sm" id="usb_save" type="button" disabled>Guardar y reiniciar</button></div>
+          <p class="hint" id="usb_msg" aria-live="polite" style="margin-top:8px"></p>
+        </div>
     <div class="card" id="c_names">
-          <div><b>Nombres de las entradas</b><span class="hint">Los 10 canales de audio que llegan por la entrada. El nombre se ve en el plano, en los indicadores y al elegir qué canal toma cada altavoz (hasta 12 caracteres)</span></div>
+          <div><b>Nombres de las entradas</b><span class="hint">Todos los canales activos de las placas de entrada. El nombre se ve en el plano, en los indicadores y al elegir qué canal toma cada altavoz (hasta 12 caracteres); el id (A1, B3…) indica de qué placa viene</span></div>
           <div class="nmgrid" id="nmgrid"></div>
           <div class="nmbtns"><button class="btn sm" id="nmsave" type="button">Guardar nombres</button><button class="btn sm" id="nmreset" type="button">Restablecer</button></div>
-        </div>
-    <div class="card" id="c_usb">
-          <div><b>Interfaces de audio USB extra</b><span class="hint">Además de la Traktor puedes capturar otras interfaces USB (a 48 kHz); cualquier altavoz puede usar sus canales. Las entradas se numeran en el orden de esta lista: usá «Subir» y «Bajar» para cambiar el lugar de cada placa, también el de la Traktor. Si la Traktor no está conectada, no ocupa entradas.</span></div>
-          <div id="usb_list" class="usblist" aria-live="polite"></div>
-          <div class="two"><div class="fld"><label for="usb_card">Interfaz</label><select class="sel" id="usb_card"></select></div>
-            <div class="fld"><label for="usb_ch">Canales</label><select class="sel" id="usb_ch"></select></div></div>
-          <div class="nmbtns"><button class="btn sm" id="usb_add" type="button">Agregar interfaz</button><button class="btn sm" id="usb_save" type="button" disabled>Guardar y reiniciar</button></div>
-          <p class="hint" id="usb_msg" aria-live="polite" style="margin-top:8px"></p>
         </div>
   </div></div>
   <div class="subpane" id="sp_fw" role="tabpanel" aria-labelledby="sy_fw" hidden><div class="cards">
@@ -785,8 +788,13 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
 
 <script>
 const CH=['FL','FR','C','LFE','SL','SR','SBL','SBR','AUX-L','AUX-R'];
-const CH_DEF=CH.slice();   // nombres de fábrica; los de la Raspberry (ch_names de /api/status) sustituyen a CH en el sitio
-const CHN=['Frontal izq.','Frontal der.','Central','Graves (LFE)','Lateral izq.','Lateral der.','Trasero izq.','Trasero der.','Extra izq.','Extra der.'];
+const NM=CH.slice();      // nombre de cada entrada (el que elige el usuario); CH[i] es la etiqueta que se muestra (con el id de la placa si hay varias)
+const ID=CH.map((_,i)=>'A'+(i+1));   // id fijo de cada entrada: letra de la placa + nº de canal en ella
+const CHN0=['Frontal izq.','Frontal der.','Central','Graves (LFE)','Lateral izq.','Lateral der.','Trasero izq.','Trasero der.','Extra izq.','Extra der.'];
+const defName=id=>{const n=+id.slice(1);return n>=1&&n<=10?CH0[n-1]:'Ch'+n;};
+const CH0=CH.slice();     // nombres de fábrica
+let CHMULTI=false;        // hay más de una placa activa: las etiquetas llevan el id
+const CHN=CHN0.slice();
 const POS=[[15,20],[85,20],[50,17],[50,37],[10,60],[90,60],[18,88],[82,88],[20,42],[80,42]];
 const EQF=['354 Hz','707 Hz','1,4 kHz','2,8 kHz','5,7 kHz','9,8 kHz'];
 const ROLES=['Rango completo','Satélite','Subwoofer'];
@@ -848,7 +856,7 @@ function sheetDrag(el,close){const hs=[el.querySelector('.grab'),el.querySelecto
 /* Datos */
 async function loadStatus(){
   try{const d=await (await fetch('/api/status')).json();st=d;
-    if(d.ch_names)setChNames(d.ch_names);
+    if(d.ch_names)setChNames(d.ch_names,d.ch_ids);
     if(!lvOK){$('hs').textContent=(d.running?'Capturando':'Detenido')+' · '+d.sample_rate/1000+' kHz';$('dot').className='dot '+(d.running?'ok':'bad');}
     if(document.activeElement!==$('xos')){$('xos').value=d.xover_hz||80;$('xod').textContent=Math.round(d.xover_hz||80)+' Hz';fillRng($('xos'));}
     if(document.activeElement!==$('lex')&&d.lipsync_extra_ms!==undefined)$('lex').value=d.lipsync_extra_ms;
@@ -1326,7 +1334,7 @@ function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
 function lsSet(k,v){try{localStorage.setItem(k,v);}catch(e){}}
 function drawWizard(){const w=$('wiz');if(!w)return;const vis=nodes.filter(isKnown);
   const steps=[
-   ['Conecta la entrada de audio','Enchufa la Traktor Audio 10 por USB a la Raspberry.',!!(st&&(st.capturing||st.running))],
+   ['Conecta la entrada de audio','Enchufa la placa de audio USB a la Raspberry y actívala en Sistema → Entradas.',!!(st&&(st.capturing||st.running))],
    ['Añade tus altavoces','Enciéndelos cerca de la Raspberry y búscalos por Bluetooth.',vis.length>0],
    ['Colócalos en el plano','Arrastra cada altavoz a su sitio (con «Editar plano»).',lsGet('sonos_placed')==='1'||vis.some(n=>n.pos_x>=0||n.pos2_x>=0)],
    ['Calibra el retardo','Mide la distancia de cada altavoz para que todos suenen a la vez.',lsGet('sonos_cal')==='1'||vis.some(n=>n.latency_offset_us)]];
@@ -1502,98 +1510,115 @@ const NSEG=12,SEGDB=MDB/NSEG;                  // 12 LED por altavoz, 5 dB cada 
 const segCls=i=>{const top=-MDB+SEGDB*(i+1);return top<=-20?'g':top<=-10?'y':'r';};   // verde hasta −20 dB, amarillo hasta −10 dB, rojo por encima
 const VUSEGS=Array.from({length:NSEG},(_,k)=>'<i class="led '+segCls(k)+'"></i>').join('');
 const vuHtml=ch=>'<span class="vu" aria-hidden="true" data-ch="'+ch+'">'+VUSEGS+'</span>';
-function buildMeters(){$('mb').innerHTML=CH.map((c,i)=>'<div class="mc" title="'+CH[i]+' · '+CHN[i]+'"><span class="lab">'+c+'</span><i class="lamp" id="lp'+i+'" data-st="off"></i><span class="lvn" id="nm'+i+'">—</span></div>').join('');}
+function buildMeters(){$('mb').innerHTML=CH.map((c,i)=>'<div class="mc" title="'+esc(CH[i]+' · '+CHN[i])+'"><span class="lab">'+esc(CHMULTI?ID[i]:NM[i])+'</span><i class="lamp" id="lp'+i+'" data-st="off"></i><span class="lvn" id="nm'+i+'">—</span></div>').join('');}
 buildMeters();
-function ensureCh(n){   // entradas extra (interfaces USB): amplía nombres, medidores y estado hasta n canales
-  while(CH.length<n){const i=CH.length;CH.push('USB'+(i-9));CHN.push('Interfaz USB');CH_DEF.push('USB'+(i-9));}
-  while(CH.length>n&&CH.length>10){CH.pop();CHN.pop();CH_DEF.pop();}
+function ensureCh(n){   // amplía o recorta nombres, ids, medidores y estado hasta n entradas activas
+  while(CH.length<n){const i=CH.length;NM.push('Ch'+(i+1));ID.push('A'+(i+1));CH.push('Ch'+(i+1));CHN.push('Entrada '+(i+1));}
+  while(CH.length>n&&CH.length>10){CH.pop();NM.pop();ID.pop();CHN.pop();}
   while(LV.length<n){LV.push(-1);PK.push(-1);LAMPS.push({ref:-90,until:0,tm:0});holdV.push(-90);holdT.push(0);}
   LV.length=PK.length=LAMPS.length=holdV.length=holdT.length=n;
 }
-function drawChLabels(){document.querySelectorAll('#mb .mc').forEach((m,i)=>{m.title=CH[i]+' · '+CHN[i];m.querySelector('.lab').textContent=CH[i];});}
+function relabel(){   // CH/CHN a partir de NM/ID: con varias placas, «B3 FL»; con una sola, como siempre
+  CHMULTI=new Set(ID.map(x=>x[0])).size>1;
+  ID.forEach((id,i)=>{
+    CH[i]=CHMULTI?id+' '+NM[i]:NM[i];
+    const local=+id.slice(1);
+    CHN[i]=!CHMULTI&&local>=1&&local<=10?CHN0[local-1]:'Placa '+id[0]+' · canal '+local;
+  });
+}
+function drawChLabels(){document.querySelectorAll('#mb .mc').forEach((m,i)=>{m.title=CH[i]+' · '+CHN[i];m.querySelector('.lab').textContent=CHMULTI?ID[i]:NM[i];});}
 function drawNamesForm(force){
   const g=$('nmgrid');if(!g||(!force&&g.contains(document.activeElement)))return;      // no pisar lo que se está escribiendo
-  g.innerHTML=CH.slice(0,10).map((c,i)=>'<div><label for="chn_'+i+'">Entrada '+(i+1)+' · '+CHN[i]+'</label><input class="txt" id="chn_'+i+'" type="text" maxlength="12" value="'+c+'" placeholder="'+CH_DEF[i]+'" autocomplete="off"></div>').join('');
+  g.innerHTML=NM.map((c,i)=>'<div><label for="chn_'+i+'">'+esc(ID[i])+' · '+esc(CHN[i])+'</label><input class="txt" id="chn_'+i+'" type="text" maxlength="12" value="'+esc(c)+'" placeholder="'+esc(defName(ID[i]))+'" autocomplete="off"></div>').join('');
 }
-function setChNames(a){   // aplica los nombres que llegan de la Raspberry; devuelve true si cambió alguno
+function setChNames(a,ids){   // aplica nombres e ids que llegan de la Raspberry; devuelve true si cambió algo
   if(!Array.isArray(a)||a.length<10||a.length>32)return false;
-  const grew=a.length!==CH.length;
-  if(!grew&&a.every((x,i)=>x===CH[i]))return false;
-  if(grew){ensureCh(a.length);}
-  a.forEach((x,i)=>{CH[i]=x;});
-  if(grew){buildMeters();chBuiltN=a.length;}else drawChLabels();
+  const idl=Array.isArray(ids)&&ids.length===a.length?ids:a.map((_,i)=>'A'+(i+1));
+  if(a.length===NM.length&&a.every((x,i)=>x===NM[i])&&idl.every((x,i)=>x===ID[i]))return false;
+  const grew=a.length!==CH.length,idch=!idl.every((x,i)=>x===ID[i]);
+  ensureCh(a.length);
+  a.forEach((x,i)=>{NM[i]=x;ID[i]=idl[i];});
+  relabel();
+  if(grew||idch)buildMeters();else drawChLabels();
   drawNamesForm();sig='';return true;
 }
 $('nmsave').onclick=async()=>{
-  const r=await J('/api/names',{names:CH.slice(0,10).map((_,i)=>$('chn_'+i).value)});
-  if(r.names){setChNames(r.names);drawNamesForm(true);toast('Nombres guardados');log('Nombres de las entradas guardados');loadNodes();}else toast(r.error||'No se pudieron guardar los nombres.',false);
+  const r=await J('/api/names',{names:NM.map((_,i)=>$('chn_'+i).value)});
+  if(r.names){setChNames(r.names,r.ids);drawNamesForm(true);toast('Nombres guardados');log('Nombres de las entradas guardados');loadNodes();}else toast(r.error||'No se pudieron guardar los nombres.',false);
 };
 $('nmreset').onclick=async()=>{
   const r=await J('/api/names',{reset:true});
-  if(r.names){setChNames(r.names);drawNamesForm(true);toast('Nombres restablecidos');loadNodes();}else toast(r.error||'No se pudo restablecer.',false);
+  if(r.names){setChNames(r.names,r.ids);drawNamesForm(true);toast('Nombres restablecidos');loadNodes();}else toast(r.error||'No se pudo restablecer.',false);
 };
-/* ── Interfaces USB de audio extra (Sistema → Entradas) ── */
-let usbCards=[],usbSel=[],usbRun=[],usbMax=22,usbTrk=true,usbTpos=0,usbTmaster=true,usbDirty=false;   // usbTrk: la Traktor está conectada; usbTpos: su lugar en el orden; usbTmaster: manda el reloj
-const usbUsed=()=>usbSel.reduce((s,e)=>s+e.channels,0);
-function usbKey(c){return usbCards.filter(x=>x.name===c.name).length===1?c.name:c.id;}   // por nombre si es único (no cambia al reenchufar); si no, hw:N,0
-function usbItems(){const it=usbSel.map(e=>({e}));it.splice(Math.min(usbTpos,it.length),0,{trk:true});return it;}
-function usbSetItems(it){usbSel=it.filter(x=>!x.trk).map(x=>x.e);usbTpos=it.findIndex(x=>x.trk);usbDirty=true;usbDraw();}
-function usbDraw(){
-  const run=usbRun,L=$('usb_list'),it=usbItems(),tc=usbCards.find(c=>c.traktor),tn=tc?tc.name:'Traktor Audio 10';
-  let first=0;   // sin Traktor conectada su lugar no ocupa entradas
-  const mv=(j)=>'<span class="usbmv"><button class="btn sm" type="button" data-mv="'+j+':-1"'+(j===0?' disabled':'')+' aria-label="Subir">↑ Subir</button><button class="btn sm" type="button" data-mv="'+j+':1"'+(j===it.length-1?' disabled':'')+' aria-label="Bajar">↓ Bajar</button></span>';
-  L.innerHTML=it.map((x,j)=>{
-    if(x.trk){
-      const f=first;if(usbTrk)first+=10;
-      return '<div class="usbrow" id="usb_trk"><div class="nm"><b>'+esc(tn)+' · 10 canales</b><span>'+(usbTrk?'En línea · entradas '+(f+1)+'–'+(f+10):'No conectada: no ocupa entradas')+(usbTmaster?' · reloj principal':' · con colchón')+'</span></div>'+mv(j)+
-        '<div class="sw"><div><b>Reloj principal</b><span class="hint">Activado: la Traktor marca el reloj (lo de siempre) y las otras placas se adaptan a ella. Apagado: todas pasan por un colchón y la Raspberry usa su propio reloj.</span></div><button class="switch" id="usb_master" role="switch" aria-checked="'+(usbTmaster?'true':'false')+'" aria-label="Traktor como reloj principal"></button></div></div>';
-    }
-    const e=x.e,i=usbSel.indexOf(e),r=run.find(y=>y.device===e.device&&y.channels===e.channels),f=first;first+=e.channels;
-    const st=r?(r.online?'En línea · entradas '+(f+1)+'–'+(f+e.channels)+(r.underruns?' · '+r.underruns+' cortes':''):'<span class="bad">'+esc(r.error||'sin conexión')+'</span>'):'Pendiente: se aplica al guardar y reiniciar';
-    return '<div class="usbrow"><div class="nm"><b>'+esc(e.device)+' · '+e.channels+(e.channels===1?' canal':' canales')+'</b><span>'+st+'</span></div>'+mv(j)+'<button class="btn sm" type="button" data-rm="'+i+'" aria-label="Quitar '+esc(e.device)+'">Quitar</button></div>';
-  }).join('')+(usbSel.length?'':'<p class="hint">Sin interfaces extra: solo se captura la Traktor.</p>');
-  L.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{usbSel.splice(+b.dataset.rm,1);usbTpos=Math.min(usbTpos,usbSel.length);usbDirty=true;usbDraw();});
-  L.querySelectorAll('[data-mv]').forEach(b=>b.onclick=()=>{const[j,d]=b.dataset.mv.split(':').map(Number),a=usbItems(),k=j+d;if(k<0||k>=a.length)return;[a[j],a[k]]=[a[k],a[j]];usbSetItems(a);});
-  $('usb_master').onclick=()=>{usbTmaster=!usbTmaster;usbDirty=true;usbDraw();};
-  const free=usbMax-usbUsed(),taken=new Set(usbSel.map(e=>e.device));
-  const opts=usbCards.filter(c=>!c.traktor&&!taken.has(usbKey(c))&&!taken.has(c.id));
-  $('usb_card').innerHTML=opts.length?opts.map(c=>'<option value="'+esc(usbKey(c))+'" data-max="'+c.max_channels+'">'+esc(c.name)+' ('+esc(c.id)+(c.busy?', en uso':'')+')</option>').join(''):'<option value="">No hay otras interfaces</option>';
-  usbCh();
-  $('usb_add').disabled=!opts.length||free<1;
-  $('usb_save').disabled=!usbDirty;
+/* ── Placas de audio de entrada (Sistema → Entradas) ── */
+let inRows=[],inRun=[],inClock='',inMax=32,inDirty=false;   // inRows: placas en el orden de las entradas; inClock: ''=automático, 'rpi' o la key de una placa
+const inUsed=()=>inRows.reduce((s,r)=>s+(r.enabled?r.channels:0),0);
+function inEff(){   // reloj efectivo: lo elegido, o la única placa activa, o la Raspberry
+  if(inClock)return inClock;
+  const act=inRows.filter(r=>r.enabled);return act.length===1?act[0].key:'rpi';
 }
-function usbCh(){
-  const o=$('usb_card').selectedOptions[0],mx=o&&+o.dataset.max?+o.dataset.max:usbMax,top=Math.max(1,Math.min(mx,usbMax-usbUsed())),prev=+$('usb_ch').value||0;
-  $('usb_ch').innerHTML=Array.from({length:top},(_,k)=>'<option value="'+(k+1)+'">'+(k+1)+'</option>').join('');
-  $('usb_ch').value=String(Math.min(prev||top,top));
+function inDraw(){
+  const L=$('usb_list'),eff=inEff();let first=0;
+  const rows=inRows.map((r,i)=>{
+    const f=first;if(r.enabled)first+=r.channels;
+    const run=inRun.find(x=>x.key===r.key);
+    let st;
+    if(!r.enabled)st='Sin usar';
+    else if(!r.connected)st='<span class="bad">No conectada</span> · reserva las entradas '+(f+1)+'–'+(f+r.channels);
+    else if(!run)st='Se aplica al guardar y reiniciar · entradas '+(f+1)+'–'+(f+r.channels);
+    else if(run.online)st='En línea · entradas '+(f+1)+'–'+(f+r.channels)+(run.underruns?' · '+run.underruns+' cortes':'');
+    else st='<span class="bad">'+esc(run.error||'sin conexión')+'</span>';
+    const room=Math.max(1,Math.min(r.max_channels||MAXCH,MAXCH-(inUsed()-(r.enabled?r.channels:0)))),opts=[];
+    for(let c=1;c<=Math.max(room,r.channels);c++)opts.push('<option value="'+c+'"'+(c===r.channels?' selected':'')+'>'+c+(c===1?' canal':' canales')+'</option>');
+    return '<div class="usbrow" data-i="'+i+'"><div class="nm"><b>'+esc(r.name)+' <span class="tagid">'+esc(r.tag||'')+'</span></b><span>'+st+'</span></div>'+
+      '<div class="usbctl"><button class="switch" role="switch" aria-checked="'+(r.enabled?'true':'false')+'" data-use="'+i+'" aria-label="Usar '+esc(r.name)+'"></button>'+
+      '<label class="usbl">Usar</label>'+
+      '<select class="sel" data-ch="'+i+'" aria-label="Canales de '+esc(r.name)+'"'+(r.enabled?'':' disabled')+'>'+opts.join('')+'</select>'+
+      '<label class="usbclk"><input type="radio" name="usb_clock" data-clk="'+i+'"'+(eff===r.key?' checked':'')+(r.enabled?'':' disabled')+'> Reloj principal</label>'+
+      '<span class="usbmv"><button class="btn sm" type="button" data-mv="'+i+':-1"'+(i===0?' disabled':'')+' aria-label="Subir '+esc(r.name)+'">↑</button><button class="btn sm" type="button" data-mv="'+i+':1"'+(i===inRows.length-1?' disabled':'')+' aria-label="Bajar '+esc(r.name)+'">↓</button></span>'+
+      (r.connected?'':'<button class="btn sm" type="button" data-rm="'+i+'" aria-label="Quitar '+esc(r.name)+'">Quitar</button>')+'</div></div>';
+  }).join('');
+  L.innerHTML=(rows||'<p class="hint">No hay placas de audio de entrada conectadas.</p>')+
+    '<div class="usbrow" id="usb_rpi"><div class="nm"><b>La Raspberry marca el reloj</b><span>Todas las placas pasan por un colchón y la Raspberry usa su propio reloj</span></div><div class="usbctl"><label class="usbclk"><input type="radio" name="usb_clock" id="usb_clk_rpi"'+(eff==='rpi'?' checked':'')+'> Reloj principal</label></div></div>';
+  L.querySelectorAll('[data-use]').forEach(b=>b.onclick=()=>{const r=inRows[+b.dataset.use];if(!r.enabled&&inUsed()+r.channels>MAXCH){toast('Máximo '+MAXCH+' canales activos en total.',false);return;}r.enabled=!r.enabled;if(!r.enabled&&inClock===r.key)inClock='';inDirty=true;inDraw();});
+  L.querySelectorAll('[data-ch]').forEach(s=>s.onchange=()=>{inRows[+s.dataset.ch].channels=+s.value;inDirty=true;inDraw();});
+  L.querySelectorAll('[data-clk]').forEach(r=>r.onchange=()=>{inClock=inRows[+r.dataset.clk].key;inDirty=true;inDraw();});
+  $('usb_clk_rpi').onchange=()=>{inClock='rpi';inDirty=true;inDraw();};
+  L.querySelectorAll('[data-mv]').forEach(b=>b.onclick=()=>{const[j,d]=b.dataset.mv.split(':').map(Number),k=j+d;if(k<0||k>=inRows.length)return;[inRows[j],inRows[k]]=[inRows[k],inRows[j]];inDirty=true;inDraw();});
+  L.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{const r=inRows[+b.dataset.rm];if(inClock===r.key)inClock='';inRows.splice(+b.dataset.rm,1);inDirty=true;inDraw();});
+  $('usb_save').disabled=!inDirty;
 }
-async function usbLoad(){
+const MAXCH=32;
+function inTags(){   // letra provisional para las placas nuevas (la Raspberry confirma al guardar)
+  inRows.forEach(r=>{if(!r.tag){for(let c=65;c<91;c++){const l=String.fromCharCode(c);if(!inRows.some(x=>x.tag===l)){r.tag=l;break;}}}});
+}
+async function inLoad(){
   try{
     const d=await (await fetch('/api/inputs')).json();
-    usbCards=d.cards||[];usbMax=d.max_extra||22;usbTrk=!(d.traktor&&d.traktor.present===false);usbRun=(d.running&&d.running.extras)||[];
-    if(!usbDirty){usbSel=(d.saved||[]).map(e=>({device:e.device,channels:e.channels}));usbTpos=Math.min((d.traktor&&d.traktor.pos)||0,usbSel.length);usbTmaster=!(d.traktor&&d.traktor.master===false);}
-    usbDraw();
-    if(d.restart_needed&&!usbDirty)$('usb_msg').textContent='Hay cambios guardados que se aplican al reiniciar el servicio.';
+    inMax=d.max_total||32;inRun=(d.running&&d.running.devices)||[];
+    const fresh=(d.devices||[]).map(x=>({key:x.key,name:x.name||x.key,channels:x.channels,enabled:!!x.enabled,tag:x.tag,connected:!!x.connected,max_channels:x.max_channels||0}))
+      .concat((d.cards||[]).map(c=>({key:c.key,name:c.name||c.id,channels:Math.max(1,Math.min(c.max_channels||2,MAXCH)),enabled:false,tag:'',connected:true,max_channels:c.max_channels||0,fresh:true})));
+    if(!inDirty){inRows=fresh;inClock=d.clock||'';}
+    else{   // con cambios sin guardar: se conserva lo editado y solo se actualiza el estado y se agregan las placas nuevas
+      fresh.forEach(f=>{const r=inRows.find(x=>x.key===f.key);if(r){r.connected=f.connected;r.name=f.name;r.max_channels=f.max_channels;}else inRows.push(f);});
+    }
+    inTags();inDraw();
+    if(d.restart_needed&&!inDirty)$('usb_msg').textContent='Hay cambios guardados que se aplican al reiniciar el servicio.';
   }catch(e){}
 }
-$('usb_card').onchange=usbCh;
-$('usb_add').onclick=()=>{
-  const dev=$('usb_card').value,ch=+$('usb_ch').value;
-  if(!dev||!ch)return;
-  usbSel.push({device:dev,channels:ch});usbDirty=true;usbDraw();
-};
+$('usb_scan').onclick=()=>inLoad();
 $('usb_save').onclick=async()=>{
   $('usb_save').disabled=true;$('usb_msg').textContent='Guardando…';
-  const r=await J('/api/inputs',{extras:usbSel,traktor:{pos:usbTpos,master:usbTmaster}});
-  if(!r.ok){$('usb_msg').textContent=r.error||'No se pudo guardar.';toast(r.error||'No se pudo guardar las interfaces.',false);$('usb_save').disabled=false;return;}
-  usbDirty=false;log('Interfaces USB extra guardadas ('+usbSel.length+')');
-  if(!r.restarting){$('usb_msg').textContent='Guardado. Reinicia el servicio para aplicarlo.';usbDraw();return;}
+  const r=await J('/api/inputs',{devices:inRows.map(x=>({key:x.key,channels:x.channels,enabled:x.enabled,tag:x.tag})),clock:inClock});
+  if(!r.ok){$('usb_msg').textContent=r.error||'No se pudo guardar.';toast(r.error||'No se pudieron guardar las placas.',false);$('usb_save').disabled=false;return;}
+  inDirty=false;log('Placas de entrada guardadas ('+inRows.filter(x=>x.enabled).length+' activas)');
+  if(!r.restarting){$('usb_msg').textContent='Guardado. Reiniciá el servicio para aplicarlo.';inDraw();return;}
   $('usb_msg').textContent='Reiniciando el servicio… el audio se corta unos segundos.';
   await sleep(2500);
   for(let k=0;k<40;k++){try{const s=await fetch('/api/status',{cache:'no-store'});if(s.ok){location.reload();return;}}catch(e){}await sleep(1000);}
-  $('usb_msg').textContent='El servicio tarda en volver; recarga la página en unos segundos.';
+  $('usb_msg').textContent='El servicio tarda en volver; recargá la página en unos segundos.';
 };
-$('sy_in').addEventListener('click',()=>setTimeout(usbLoad,0));
+$('sy_in').addEventListener('click',()=>setTimeout(inLoad,0));
 const segIdx=db=>db<=-MDB?-1:Math.min(NSEG-1,Math.ceil((db+MDB)/SEGDB)-1);
 const LV=new Array(10).fill(-1),PK=new Array(10).fill(-1);
 /* Estado del indicador de cada canal. Umbrales en dBFS; LAMP_STEP = subida que dispara un destello. */
@@ -1631,13 +1656,13 @@ function drawMeters(d){
   }
   applyVu();lastDraw=now;
   const mx=on?Math.max.apply(null,d.db):-90;
-  $('mtxt').textContent=!on?'Sin captura de la Traktor':mx<-70?'Silencio':mx<-40?'Cable conectado, sin sonido':'Pico '+mx.toFixed(1).replace('.',',')+' dBFS';
+  $('mtxt').textContent=!on?'Sin captura de audio':mx<-70?'Silencio':mx<-40?'Cable conectado, sin sonido':'Pico '+mx.toFixed(1).replace('.',',')+' dBFS';
 }
 async function pollLevels(){
   if(document.hidden)return;
   try{const d=await (await fetch('/api/levels')).json();lvOK=true;drawMeters(d);
-    if(!d.capturing)setTx('bad','Sin captura de la Traktor','No llegan bloques de audio de la tarjeta (¿Traktor desconectada o ocupada?).');
-    else if(!d.signal)setTx('warn','Traktor conectada, sin señal','La tarjeta captura, pero todos los canales están en silencio (< −70 dBFS).');
+    if(!d.capturing)setTx('bad','Sin captura de audio','No llegan bloques de audio de las placas (¿desconectadas, ocupadas o sin activar en Sistema → Entradas?).');
+    else if(!d.signal)setTx('warn','Entrada conectada, sin señal','Las placas capturan, pero todos los canales están en silencio (< −70 dBFS).');
     else if(!d.sending)setTx('warn',d.nodes_online?'Hay señal, sin enviar':'Hay señal, ningún altavoz en línea',d.nodes_online?'No se están enviando paquetes.':'Enciende o conecta algún altavoz.');
     else setTx('ok','Transmitiendo · '+d.nodes_online+(d.nodes_online===1?' altavoz':' altavoces'),d.pps+' paquetes de audio por segundo.');
   }catch(e){lvOK=false;setTx('bad','Sin conexión con la Raspberry','');}
@@ -2102,7 +2127,7 @@ async function runCal(){
     if(!cfg.ok){stream.getTracks().forEach(t=>t.stop());await ctx.close();
       view(1);showErr('<b>'+(cfg.error||'No se pudo empezar')+'</b>');$('go').disabled=false;return;}
     try{const ni=await (await fetch('/api/nodes')).json();for(const n of ni)if(n.role===2){if(volIncl[n.id]===undefined)volIncl[n.id]=false;if(eqIncl[n.id]===undefined)eqIncl[n.id]=false;}}catch(e){}
-    try{const sj=await (await fetch('/api/status')).json();eqOn=!!sj.dsp_eq;if(Array.isArray(sj.ch_names)&&sj.ch_names.length>=10)sj.ch_names.slice(0,10).forEach((x,i)=>{CH[i]=x;});}catch(e){}
+    try{const sj=await (await fetch('/api/status')).json();eqOn=!!sj.dsp_eq;if(Array.isArray(sj.ch_names)&&sj.ch_names.length>=10){const ids=Array.isArray(sj.ch_ids)?sj.ch_ids:[],multi=new Set(ids.map(x=>x[0])).size>1;sj.ch_names.forEach((x,i)=>{CH[i]=multi&&ids[i]?ids[i]+' '+x:x;});}}catch(e){}
     log('Secuencia: altavoces '+cfg.sequence.join(', ')+' ('+(cfg.total_ms/1000).toFixed(1)+' s)');
     const t0=Date.now(),tot=cfg.total_ms+900;
     $('msg').textContent='Midiendo cada altavoz. No hagas ruido.';
@@ -2546,8 +2571,8 @@ static const char PWA_MANIFEST[] = R"HTML({
 static const char PWA_SW[] = R"HTML(/* Service worker de AStream. Solo se registra en contexto seguro (HTTPS o localhost).
  * - /api/*: SIEMPRE a la red (el estado en vivo no se cachea).
  * - Páginas e iconos: red primero y, si no hay red, la última copia (la interfaz abre sin conexión y avisa de que no hay datos).
- * e229c9d0b7 lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
-const CACHE = 'sonoswifi-e229c9d0b7';
+ * 5c63434b5d lo sustituye scripts/gen_web_pages.py por un hash de las páginas: cada cambio invalida la caché. */
+const CACHE = 'sonoswifi-5c63434b5d';
 const SHELL = ['/', '/calibrate', '/ble', '/manifest.webmanifest', '/icons/icon-192.png', '/fonts/roboto-400.woff2', '/fonts/roboto-500.woff2'];
 
 self.addEventListener('install', e => {

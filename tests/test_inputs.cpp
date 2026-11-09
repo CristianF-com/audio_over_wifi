@@ -1,4 +1,4 @@
-// Interfaces USB extra: configuración, validación, unión de canales y colchón elástico (sin ALSA ni hardware).
+// Entradas de audio: configuración, ids/nombres de canal, reloj principal y mezcla de varias placas (sin ALSA ni hardware).
 #include "input_mixer.h"
 #include "udp_streamer.h"
 #include <cstdio>
@@ -7,129 +7,149 @@
 #include <vector>
 static int fails = 0;
 #define CHECK(n, c) do { bool _c = (c); printf("%s %s\n", _c ? "PASS" : "FAIL", n); if (!_c) fails++; } while (0)
+static const uint32_t P = 240;
+static InputDev dev(const char* k, unsigned ch, bool en, const char* tag = "") { InputDev d; d.key = k; d.channels = ch; d.enabled = en; d.tag = tag; return d; }
+static std::vector<int32_t> blk(unsigned ch, int which, int32_t amp) {      // bloque con señal solo en el canal «which»
+    std::vector<int32_t> v((size_t)P * ch, 0);
+    for (uint32_t f = 0; f < P; f++) v[(size_t)f * ch + (size_t)which] = amp;
+    return v;
+}
 
 int main() {
-    // ── validación y JSON ──
-    std::vector<ExtraSpec> v; std::string err;
-    CHECK("JSON válido (2 interfaces)", InputMixer::parseJson("{\"extras\":[{\"device\":\"hw:2,0\",\"channels\":8},{\"device\":\"Scarlett\",\"channels\":2}]}", v, err) && v.size() == 2 && v[0].device == "hw:2,0" && v[0].channels == 8 && v[1].device == "Scarlett");
-    CHECK("lista vacía válida", InputMixer::parseJson("{\"extras\":[]}", v, err) && v.empty());
-    CHECK("sin extras → error", !InputMixer::parseJson("{}", v, err) && !err.empty());
-    CHECK("canales 0 rechazado", !InputMixer::parseJson("{\"extras\":[{\"device\":\"hw:2,0\",\"channels\":0}]}", v, err));
-    CHECK("más de 22 canales rechazado", !InputMixer::parseJson("{\"extras\":[{\"device\":\"hw:2,0\",\"channels\":23}]}", v, err));
-    CHECK("total > 22 rechazado", !InputMixer::parseJson("{\"extras\":[{\"device\":\"hw:2,0\",\"channels\":12},{\"device\":\"hw:3,0\",\"channels\":12}]}", v, err));
-    CHECK("repetida rechazada", !InputMixer::parseJson("{\"extras\":[{\"device\":\"hw:2,0\",\"channels\":2},{\"device\":\"hw:2,0\",\"channels\":2}]}", v, err));
-    CHECK("la Traktor no puede ser extra", !InputMixer::parseJson("{\"extras\":[{\"device\":\"Traktor Audio 10\",\"channels\":2}]}", v, err));
-    CHECK("dispositivo con | o comillas rechazado", !InputMixer::parseJson("{\"extras\":[{\"device\":\"a|b\",\"channels\":2}]}", v, err));
-    // ── fichero ──
-    const char* path = "/tmp/sonos_inputs_test.inputs";
-    remove(path);
-    CHECK("sin fichero → lista vacía", InputMixer::loadFile(path).empty());
-    std::vector<ExtraSpec> a = {{"hw:2,0", 8}, {"UMC1820", 6}};
-    CHECK("guardar y recargar", InputMixer::saveFile(path, a) && InputMixer::loadFile(path).size() == 2 && InputMixer::loadFile(path)[1].device == "UMC1820" && InputMixer::loadFile(path)[1].channels == 6);
+    // ── JSON y validación ──
+    InputConfig c; std::string err;
+    CHECK("JSON válido: 2 placas, reloj en la primera", InputMixer::parseJson("{\"devices\":[{\"key\":\"Traktor\",\"channels\":10,\"enabled\":true,\"tag\":\"A\"},{\"key\":\"Scarlett\",\"channels\":8,\"enabled\":false,\"tag\":\"B\"}],\"clock\":\"Traktor\"}", c, err)
+          && c.devs.size() == 2 && c.devs[0].key == "Traktor" && c.devs[0].enabled && !c.devs[1].enabled && c.devs[1].channels == 8 && c.clock == "Traktor");
+    CHECK("lista vacía válida", InputMixer::parseJson("{\"devices\":[],\"clock\":\"\"}", c, err) && c.devs.empty());
+    CHECK("sin devices → error", !InputMixer::parseJson("{}", c, err));
+    CHECK("las letras que faltan se asignan (A, B) y no se repiten", InputMixer::parseJson("{\"devices\":[{\"key\":\"x\",\"channels\":2,\"enabled\":true},{\"key\":\"y\",\"channels\":2,\"enabled\":true,\"tag\":\"A\"},{\"key\":\"z\",\"channels\":2,\"enabled\":true,\"tag\":\"A\"}],\"clock\":\"\"}", c, err)
+          && c.devs[0].tag != c.devs[1].tag && c.devs[1].tag == "A" && c.devs[2].tag != "A" && c.devs[0].tag != c.devs[2].tag);
+    CHECK("canales 0 rechazado", !InputMixer::parseJson("{\"devices\":[{\"key\":\"x\",\"channels\":0,\"enabled\":true}],\"clock\":\"\"}", c, err));
+    CHECK("33 canales rechazado", !InputMixer::parseJson("{\"devices\":[{\"key\":\"x\",\"channels\":33,\"enabled\":true}],\"clock\":\"\"}", c, err));
+    CHECK("más de 32 canales ACTIVOS rechazado; con una desactivada se admite", !InputMixer::parseJson("{\"devices\":[{\"key\":\"x\",\"channels\":20,\"enabled\":true},{\"key\":\"y\",\"channels\":20,\"enabled\":true}],\"clock\":\"\"}", c, err)
+          && InputMixer::parseJson("{\"devices\":[{\"key\":\"x\",\"channels\":20,\"enabled\":true},{\"key\":\"y\",\"channels\":20,\"enabled\":false}],\"clock\":\"\"}", c, err));
+    CHECK("placa repetida rechazada", !InputMixer::parseJson("{\"devices\":[{\"key\":\"x\",\"channels\":2,\"enabled\":true},{\"key\":\"x\",\"channels\":2,\"enabled\":true}],\"clock\":\"\"}", c, err));
+    CHECK("nombre con | o comillas rechazado", !InputMixer::parseJson("{\"devices\":[{\"key\":\"a|b\",\"channels\":2,\"enabled\":true}],\"clock\":\"\"}", c, err));
+    CHECK("reloj: una placa desactivada no puede ser el reloj principal", !InputMixer::parseJson("{\"devices\":[{\"key\":\"x\",\"channels\":2,\"enabled\":false}],\"clock\":\"x\"}", c, err));
+    CHECK("reloj «rpi» válido", InputMixer::parseJson("{\"devices\":[{\"key\":\"x\",\"channels\":2,\"enabled\":true}],\"clock\":\"rpi\"}", c, err) && c.clock == "rpi");
+    CHECK("reloj que no existe rechazado", !InputMixer::parseJson("{\"devices\":[{\"key\":\"x\",\"channels\":2,\"enabled\":true}],\"clock\":\"zzz\"}", c, err));
 
-    // ── Solo Traktor: nada cambia ──
+    // ── Fichero ──
+    const char* path = "/tmp/sonos_inputs_test.inputs"; remove(path);
+    InputConfig r;
+    CHECK("sin fichero: load devuelve false", !InputMixer::load(path, r));
+    InputConfig a; a.devs = {dev("Traktor", 10, true, "A"), dev("UMC1820", 6, false, "B")}; a.clock = "rpi";
+    CHECK("guardar y recargar (incluye «Usar» y reloj)", InputMixer::save(path, a) && InputMixer::load(path, r) && r == a && !r.devs[1].enabled && r.clock == "rpi" && r.devs[1].channels == 6);
+    { FILE* f = fopen(path, "w"); fputs("hw:2,0|8\nScarlett|2\n@traktor|1|0\n", f); fclose(f); }
+    CHECK("fichero de la versión anterior: la Traktor pasa a ser una placa más (en su posición) y rpi si no era el reloj", InputMixer::load(path, r) && r.devs.size() == 3 && r.devs[0].key == "hw:2,0" && r.devs[1].key == "Traktor" && r.devs[1].channels == 10 && r.devs[2].key == "Scarlett" && r.clock == "rpi" && r.devs[0].enabled);
+    { FILE* f = fopen(path, "w"); fputs("hw:2,0|2\n", f); fclose(f); }
+    CHECK("fichero antiguo sin @traktor: la Traktor primera y reloj principal", InputMixer::load(path, r) && r.devs[0].key == "Traktor" && r.clock == "Traktor" && r.devs.size() == 2);
+
+    // ── Tarjetas, valores de fábrica y reloj automático ──
+    std::vector<CardInfo> trk(1), two(2), one(1);
+    trk[0].name = "Traktor Audio 10"; trk[0].id = "hw:1,0"; trk[0].max_channels = 10;
+    two[0].name = "Scarlett 18i20"; two[0].id = "hw:2,0"; two[0].max_channels = 18; two[1].name = "USB Audio Device"; two[1].id = "hw:3,0"; two[1].max_channels = 2;
+    one[0] = two[1];
+    CHECK("tarjeta «Traktor» se reconoce por parte del nombre", InputMixer::matchCard("Traktor", trk) == 0 && InputMixer::matchCard("hw:1,0", trk) == 0 && InputMixer::matchCard("Scarlett", trk) < 0);
+    { InputConfig d = InputMixer::defaultConfig(trk); CHECK("de fábrica con la Traktor: solo ella, activa, 10 canales y su reloj", d.devs.size() == 1 && d.devs[0].key == "Traktor" && d.devs[0].enabled && d.devs[0].channels == 10 && d.devs[0].tag == "A" && InputMixer::effectiveClock(d) == "Traktor"); }
+    { InputConfig d = InputMixer::defaultConfig(one); CHECK("de fábrica sin Traktor y con UNA placa: se usa esa y su reloj", d.devs.size() == 1 && d.devs[0].key == "USB Audio Device" && d.devs[0].channels == 2 && d.devs[0].enabled && InputMixer::effectiveClock(d) == "USB Audio Device"); }
+    CHECK("de fábrica con varias placas y sin Traktor: ninguna (hay que elegir)", InputMixer::defaultConfig(two).devs.empty());
+    { InputConfig d; d.devs = {dev("a", 2, true, "A"), dev("b", 2, false, "B")}; CHECK("reloj automático con una sola placa ACTIVA = esa", InputMixer::effectiveClock(d) == "a");
+      d.devs[1].enabled = true; CHECK("reloj automático con varias activas = la Raspberry", InputMixer::effectiveClock(d) == "rpi");
+      d.clock = "b"; CHECK("reloj elegido", InputMixer::effectiveClock(d) == "b"); }
+
+    // ── Ids y nombres de canal ──
     {
         UdpStreamer s;
-        CHECK("por defecto 10 entradas", s.inputChannels() == 10 && s.allChannelNames().size() == 10);
-        CHECK("canal 10 rechazado sin interfaces extra", !s.setNodeConfig(0, 10, 11, 255, 255, true));
-        CHECK("canales 0..9 aceptados", s.setNodeConfig(0, 8, 9, 255, 255, true));
+        CHECK("por defecto: ids A1…A10 y nombres de siempre", s.channelIds().size() == 10 && s.channelIds()[0] == "A1" && s.channelIds()[9] == "A10" && s.channelNames()[0] == "FL" && s.channelNames()[9] == "AUX-R");
+        s.setInputChannels(12, {"A1","A2","A3","A4","A5","A6","A7","A8","A9","A10","B1","B2"});
+        CHECK("ids con 2 placas: A1…A10, B1, B2", s.channelIds().size() == 12 && s.channelIds()[10] == "B1" && s.channelIds()[11] == "B2");
+        CHECK("nombres de fábrica por canal local: B1 = FL, B2 = FR", s.channelNames()[10] == "FL" && s.channelNames()[11] == "FR");
+        std::vector<std::string> n = s.channelNames(); n[0] = "Sala"; n[11] = "Micro";
+        std::string e;
+        CHECK("se renombran TODOS los canales activos (no solo 10)", s.setChannelNames(n, e) && s.channelNames()[0] == "Sala" && s.channelNames()[11] == "Micro");
+        std::vector<std::string> bad(10, "x");
+        CHECK("hacen falta tantos nombres como canales activos", !s.setChannelNames(bad, e) && e.find("12") != std::string::npos);
+        s.setInputChannels(14, {"B1","B2","A1","A2","A3","A4","A5","A6","A7","A8","A9","A10","C1","C2"});   // se reordenan las placas
+        CHECK("los nombres siguen al id de la placa, no a la posición", s.channelNames()[1] == "Micro" && s.channelNames()[2] == "Sala");
+        n = s.channelNames(); for (auto& x : n) x = ""; 
+        CHECK("nombre vacío = el de fábrica", s.setChannelNames(n, e) && s.channelNames()[2] == "FL" && s.channelNames()[1] == "FR");
+        s.setInputChannels(12, {"A1","A2","A3","A4","A5","A6","A7","A8","A9","A10","A11","A12"});
+        CHECK("del canal 11 en adelante el nombre de fábrica es «Ch11»", s.channelNames()[10] == "Ch11" && s.channelNames()[11] == "Ch12");
     }
-    // ── Con interfaces extra ──
-    UdpStreamer s;
-    InputMixer m(s, 240);
-    m.setExtras({{"hw:2,0", 4}, {"hw:3,0", 2}});
-    CHECK("total = 10 + 4 + 2", m.totalChannels() == 16 && s.inputChannels() == 16);
-    { auto n = s.allChannelNames(); CHECK("nombres: 10 + USB1-1..4 + USB2-1..2", n.size() == 16 && n[3] == "LFE" && n[10] == "USB1-1" && n[13] == "USB1-4" && n[14] == "USB2-1" && n[15] == "USB2-2"); }
-    CHECK("el nombre editable sigue siendo de 10 entradas", s.channelNames().size() == 10);
-    CHECK("un altavoz puede usar un canal extra (15)", s.setNodeConfig(1, 10, 15, 255, 255, true));
-    CHECK("canal 16 rechazado", !s.setNodeConfig(1, 10, 16, 255, 255, true));
-
-    const uint32_t P = 240;
-    std::vector<int32_t> trk((size_t)P * 10, 0), x1((size_t)P * 4, 0), x2((size_t)P * 2, 0);
-    for (uint32_t f = 0; f < P; f++) { trk[(size_t)f * 10 + 0] = 0x40000000; x1[(size_t)f * 4 + 1] = 0x40000000; x2[(size_t)f * 2 + 1] = 0x10000000; }
-    // 3 bloques de colchón y luego en régimen
-    for (int i = 0; i < 3; i++) { m.injectForTest(0, x1.data(), P); m.injectForTest(1, x2.data(), P); }
-    for (int i = 0; i < 20; i++) { m.injectForTest(0, x1.data(), P); m.injectForTest(1, x2.data(), P); m.onTraktor(trk.data(), P, (uint64_t)i * 5000); }
-    CHECK("canal 0 (Traktor) con señal", s.meterDb(0) > -7 && s.meterDb(0) < -5);
-    CHECK("canal 1 (Traktor) en silencio", s.meterDb(1) <= -89);
-    CHECK("canal 11 = 2.º canal de USB1 con señal", s.meterDb(11) > -7 && s.meterDb(11) < -5);
-    CHECK("canal 10 (1.º de USB1) en silencio", s.meterDb(10) <= -89);
-    CHECK("canal 15 = 2.º canal de USB2 con señal (−18 dB)", s.meterDb(15) > -19 && s.meterDb(15) < -17);
-    CHECK("estado: sin subdesbordes en régimen", m.statusJson().find("\"underruns\":0") != std::string::npos);
-
-    // ── Deriva: una interfaz que va más rápida no acumula retraso (se recorta) ──
-    for (int i = 0; i < 40; i++) { m.injectForTest(0, x1.data(), P); m.injectForTest(0, x1.data(), P); m.onTraktor(trk.data(), P, 100000 + (uint64_t)i * 5000); }
-    { std::string j = m.statusJson(); size_t k = j.find("\"fill_ms\":"); double fill = atof(j.c_str() + k + 10);
-      CHECK("deriva: el colchón no crece sin límite (≤ 40 ms)", fill <= 40.0);
-      CHECK("deriva: se contabilizan los recortes", atof(j.c_str() + j.find("\"dropped_ms\":") + 13) > 0.0); }
-    // ── Una interfaz que deja de entregar: silencio en sus canales, la Traktor sigue ──
-    for (int i = 0; i < 250; i++) m.onTraktor(trk.data(), P, 400000 + (uint64_t)i * 5000);
-    CHECK("USB1 sin datos → silencio (cae el medidor)", s.meterDb(11) < -30);
-    CHECK("la Traktor sigue sonando", s.meterDb(0) > -7);
-    { std::string j = m.statusJson(); CHECK("subdesborde contabilizado", atoi(j.c_str() + j.find("\"underruns\":") + 12) > 0); }
-    // ── Sin Traktor: las extras toman las entradas desde la 1 ──
+    // ── Persistencia de nombres (por id; el formato antiguo chN= se lee como A1…A10) ──
     {
-        UdpStreamer s2; InputMixer m2(s2, 240);
-        m2.setTraktorPresent(false);
-        m2.setExtras({{"hw:2,0", 8}, {"hw:3,0", 4}});
-        CHECK("sin Traktor: 12 canales extra → 12 entradas", m2.totalChannels() == 12 && s2.inputChannels() == 12);
-        { auto n = s2.allChannelNames(); CHECK("sin Traktor: las 10 primeras conservan los nombres editables y las demás son USB", n.size() == 12 && n[0] == "FL" && n[9] == "AUX-R" && n[10] == "USB2-3" && n[11] == "USB2-4"); }
-        std::vector<int32_t> x((size_t)P * 8, 0), y((size_t)P * 4, 0);
-        for (uint32_t f = 0; f < P; f++) { x[(size_t)f * 8 + 0] = 0x40000000; y[(size_t)f * 4 + 3] = 0x40000000; }
-        for (int i = 0; i < 3; i++) { m2.injectForTest(0, x.data(), P); m2.injectForTest(1, y.data(), P); }
-        for (int i = 0; i < 20; i++) { m2.injectForTest(0, x.data(), P); m2.injectForTest(1, y.data(), P); m2.onTraktor(nullptr, P, (uint64_t)i * 5000); }
-        CHECK("sin Traktor: el canal 1 de la 1.ª interfaz es la entrada 1", s2.meterDb(0) > -7 && s2.meterDb(0) < -5 && s2.meterDb(1) <= -89);
-        CHECK("sin Traktor: el canal 4 de la 2.ª interfaz es la entrada 12", s2.meterDb(11) > -7 && s2.meterDb(11) < -5 && s2.meterDb(10) <= -89);
-        CHECK("sin Traktor: un altavoz puede usar la entrada 1 y la 12", s2.setNodeConfig(0, 0, 11, 255, 255, true) && !s2.setNodeConfig(0, 0, 12, 255, 255, true));
-        std::vector<ExtraSpec> w; std::string e;
-        CHECK("sin Traktor: se admiten hasta 32 canales (con Traktor, 22)", InputMixer::parseJson("{\"extras\":[{\"device\":\"hw:2,0\",\"channels\":30}]}", w, e, false) && !InputMixer::parseJson("{\"extras\":[{\"device\":\"hw:2,0\",\"channels\":30}]}", w, e, true));
-        UdpStreamer s3; InputMixer m3(s3, 240); m3.setTraktorPresent(false); m3.setExtras({{"hw:2,0", 2}});
-        CHECK("sin Traktor y pocas extras: mínimo 10 entradas (resto en silencio)", m3.totalChannels() == 10 && s3.inputChannels() == 10);
+        const char* base = "/tmp/sonos_names_test.txt"; remove("/tmp/sonos_names_test.txt.chnames");
+        UdpStreamer s; s.setConfigPath(base);
+        s.setInputChannels(12, {"A1","A2","A3","A4","A5","A6","A7","A8","A9","A10","B1","B2"});
+        std::vector<std::string> n = s.channelNames(); n[10] = "Guitarra"; n[0] = "Izq"; std::string e;
+        CHECK("guardar nombres", s.setChannelNames(n, e));
+        UdpStreamer s2; s2.setConfigPath(base); s2.loadChannelNames(); s2.setInputChannels(12, {"A1","A2","A3","A4","A5","A6","A7","A8","A9","A10","B1","B2"});
+        CHECK("nombres persisten por id", s2.channelNames()[10] == "Guitarra" && s2.channelNames()[0] == "Izq" && s2.channelNames()[11] == "FR");
+        { FILE* f = fopen("/tmp/sonos_names_test.txt.chnames", "w"); fputs("ch0=Viejo\nch9=Fin\n", f); fclose(f); }
+        UdpStreamer s3; s3.setConfigPath(base); s3.loadChannelNames();
+        CHECK("formato antiguo: ch0 → A1, ch9 → A10", s3.channelNames()[0] == "Viejo" && s3.channelNames()[9] == "Fin" && s3.channelNames()[1] == "FR");
     }
-    // ── Traktor editable: posición y reloj ──
+
+    // ── Mezcla: placa A (4 canales) reloj principal + B (2 canales) por colchón ──
     {
-        const char* pth = "/tmp/sonos_inputs_trk.inputs"; remove(pth);
-        int tp = 5; bool tm = false;
-        InputMixer::loadTraktor(pth, tp, tm);
-        CHECK("sin @traktor: posición 0 y reloj principal por defecto", tp == 0 && tm);
-        CHECK("guardar con posición y reloj", InputMixer::saveFile(pth, {{"hw:2,0", 2}}, 1, false));
-        InputMixer::loadTraktor(pth, tp, tm);
-        CHECK("recargar posición 1 y reloj secundario; la línea @traktor no se lee como interfaz", tp == 1 && !tm && InputMixer::loadFile(pth).size() == 1);
-        InputMixer::saveFile(pth, {{"hw:2,0", 2}});
-        { std::string txt; FILE* f = fopen(pth, "r"); char b[128]; while (fgets(b, sizeof b, f)) txt += b; fclose(f); CHECK("valores por defecto: el fichero no lleva @traktor", txt == "hw:2,0|2\n"); }
-        int p2 = 0; bool m2 = true; InputMixer::parseTraktor("{\"extras\":[],\"traktor\":{\"pos\":2,\"master\":false}}", p2, m2);
-        CHECK("JSON traktor: pos 2, master false", p2 == 2 && !m2);
-        p2 = 3; m2 = false; InputMixer::parseTraktor("{\"extras\":[]}", p2, m2);
-        CHECK("JSON sin traktor no toca los valores", p2 == 3 && !m2);
-
-        // Traktor en el medio (pos 1), sigue siendo el reloj: A(2) | Traktor(10) | B(2)
-        UdpStreamer s4; InputMixer m4(s4, 240);
-        m4.setTraktorLayout(1, true); m4.setExtras({{"hw:2,0", 2}, {"hw:3,0", 2}});
-        CHECK("Traktor en el medio: 14 entradas y sus canales empiezan en la 3", m4.totalChannels() == 14 && m4.traktorFirst() == 2);
-        { auto n = s4.allChannelNames(); CHECK("nombres: TK en las entradas ≥ 10 de la Traktor, USB en las otras", n.size() == 14 && n[10] == "TK9" && n[11] == "TK10" && n[12] == "USB2-1" && n[13] == "USB2-2"); }
-        std::vector<int32_t> a((size_t)P * 2, 0), b((size_t)P * 2, 0), k((size_t)P * 10, 0);
-        for (uint32_t f = 0; f < P; f++) { a[(size_t)f * 2] = 0x40000000; b[(size_t)f * 2 + 1] = 0x40000000; k[(size_t)f * 10] = 0x20000000; }
-        for (int i = 0; i < 3; i++) { m4.injectForTest(0, a.data(), P); m4.injectForTest(1, b.data(), P); }
-        for (int i = 0; i < 20; i++) { m4.injectForTest(0, a.data(), P); m4.injectForTest(1, b.data(), P); m4.onTraktor(k.data(), P, (uint64_t)i * 5000); }
-        CHECK("Traktor en el medio: A.1 = entrada 1 (−6 dB)", s4.meterDb(0) > -7 && s4.meterDb(0) < -5);
-        CHECK("Traktor en el medio: Traktor FL = entrada 3 (−12 dB)", s4.meterDb(2) > -13 && s4.meterDb(2) < -11 && s4.meterDb(3) <= -89);
-        CHECK("Traktor en el medio: B.2 = entrada 14 (−6 dB)", s4.meterDb(13) > -7 && s4.meterDb(13) < -5 && s4.meterDb(12) <= -89);
-
-        // Traktor sin ser el reloj: entra por colchón y manda el reloj del mezclador (tickForTest)
-        UdpStreamer s5; InputMixer m5(s5, 240);
-        m5.setTraktorLayout(0, false); m5.setExtras({{"hw:2,0", 2}});
-        CHECK("Traktor secundaria al principio: 12 entradas, Traktor en la 1", m5.totalChannels() == 12 && m5.traktorFirst() == 0);
-        for (int i = 0; i < 3; i++) { m5.injectForTest(0, a.data(), P); m5.onTraktor(k.data(), P, 0); }
-        for (int i = 0; i < 20; i++) { m5.injectForTest(0, a.data(), P); m5.onTraktor(k.data(), P, 0); m5.tickForTest(P, (uint64_t)i * 5000); }
-        CHECK("Traktor secundaria: la Traktor suena por su colchón (entrada 1, −12 dB)", s5.meterDb(0) > -13 && s5.meterDb(0) < -11);
-        CHECK("Traktor secundaria: la extra queda en las entradas 11–12 (A.1 = 11, −6 dB)", s5.meterDb(10) > -7 && s5.meterDb(10) < -5);
-        CHECK("Traktor secundaria: el estado informa underruns de la Traktor", m5.statusJson().find("\"master\":false") != std::string::npos && m5.statusJson().find("\"traktor\":{") != std::string::npos);
-        for (int i = 0; i < 250; i++) m5.tickForTest(P, 200000 + (uint64_t)i * 5000);
-        CHECK("Traktor secundaria: si deja de entregar, silencio y la extra también sigue su colchón", s5.meterDb(0) < -30);
-        // Traktor ausente: su hueco no existe aunque tenga posición
-        UdpStreamer s6; InputMixer m6(s6, 240);
-        m6.setTraktorPresent(false); m6.setTraktorLayout(1, true); m6.setExtras({{"hw:2,0", 2}, {"hw:3,0", 2}});
-        CHECK("Traktor ausente: las extras ocupan desde la entrada 1 sin hueco (10 entradas mínimo)", m6.totalChannels() == 10);
+        UdpStreamer s; InputMixer m(s, P);
+        InputConfig cfg; cfg.devs = {dev("A", 4, true, "A"), dev("B", 2, true, "B")}; cfg.clock = "A";
+        m.configure(cfg);
+        CHECK("2 placas (4+2 canales): mínimo 10 entradas; B empieza en la 5", m.totalChannels() == 10 && m.firstOf(0) == 0 && m.firstOf(1) == 4);
+        CHECK("ids: A1…A4, B1, B2", s.channelIds()[3] == "A4" && s.channelIds()[4] == "B1" && s.channelIds()[5] == "B2");
+        auto a1 = blk(4, 1, 0x40000000), b1 = blk(2, 1, 0x10000000);
+        for (int i = 0; i < 3; i++) m.injectForTest(1, b1.data(), P);
+        for (int i = 0; i < 20; i++) { m.injectForTest(1, b1.data(), P); m.injectForTest(0, a1.data(), P, true, (uint64_t)i * 5000); }
+        CHECK("la placa que manda el reloj suena (A2 = entrada 2, −6 dB)", s.meterDb(1) > -7 && s.meterDb(1) < -5 && s.meterDb(0) <= -89);
+        CHECK("la otra entra por colchón (B2 = entrada 6, −18 dB)", s.meterDb(5) > -19 && s.meterDb(5) < -17 && s.meterDb(4) <= -89);
+        for (int i = 0; i < 250; i++) { m.injectForTest(0, a1.data(), P, true, 100000 + (uint64_t)i * 5000); }
+        CHECK("si la otra deja de entregar: silencio en sus canales y A sigue sonando", s.meterDb(5) < -30 && s.meterDb(1) > -7);
+        { std::string j = m.statusJson(); size_t k = j.find("\"key\":\"B\""); CHECK("estado: B informa cortes", k != std::string::npos && atoi(j.c_str() + j.find("\"underruns\":", k) + 12) > 0); }
+    }
+    // ── Reloj = Raspberry: todas por colchón y reloj propio; una placa desactivada no ocupa entradas ──
+    {
+        UdpStreamer s; InputMixer m(s, P);
+        InputConfig cfg; cfg.devs = {dev("A", 2, false, "A"), dev("B", 2, true, "B"), dev("C", 2, true, "C")}; cfg.clock = "rpi";
+        m.configure(cfg);
+        CHECK("la desactivada no ocupa entradas: B = 1–2, C = 3–4", m.firstOf(0) == 0 && m.firstOf(1) == 2 && s.channelIds()[0] == "B1" && s.channelIds()[2] == "C1");
+        auto x = blk(2, 0, 0x40000000), y = blk(2, 1, 0x40000000);
+        for (int i = 0; i < 3; i++) { m.injectForTest(0, x.data(), P); m.injectForTest(1, y.data(), P); }
+        for (int i = 0; i < 20; i++) { m.injectForTest(0, x.data(), P); m.injectForTest(1, y.data(), P); m.tickForTest(P, (uint64_t)i * 5000); }
+        CHECK("clock=rpi: B1 (entrada 1) y C2 (entrada 4) suenan", s.meterDb(0) > -7 && s.meterDb(0) < -5 && s.meterDb(3) > -7 && s.meterDb(3) < -5 && s.meterDb(1) <= -89 && s.meterDb(2) <= -89);
+        // un inyectado «como reloj» no mezcla si nadie manda
+        m.injectForTest(0, x.data(), P, true, 0);
+        CHECK("clock=rpi: el estado indica reloj rpi", m.statusJson().find("\"clock\":\"rpi\"") != std::string::npos);
+    }
+    // ── Traktor (10 canales) + otra placa ──
+    {
+        UdpStreamer s; InputMixer m(s, P);
+        InputConfig cfg; cfg.devs = {dev("Traktor", 10, true, "A"), dev("Scarlett", 8, true, "B")}; cfg.clock = "Traktor";
+        m.configure(cfg);
+        CHECK("Traktor + Scarlett: 18 entradas, B desde la 11", m.totalChannels() == 18 && m.firstOf(1) == 10 && s.channelIds()[10] == "B1" && s.channelIds()[17] == "B8");
+        CHECK("un altavoz puede usar un canal de la segunda placa (18) y no el 19", s.setNodeConfig(0, 0, 17, 255, 255, true) && !s.setNodeConfig(0, 0, 18, 255, 255, true));
+        auto k = blk(10, 0, 0x40000000), b = blk(8, 7, 0x40000000);
+        for (int i = 0; i < 3; i++) m.injectForTest(1, b.data(), P);
+        for (int i = 0; i < 20; i++) { m.injectForTest(1, b.data(), P); m.injectForTest(0, k.data(), P, true, (uint64_t)i * 5000); }
+        CHECK("Traktor FL = entrada 1 y B8 = entrada 18", s.meterDb(0) > -7 && s.meterDb(0) < -5 && s.meterDb(17) > -7 && s.meterDb(17) < -5);
+    }
+    // ── Deriva: una placa más rápida no acumula retraso (se recorta) ──
+    {
+        UdpStreamer s; InputMixer m(s, P);
+        InputConfig cfg; cfg.devs = {dev("A", 10, true, "A"), dev("B", 2, true, "B")}; cfg.clock = "A"; m.configure(cfg);
+        auto a = blk(10, 0, 0x40000000), b = blk(2, 0, 0x40000000);
+        for (int i = 0; i < 60; i++) { m.injectForTest(1, b.data(), P); m.injectForTest(1, b.data(), P); m.injectForTest(0, a.data(), P, true, (uint64_t)i * 5000); }
+        std::string j = m.statusJson(); size_t k = j.find("\"key\":\"B\"");
+        double fill = atof(j.c_str() + j.find("\"fill_ms\":", k) + 10), dropped = atof(j.c_str() + j.find("\"dropped_ms\":", k) + 13);
+        CHECK("deriva: el colchón no crece sin límite (≤ 40 ms)", fill <= 40.0);
+        CHECK("deriva: se contabilizan los recortes", dropped > 0.0);
+    }
+    // ── Sin placas activas: silencio, 10 entradas ──
+    {
+        UdpStreamer s; InputMixer m(s, P);
+        InputConfig cfg; cfg.devs = {dev("A", 2, false, "A")}; m.configure(cfg);
+        for (int i = 0; i < 5; i++) m.tickForTest(P, (uint64_t)i * 5000);
+        CHECK("ninguna activa: 10 entradas en silencio", m.totalChannels() == 10 && s.inputChannels() == 10 && s.meterDb(0) <= -89);
     }
     printf("%s\n", fails ? "RESULTADO: FALLOS" : "RESULTADO: TODO OK");
     return fails ? 1 : 0;

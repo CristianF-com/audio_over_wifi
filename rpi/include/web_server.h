@@ -13,9 +13,9 @@
 
 class WebServer {
 public:
-    // Interfaces USB extra: mezclador (puede ser null si no hay), fichero de configuración, las que están en marcha y cómo reiniciar el servicio
-    void setInputs(InputMixer* m, const std::string& path, const std::vector<ExtraSpec>& running, bool traktor_present, int tpos, bool tmaster, std::function<void()> restart) {
-        mixer_ = m; inputs_path_ = path; inputs_running_ = running; traktor_present_ = traktor_present; run_tpos_ = tpos; run_tmaster_ = tmaster; restart_cb_ = std::move(restart);
+    // Entradas de audio: mezclador (null si captura directa de una sola placa), fichero de configuración, la configuración en marcha y cómo reiniciar el servicio
+    void setInputs(InputMixer* m, const std::string& path, const InputConfig& running, bool direct, std::function<void()> restart) {
+        mixer_ = m; inputs_path_ = path; running_cfg_ = running; direct_ = direct; restart_cb_ = std::move(restart);
     }
     WebServer(UdpStreamer& s, AudioCapture& c, uint16_t port = 8080);
     ~WebServer();
@@ -72,10 +72,8 @@ private:
     std::string inputsPost(const std::string& body);
     InputMixer*       mixer_ = nullptr;
     std::string       inputs_path_;
-    std::vector<ExtraSpec> inputs_running_;
-    bool              traktor_present_ = true;
-    int               run_tpos_ = 0;
-    bool              run_tmaster_ = true;
+    InputConfig       running_cfg_;
+    bool              direct_ = true;
     std::function<void()> restart_cb_;
     BleManager        ble_;
     SystemManager     sys_;

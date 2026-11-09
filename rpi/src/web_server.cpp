@@ -528,7 +528,7 @@ std::string WebServer::getStatus() {
     std::ostringstream o;
     o << "{" << jstr("device", c.device) << ","
       << jnum("sample_rate", c.sample_rate) << ","
-      << "\"ch_names\":" << [&] { std::string r = "["; auto v = streamer_.allChannelNames(); for (size_t i = 0; i < v.size(); i++) r += (i ? ",\"" : "\"") + jesc(v[i]) + "\""; return r + "]"; }() << ","
+      << "\"ch_names\":" << [&] { std::string r = "["; auto v = streamer_.channelNames(); for (size_t i = 0; i < v.size(); i++) r += (i ? ",\"" : "\"") + jesc(v[i]) + "\""; return r + "]"; }() << ",\"ch_ids\":" << [&] { std::string r = "["; auto v = streamer_.channelIds(); for (size_t i = 0; i < v.size(); i++) r += (i ? ",\"" : "\"") + jesc(v[i]) + "\""; return r + "]"; }() << ","
       << jnum("channels", c.channels) << ","
       << jnum("period_frames", c.period_size) << ","
       << jnum("playout_ms", streamer_.playoutUs() / 1000.0) << ","
@@ -767,35 +767,50 @@ std::string WebServer::serveFirmware(const std::string& path, int& code) {
     if (!tok || !end || *end || tok != fw_token_ || nowUs() > fw_token_until_us_ || fw_data_.empty()) { code = 403; return "{\"error\":\"token no válido\"}"; }
     return fw_data_;
 }
-// Interfaces USB de audio extra (además de la Traktor): GET lista tarjetas + estado; POST {"extras":[{"device","channels"}]} guarda y reinicia el servicio
+// Entradas de audio: GET lista las placas (configuradas y detectadas) con su estado; POST {"devices":[…],"clock":"…"} guarda y reinicia el servicio
 std::string WebServer::inputsGet() {
-    std::ostringstream o;
-    int tpos = 0; bool tmaster = true;
-    InputMixer::loadTraktor(inputs_path_, tpos, tmaster);
-    o << "{\"traktor\":{\"present\":" << (traktor_present_ ? "true" : "false") << ",\"channels\":" << AUDIO_CHANNELS << ",\"pos\":" << tpos << ",\"master\":" << (tmaster ? "true" : "false") << "},\"max_extra\":" << (traktor_present_ ? MAX_INPUTS - AUDIO_CHANNELS : MAX_INPUTS) << ",\"cards\":[";
     const auto cards = InputMixer::listCards();
-    for (size_t i = 0; i < cards.size(); i++)
-        o << (i ? "," : "") << "{" << jstr("id", cards[i].id) << "," << jstr("name", cards[i].name) << "," << jnum("max_channels", cards[i].max_channels) << ","
-          << jbool("traktor", cards[i].traktor) << "," << jbool("busy", cards[i].busy) << "}";
-    o << "],\"saved\":[";
-    const auto saved = InputMixer::loadFile(inputs_path_);
-    for (size_t i = 0; i < saved.size(); i++) o << (i ? "," : "") << "{" << jstr("device", saved[i].device) << "," << jnum("channels", saved[i].channels) << "}";
-    bool same = saved.size() == inputs_running_.size();
-    for (size_t i = 0; same && i < saved.size(); i++) same = saved[i].device == inputs_running_[i].device && saved[i].channels == inputs_running_[i].channels;
-    same = same && tpos == run_tpos_ && tmaster == run_tmaster_;
-    o << "],\"running\":" << (mixer_ ? mixer_->statusJson() : std::string("{\"extras\":[],\"total\":") + std::to_string(AUDIO_CHANNELS) + "}")
-      << "," << jbool("restart_needed", !same) << "}";
+    InputConfig saved;
+    if (inputs_path_.empty() || !InputMixer::load(inputs_path_, saved)) saved = InputMixer::defaultConfig(cards);
+    { std::string e; InputMixer::validate(saved, e); }
+    std::vector<bool> used(cards.size(), false);
+    std::ostringstream o;
+    o << "{\"devices\":[";
+    for (size_t i = 0; i < saved.devs.size(); i++) {
+        const auto& d = saved.devs[i];
+        const int ci = InputMixer::matchCard(d.key, cards);
+        if (ci >= 0) used[(size_t)ci] = true;
+        o << (i ? "," : "") << "{" << jstr("key", d.key) << "," << jstr("name", ci >= 0 && !cards[(size_t)ci].name.empty() ? cards[(size_t)ci].name : d.key) << "," << jnum("channels", d.channels) << ","
+          << jbool("enabled", d.enabled) << "," << jstr("tag", d.tag) << "," << jbool("connected", ci >= 0) << "," << jstr("card", ci >= 0 ? cards[(size_t)ci].id : "") << ","
+          << jnum("max_channels", ci >= 0 ? cards[(size_t)ci].max_channels : 0) << "," << jbool("busy", ci >= 0 && cards[(size_t)ci].busy) << "}";
+    }
+    o << "],\"cards\":[";
+    bool first = true;
+    for (size_t i = 0; i < cards.size(); i++) {
+        if (used[i]) continue;
+        int same = 0; for (const auto& c : cards) if (c.name == cards[i].name) same++;
+        o << (first ? "" : ",") << "{" << jstr("key", same == 1 && !cards[i].name.empty() ? cards[i].name : cards[i].id) << "," << jstr("name", cards[i].name) << "," << jstr("id", cards[i].id) << ","
+          << jnum("max_channels", cards[i].max_channels) << "," << jbool("busy", cards[i].busy) << "}";
+        first = false;
+    }
+    std::string running;
+    if (mixer_ && !direct_) running = mixer_->statusJson();
+    else {                                                         // captura directa: una sola placa que manda su reloj
+        std::ostringstream r; r << "{\"devices\":[";
+        bool f = true;
+        for (const auto& d : running_cfg_.devs) if (d.enabled) { r << (f ? "" : ",") << "{" << jstr("key", d.key) << "," << jbool("online", capture_.isRunning()) << ",\"first\":0,\"error\":\"\",\"master\":true,\"underruns\":0}"; f = false; }
+        r << "],\"clock\":\"" << jesc(InputMixer::effectiveClock(running_cfg_)) << "\",\"total\":" << streamer_.inputChannels() << "}";
+        running = r.str();
+    }
+    o << "]," << jstr("clock", saved.clock) << "," << jstr("clock_effective", InputMixer::effectiveClock(saved)) << ",\"max_total\":" << MAX_INPUTS << ","
+      << jbool("direct", direct_) << ",\"running\":" << running << "," << jbool("restart_needed", !(saved == running_cfg_)) << "}";
     return o.str();
 }
 std::string WebServer::inputsPost(const std::string& b) {
     if (inputs_path_.empty()) return "{\"error\":\"esta Raspberry no guarda configuración\"}";
-    std::vector<ExtraSpec> v; std::string err;
-    if (!InputMixer::parseJson(b, v, err, traktor_present_)) return "{" + jstr("error", err) + "}";
-    int tpos = 0; bool tmaster = true;
-    InputMixer::loadTraktor(inputs_path_, tpos, tmaster);
-    InputMixer::parseTraktor(b, tpos, tmaster);
-    if (tpos > (int)v.size()) tpos = (int)v.size();
-    if (!InputMixer::saveFile(inputs_path_, v, tpos, tmaster)) return "{\"error\":\"no se pudo guardar en la Raspberry\"}";
+    InputConfig c; std::string err;
+    if (!InputMixer::parseJson(b, c, err)) return "{" + jstr("error", err) + "}";
+    if (!InputMixer::save(inputs_path_, c)) return "{\"error\":\"no se pudo guardar en la Raspberry\"}";
     const bool restart = (jsonGet(b, "restart") != "false");
     if (restart && restart_cb_) restart_cb_();
     return std::string("{\"ok\":true,") + jbool("restarting", restart && (bool)restart_cb_) + "}";
@@ -806,17 +821,20 @@ std::string WebServer::namesList() {
     std::ostringstream o;
     o << "{\"names\":[";
     for (size_t i = 0; i < v.size(); i++) o << (i ? "," : "") << "\"" << jesc(v[i]) << "\"";
+    o << "],\"ids\":[";
+    const auto ids = streamer_.channelIds();
+    for (size_t i = 0; i < ids.size(); i++) o << (i ? "," : "") << "\"" << jesc(ids[i]) << "\"";
     o << "]}";
     return o.str();
 }
 std::string WebServer::namesPost(const std::string& b) {
     std::string err;
     std::vector<std::string> v;
-    if (jsonGet(b, "reset") == "true") { for (int i = 0; i < 10; i++) v.push_back(UdpStreamer::defaultChannelName(i)); }
+    if (jsonGet(b, "reset") == "true") { for (const auto& id : streamer_.channelIds()) v.push_back(UdpStreamer::defaultNameForId(id)); }
     else {
         const size_t k = b.find("\"names\"");
         const size_t lb = k == std::string::npos ? k : b.find('[', k), rb = lb == std::string::npos ? lb : b.find(']', lb);
-        if (rb == std::string::npos) return "{\"error\":\"falta names (lista de 10 nombres)\"}";
+        if (rb == std::string::npos) return "{\"error\":\"falta names (un nombre por entrada activa)\"}";
         size_t pos = lb + 1;
         while (pos < rb) {                                             // cadenas JSON con \" y \\ escapados
             size_t q = b.find('"', pos); if (q == std::string::npos || q >= rb) break;

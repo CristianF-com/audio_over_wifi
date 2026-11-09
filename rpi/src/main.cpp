@@ -20,7 +20,6 @@ static void usage(const char* a0) {
     fprintf(stderr, "Uso: %s [-d hw:N,0|auto] [-p puerto_http] [-P frames_periodo]\n"
                     "         [-S puerto_https] [-C cert.pem] [-K key.pem]\n"
                     "         [-c fichero_config] [-W fichero_password] [-B ayudante_ble.py]\n"
-                    "         [-x dispositivo:canales]   interfaz USB extra (repetible, p. ej. -x hw:2,0:8); también <config>.inputs\n"
                     "         [-w carpeta_web]   (desarrollo: sirve panel/calibrar/ble desde rpi/web sin recompilar)\n", a0);
 }
 
@@ -36,14 +35,8 @@ int main(int argc, char* argv[]) {
     std::string webdir;
     std::string blehelper = "/usr/local/lib/sonos_wifi/sonos_ble_prov.py";
 
-    std::vector<ExtraSpec> extras_cli;
     for (int i = 1; i < argc; i++) {
-        if (!strcmp(argv[i], "-x") && i + 1 < argc) {
-            std::string a = argv[++i]; const size_t c = a.rfind(':');
-            if (c == std::string::npos || c == 0) { usage(argv[0]); return 2; }
-            ExtraSpec e; e.device = a.substr(0, c); e.channels = (unsigned)strtoul(a.c_str() + c + 1, nullptr, 10);
-            extras_cli.push_back(e);
-        } else if (!strcmp(argv[i], "-d") && i + 1 < argc) acfg.device = argv[++i];
+        if (!strcmp(argv[i], "-d") && i + 1 < argc) acfg.device = argv[++i];
         else if (!strcmp(argv[i], "-p") && i + 1 < argc) {
             long v = strtol(argv[++i], nullptr, 10);
             if (v < 1 || v > 65535) { usage(argv[0]); return 2; }
@@ -75,6 +68,24 @@ int main(int argc, char* argv[]) {
     if (mlockall(MCL_CURRENT | MCL_FUTURE))
         fprintf(stderr, "[Main] mlockall no disponible (LimitMEMLOCK) — continuo\n");
 
+    // Entradas de audio: <config>.inputs (placas, «Usar», reloj principal). Sin fichero: la Traktor si está, o la única placa de captura conectada.
+    const std::string inputs_path = cfgfile.empty() ? std::string() : cfgfile + ".inputs";
+    const std::vector<CardInfo> cards = InputMixer::listCards();
+    InputConfig icfg;
+    bool have_cfg = !inputs_path.empty() && InputMixer::load(inputs_path, icfg);
+    if (!have_cfg) {
+        if (acfg.device != "auto") { InputDev d; d.key = acfg.device; d.channels = acfg.channels; d.enabled = true; icfg.devs.push_back(d); }   // -d explícito
+        else icfg = InputMixer::defaultConfig(cards);
+    }
+    { std::string verr; if (!InputMixer::validate(icfg, verr)) { fprintf(stderr, "[Main] Configuración de entradas no válida (%s): uso la de fábrica\n", verr.c_str()); icfg = InputMixer::defaultConfig(cards); } }
+    // Camino directo (el de siempre): UNA sola placa activa, con 10 canales o más y siendo ella el reloj → captura y pushFrames sin mezclador
+    const InputDev* only = nullptr; int n_en = 0;
+    for (const auto& d : icfg.devs) if (d.enabled) { only = &d; n_en++; }
+    bool direct = n_en == 1 && only->channels >= (unsigned)AUDIO_CHANNELS && InputMixer::effectiveClock(icfg) == only->key;
+    std::string direct_dev;
+    if (direct) { direct_dev = InputMixer::resolve(only->key); if (direct_dev.empty()) direct = false; }
+    if (direct) { acfg.device = direct_dev; acfg.channels = only->channels; }
+
     AudioCapture capture(acfg);
     UdpStreamer  streamer;
     WebServer    web(streamer, capture, web_port);
@@ -99,32 +110,17 @@ int main(int argc, char* argv[]) {
     if (!cfgfile.empty()) { streamer.setConfigPath(cfgfile); streamer.loadConfig(); }
 
     if (!streamer.init()) { fprintf(stderr, "[Main] Cannot init UDP streamer\n"); return 1; }
-    // Interfaces USB extra (opcional): <config>.inputs + -x. Sin ellas todo sigue como siempre (solo la Traktor).
-    const std::string inputs_path = cfgfile.empty() ? std::string() : cfgfile + ".inputs";
-    std::vector<ExtraSpec> extras = inputs_path.empty() ? std::vector<ExtraSpec>() : InputMixer::loadFile(inputs_path);
-    for (const auto& e : extras_cli) extras.push_back(e);
-    int trk_pos = 0; bool trk_master = true;
-    if (!inputs_path.empty()) InputMixer::loadTraktor(inputs_path, trk_pos, trk_master);
-    const bool traktor_ok = capture.open();
-    { std::string verr; if (!extras.empty() && !InputMixer::validate(extras, verr, traktor_ok)) { fprintf(stderr, "[Main] Interfaces extra ignoradas: %s\n", verr.c_str()); extras.clear(); } }
-    if (!traktor_ok && extras.empty()) { fprintf(stderr, "[Main] Cannot open ALSA device\n");  return 1; }
-    if (!traktor_ok) fprintf(stderr, "[Main] Sin Traktor: sigo con las interfaces extra (toman las entradas desde la 1)\n");
+    if (direct && !capture.open()) { fprintf(stderr, "[Main] No se pudo abrir %s: sigo con el mezclador (silencio hasta que aparezca)\n", direct_dev.c_str()); direct = false; }
     InputMixer mixer(streamer, acfg.period_size);
-    if (!extras.empty()) { mixer.setTraktorPresent(traktor_ok); mixer.setTraktorLayout(trk_pos, trk_master); mixer.setExtras(extras); }
-    web.setInputs(extras.empty() ? nullptr : &mixer, inputs_path, extras, traktor_ok, trk_pos, trk_master, [] { g_running.store(false); });   // reiniciar = salir limpio (systemd lo levanta)
-
-    if (extras.empty())
-        capture.setCallback([&](const int32_t* data, uint32_t frames, uint64_t ts) {
-            streamer.pushFrames(data, frames, ts);
-        });
-    else
-        capture.setCallback([&](const int32_t* data, uint32_t frames, uint64_t ts) {
-            mixer.onTraktor(data, frames, ts);
-        });
+    if (direct) {
+        streamer.setInputChannels((int)only->channels, InputMixer::idsFor(only->tag, only->channels));
+        capture.setCallback([&](const int32_t* data, uint32_t frames, uint64_t ts) { streamer.pushFrames(data, frames, ts); });
+    } else mixer.configure(icfg);
+    web.setInputs(direct ? nullptr : &mixer, inputs_path, icfg, direct, [] { g_running.store(false); });   // reiniciar = salir limpio (systemd lo levanta)
 
     if (!web.start())     { fprintf(stderr, "[Main] Cannot start web server\n"); return 1; }
-    if (traktor_ok && !capture.start()) { fprintf(stderr, "[Main] Cannot start capture\n"); web.stop(); return 1; }
-    if (!extras.empty()) mixer.start();
+    if (direct && !capture.start()) { fprintf(stderr, "[Main] Cannot start capture\n"); web.stop(); return 1; }
+    if (!direct) mixer.start();
 
     fprintf(stderr, "[Main] Running. Ctrl+C to stop.\n");
 
@@ -132,7 +128,7 @@ int main(int argc, char* argv[]) {
     uint32_t tick = 0;
     while (g_running.load()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
-        if (traktor_ok && !capture.isRunning()) {          // ej. Traktor desenchufada: salir y que systemd reinicie
+        if (direct && !capture.isRunning()) {              // ej. la placa desenchufada: salir y que systemd reinicie
             fprintf(stderr, "[Main] Captura detenida — saliendo (systemd reiniciará)\n");
             rc = 1; break;
         }

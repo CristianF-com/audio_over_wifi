@@ -1028,30 +1028,44 @@ bool UdpStreamer::profileDelete(int idx) {
     saveProfiles();
     return true;
 }
-// ── Nombres de entradas: «chN=nombre», una línea por entrada (solo las personalizadas) ──
+// ── Nombres de entradas: «ID=nombre» (ID = letra de la placa + nº de canal en ella, p. ej. A1, B3); solo las personalizadas.
+//    Los ficheros antiguos («chN=nombre», solo 10 entradas) se leen como A1…A10. ──
 const char* UdpStreamer::defaultChannelName(int ch) {
     static const char* N[10] = {"FL", "FR", "C", "LFE", "SL", "SR", "SBL", "SBR", "AUX-L", "AUX-R"};
     return (ch >= 0 && ch < 10) ? N[ch] : "";
 }
+std::string UdpStreamer::defaultNameForId(const std::string& id) {          // «A3» → canal local 3 → «C»; del 11 en adelante «Ch11»
+    const int local = id.size() > 1 ? atoi(id.c_str() + 1) : 0;
+    if (local >= 1 && local <= 10) return UdpStreamer::defaultChannelName(local - 1);
+    return "Ch" + std::to_string(local);
+}
+std::vector<std::string> UdpStreamer::channelIds() const {
+    std::lock_guard<std::mutex> lk(names_mtx_);
+    std::vector<std::string> v = in_ids_;
+    const size_t n = (size_t)in_ch_.load();
+    for (size_t i = v.size(); i < n; i++) v.push_back("A" + std::to_string(i + 1));
+    v.resize(n);
+    return v;
+}
 std::vector<std::string> UdpStreamer::channelNames() const {
     std::lock_guard<std::mutex> lk(names_mtx_);
     std::vector<std::string> v;
-    for (int i = 0; i < 10; i++) v.push_back(ch_names_[i].empty() ? defaultChannelName(i) : ch_names_[i]);
+    const int n = in_ch_.load();
+    for (int i = 0; i < n; i++) {
+        const std::string id = i < (int)in_ids_.size() ? in_ids_[(size_t)i] : "A" + std::to_string(i + 1);
+        auto it = ch_names_.find(id);
+        v.push_back(it != ch_names_.end() && !it->second.empty() ? it->second : UdpStreamer::defaultNameForId(id));
+    }
     return v;
 }
-std::vector<std::string> UdpStreamer::allChannelNames() const {      // las 10 de la Traktor + las de las interfaces USB extra
-    std::vector<std::string> v = channelNames();
-    std::lock_guard<std::mutex> lk(names_mtx_);
-    for (const auto& s : extra_names_) v.push_back(s);
-    return v;
-}
-void UdpStreamer::setInputChannels(int n, const std::vector<std::string>& extra_names) {
+void UdpStreamer::setInputChannels(int n, const std::vector<std::string>& ids) {
     if (n < AUDIO_CHANNELS) n = AUDIO_CHANNELS;
     if (n > MAX_INPUTS) n = MAX_INPUTS;
     {
         std::lock_guard<std::mutex> lk(names_mtx_);
-        extra_names_ = extra_names;
-        extra_names_.resize((size_t)(n - AUDIO_CHANNELS));
+        in_ids_ = ids;
+        while ((int)in_ids_.size() < n) in_ids_.push_back("A" + std::to_string(in_ids_.size() + 1));
+        in_ids_.resize((size_t)n);
     }
     in_ch_.store(n);
 }
@@ -1067,15 +1081,17 @@ static bool cleanChannelName(const std::string& in, std::string& out, std::strin
     return true;
 }
 bool UdpStreamer::setChannelNames(const std::vector<std::string>& names, std::string& err) {
-    if (names.size() != 10) { err = "hacen falta los 10 nombres"; return false; }
-    std::string clean[10];
-    for (int i = 0; i < 10; i++) {
-        if (!cleanChannelName(names[i], clean[i], err)) { err = "entrada " + std::to_string(i + 1) + ": " + err; return false; }
-        if (clean[i] == defaultChannelName(i)) clean[i].clear();
+    const int n = in_ch_.load();
+    if ((int)names.size() != n) { err = "hacen falta los " + std::to_string(n) + " nombres (uno por entrada activa)"; return false; }
+    std::vector<std::string> clean((size_t)n);
+    const std::vector<std::string> ids = channelIds();
+    for (int i = 0; i < n; i++) {
+        if (!cleanChannelName(names[(size_t)i], clean[(size_t)i], err)) { err = "entrada " + ids[(size_t)i] + ": " + err; return false; }
+        if (clean[(size_t)i] == UdpStreamer::defaultNameForId(ids[(size_t)i])) clean[(size_t)i].clear();
     }
     {
         std::lock_guard<std::mutex> lk(names_mtx_);
-        for (int i = 0; i < 10; i++) ch_names_[i] = clean[i];
+        for (int i = 0; i < n; i++) { if (clean[(size_t)i].empty()) ch_names_.erase(ids[(size_t)i]); else ch_names_[ids[(size_t)i]] = clean[(size_t)i]; }
     }
     if (!saveChannelNames()) { err = "no se pudo guardar en la Raspberry"; return false; }
     return true;
@@ -1087,7 +1103,7 @@ bool UdpStreamer::saveChannelNames() {
     if (!f) return false;
     {
         std::lock_guard<std::mutex> lk(names_mtx_);
-        for (int i = 0; i < 10; i++) if (!ch_names_[i].empty()) fprintf(f, "ch%d=%s\n", i, ch_names_[i].c_str());
+        for (const auto& kv : ch_names_) if (!kv.second.empty()) fprintf(f, "%s=%s\n", kv.first.c_str(), kv.second.c_str());
     }
     const bool ok = (fflush(f) == 0) & (ferror(f) == 0);
     fclose(f);
@@ -1097,18 +1113,24 @@ bool UdpStreamer::loadChannelNames() {
     if (cfg_path_.empty()) return false;
     FILE* f = fopen((cfg_path_ + ".chnames").c_str(), "r");
     if (!f) return false;
-    std::string v[10];
-    char line[128];
+    std::map<std::string, std::string> m;
+    char line[160];
     while (fgets(line, sizeof(line), f)) {
+        std::string id, val;
         unsigned i = 0; int n = 0;
-        if (sscanf(line, "ch%u=%n", &i, &n) < 1 || n == 0 || i >= 10) continue;
-        std::string val = line + n, clean, err;
+        if (sscanf(line, "ch%u=%n", &i, &n) >= 1 && n > 0 && i < 10) { id = "A" + std::to_string(i + 1); val = line + n; }   // formato antiguo
+        else {
+            const char* eq = strchr(line, '=');
+            if (!eq || eq == line || eq - line > 4 || !(line[0] >= 'A' && line[0] <= 'Z') || !isdigit((unsigned char)line[1])) continue;
+            id.assign(line, (size_t)(eq - line)); val = eq + 1;
+        }
         while (!val.empty() && (val.back() == '\n' || val.back() == '\r')) val.pop_back();
-        if (cleanChannelName(val, clean, err) && clean != defaultChannelName((int)i)) v[i] = clean;
+        std::string clean, err;
+        if (cleanChannelName(val, clean, err) && !clean.empty() && clean != UdpStreamer::defaultNameForId(id)) m[id] = clean;
     }
     fclose(f);
     std::lock_guard<std::mutex> lk(names_mtx_);
-    for (int i = 0; i < 10; i++) ch_names_[i] = v[i];
+    ch_names_ = m;
     return true;
 }
 // ── Nombres de altavoces: «spkN=nombre» (solo los puestos por el usuario) ──

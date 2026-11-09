@@ -769,7 +769,7 @@ c, b = http("POST", "/api/names", {"names": mine}); check("nombres: se guardan l
 c, b = http("GET", "/api/status"); check("nombres: /api/status incluye ch_names", c == 200 and json.loads(b)["ch_names"] == mine, (c, b))
 try: pf = open("/tmp/sonos_harness_config.txt.chnames").read()
 except OSError: pf = ""
-check("nombres: persisten en <config>.chnames", "ch0=Frontal I" in pf and "ch9=Extra 2" in pf, pf)
+check("nombres: persisten en <config>.chnames", "A1=Frontal I" in pf and "A10=Extra 2" in pf, pf)
 c, b = http("POST", "/api/names", {"names": ["  Sala TV  "] + DEF[1:]}); n = json.loads(b).get("names", []) if c == 200 else []
 check("nombres: se recortan espacios y un nombre igual al de fábrica no se guarda como personalizado", c == 200 and n[0] == "Sala TV" and n[1:] == DEF[1:], (c, b))
 c, b = http("POST", "/api/names", {"names": ["", "", "", "", "", "", "", "", "", ""]}); check("nombres: vacío = nombre de fábrica", c == 200 and json.loads(b)["names"] == DEF, (c, b))
@@ -780,37 +780,40 @@ c, b = http("POST", "/api/names", {"names": mine}); c2, b2 = http("POST", "/api/
 check("nombres: «reset» vuelve a los de fábrica", c2 == 200 and json.loads(b2)["names"] == DEF, (c2, b2))
 c, b = http("POST", "/api/names", {"names": mine})   # se deja personalizado: la interfaz lo comprueba después
 
-# ── Interfaces USB de audio extra ──
+# ── Entradas de audio: placas con «Usar», reloj principal, ids de canal ──
 import os
 try: os.remove("/tmp/sonos_harness_inputs.txt")
 except FileNotFoundError: pass
 c, b = http("GET", "/api/inputs"); j = json.loads(b) if c == 200 else {}
-check("inputs: GET sin interfaces extra (solo Traktor, 10 entradas)", c == 200 and j.get("traktor", {}).get("present") is True and j.get("saved") == [] and j.get("running", {}).get("total") == 10 and j.get("max_extra") == 22 and isinstance(j.get("cards"), list) and j.get("restart_needed") is False, (c, b))
+check("inputs: GET sin placas en el arnés (lista vacía, reloj automático, nada pendiente)", c == 200 and j.get("devices") == [] and isinstance(j.get("cards"), list) and j.get("max_total") == 32 and j.get("restart_needed") is False and j.get("clock") == "", (c, b[:200]))
 c, b = http("GET", "/api/status"); st = json.loads(b)
-check("inputs: /api/status sigue con 10 nombres y 10 canales", len(st["ch_names"]) == 10 and st["input_channels"] == 10, st.get("input_channels"))
+check("inputs: /api/status trae ch_ids A1…A10 y 10 canales", st["ch_ids"] == ["A%d" % i for i in range(1, 11)] and st["input_channels"] == 10 and len(st["ch_names"]) == 10, st.get("ch_ids"))
 c, b = http("GET", "/api/levels"); check("inputs: /api/levels con 10 medidores", len(json.loads(b)["db"]) == 10, b[:80])
-c, b = http("POST", "/api/inputs", {"extras": [{"device": "hw:2,0", "channels": 8}, {"device": "Scarlett", "channels": 2}]})
+c, b = http("GET", "/api/names"); check("inputs: /api/names devuelve también los ids", json.loads(b).get("ids") == st["ch_ids"], b[:120])
+body = {"devices": [{"key": "Traktor", "channels": 10, "enabled": True, "tag": "A"}, {"key": "Scarlett 18i20", "channels": 8, "enabled": False, "tag": "B"}, {"key": "hw:3,0", "channels": 2, "enabled": True, "tag": "C"}], "clock": "Traktor"}
+c, b = http("POST", "/api/inputs", body)
 check("inputs: POST guarda y pide reiniciar", c == 200 and json.loads(b).get("ok") is True and json.loads(b).get("restarting") is True, (c, b))
 c, b = http("GET", "/api/inputs"); j = json.loads(b)
-check("inputs: lo guardado se lista y marca reinicio pendiente", j["saved"] == [{"device": "hw:2,0", "channels": 8}, {"device": "Scarlett", "channels": 2}] and j["restart_needed"] is True, b[:300])
-check("inputs: el fichero tiene una línea por interfaz", open("/tmp/sonos_harness_inputs.txt").read() == "hw:2,0|8\nScarlett|2\n")
-for bad, why in (({"extras": [{"device": "hw:2,0", "channels": 0}]}, "0 canales"), ({"extras": [{"device": "hw:2,0", "channels": 23}]}, "23 canales"),
-                 ({"extras": [{"device": "hw:2,0", "channels": 12}, {"device": "hw:3,0", "channels": 12}]}, "más de 22 en total"),
-                 ({"extras": [{"device": "hw:2,0", "channels": 2}, {"device": "hw:2,0", "channels": 2}]}, "repetida"),
-                 ({"extras": [{"device": "Traktor Audio 10", "channels": 2}]}, "la Traktor como extra"), ({"extras": [{"device": "a|b", "channels": 2}]}, "con |"), ({}, "sin lista")):
+check("inputs: lo guardado se lista con «Usar», letra y reloj, y queda pendiente de reiniciar", [(d["key"], d["channels"], d["enabled"], d["tag"]) for d in j["devices"]] == [("Traktor", 10, True, "A"), ("Scarlett 18i20", 8, False, "B"), ("hw:3,0", 2, True, "C")] and j["clock"] == "Traktor" and j["clock_effective"] == "Traktor" and j["restart_needed"] is True and all(d["connected"] is False for d in j["devices"]), b[:400])
+check("inputs: el fichero es v2", open("/tmp/sonos_harness_inputs.txt").read() == "v2\nclock|Traktor\ndev|Traktor|10|1|A\ndev|Scarlett 18i20|8|0|B\ndev|hw:3,0|2|1|C\n")
+c, b = http("POST", "/api/inputs", {"devices": body["devices"], "clock": "rpi"}); c2, b2 = http("GET", "/api/inputs")
+check("inputs: la Raspberry puede ser el reloj", json.loads(b).get("ok") is True and json.loads(b2)["clock_effective"] == "rpi", b2[:200])
+c, b = http("POST", "/api/inputs", {"devices": [{"key": "A", "channels": 2, "enabled": True}, {"key": "B", "channels": 2, "enabled": True}], "clock": ""}); c2, b2 = http("GET", "/api/inputs")
+check("inputs: reloj automático con varias placas activas = la Raspberry; las letras se asignan solas", json.loads(b2)["clock_effective"] == "rpi" and [d["tag"] for d in json.loads(b2)["devices"]] == ["A", "B"], b2[:300])
+c, b = http("POST", "/api/inputs", {"devices": [{"key": "A", "channels": 2, "enabled": True}], "clock": ""}); c2, b2 = http("GET", "/api/inputs")
+check("inputs: con una sola placa activa su reloj es el principal", json.loads(b2)["clock_effective"] == "A", b2[:200])
+for bad, why in (({"devices": [{"key": "x", "channels": 0, "enabled": True}]}, "0 canales"), ({"devices": [{"key": "x", "channels": 33, "enabled": True}]}, "33 canales"),
+                 ({"devices": [{"key": "x", "channels": 20, "enabled": True}, {"key": "y", "channels": 20, "enabled": True}]}, "más de 32 activos"),
+                 ({"devices": [{"key": "x", "channels": 2, "enabled": True}, {"key": "x", "channels": 2, "enabled": True}]}, "repetida"),
+                 ({"devices": [{"key": "a|b", "channels": 2, "enabled": True}]}, "con |"),
+                 ({"devices": [{"key": "x", "channels": 2, "enabled": False}], "clock": "x"}, "reloj en una placa desactivada"),
+                 ({"devices": [{"key": "x", "channels": 2, "enabled": True}], "clock": "zzz"}, "reloj inexistente"), ({}, "sin lista")):
     c, b = http("POST", "/api/inputs", bad); check("inputs: se rechaza " + why, c == 400 and "error" in json.loads(b), (c, b))
-c, b = http("GET", "/api/inputs"); check("inputs: los rechazos no tocan lo guardado", len(json.loads(b)["saved"]) == 2)
-c, b = http("POST", "/api/inputs", {"extras": []}); c2, b2 = http("GET", "/api/inputs")
-check("inputs: lista vacía vuelve a solo Traktor", json.loads(b).get("ok") is True and json.loads(b2)["saved"] == [] and json.loads(b2)["restart_needed"] is False, b2[:200])
-c, b = http("GET", "/api/inputs"); j = json.loads(b)
-check("inputs: la Traktor por defecto va en la posición 0 y es el reloj principal", j["traktor"].get("pos") == 0 and j["traktor"].get("master") is True, j.get("traktor"))
-c, b = http("POST", "/api/inputs", {"extras": [{"device": "hw:2,0", "channels": 2}], "traktor": {"pos": 1, "master": False}})
-c2, b2 = http("GET", "/api/inputs"); j = json.loads(b2)
-check("inputs: se guarda la posición y el reloj de la Traktor y marca reinicio pendiente", json.loads(b).get("ok") is True and j["traktor"]["pos"] == 1 and j["traktor"]["master"] is False and j["restart_needed"] is True, b2[:240])
-check("inputs: el fichero lleva la línea @traktor", open("/tmp/sonos_harness_inputs.txt").read() == "@traktor|1|0\nhw:2,0|2\n")
-c, b = http("POST", "/api/inputs", {"extras": [], "traktor": {"pos": 5, "master": True}}); c2, b2 = http("GET", "/api/inputs"); j = json.loads(b2)
-check("inputs: la posición de la Traktor se acota al nº de interfaces y vuelve a lo de siempre", j["traktor"]["pos"] == 0 and j["traktor"]["master"] is True and j["restart_needed"] is False and open("/tmp/sonos_harness_inputs.txt").read() == "", b2[:240])
-c, b = http("POST", "/api/node", {"id": 1, "ch_left": 10, "ch_right": 11}); check("inputs: sin interfaces extra un altavoz no puede usar el canal 11", "error" in b or c >= 400, (c, b))
+c, b = http("GET", "/api/inputs"); check("inputs: los rechazos no tocan lo guardado", len(json.loads(b)["devices"]) == 1)
+c, b = http("POST", "/api/inputs", {"devices": [], "clock": ""}); c2, b2 = http("GET", "/api/inputs")
+check("inputs: lista vacía y nada pendiente", json.loads(b).get("ok") is True and json.loads(b2)["devices"] == [] and json.loads(b2)["restart_needed"] is False, b2[:200])
+c, b = http("POST", "/api/node", {"id": 1, "ch_left": 10, "ch_right": 11}); check("inputs: con 10 entradas un altavoz no puede usar el canal 11", "error" in b or c >= 400, (c, b))
+c, b = http("POST", "/api/names", {"names": ["x"] * 11}); check("inputs: /api/names exige un nombre por canal activo (11 ≠ 10)", c == 400 and "10" in b, (c, b))
 
 print("\nRESULTADO:", "TODO OK" if ok else "HAY FALLOS")
 sys.exit(0 if ok else 1)
