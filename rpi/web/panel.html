@@ -21,8 +21,13 @@ main{max-width:1180px;margin:0 auto;padding:18px 18px 90px}
 details.help{margin:8px 0}details.help>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;color:var(--mut);font-size:.9rem}
 details.help>summary:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 details.adv>.advbody{display:grid;gap:14px;padding-top:6px}
-.wlist{display:grid;gap:6px;margin-top:6px;max-height:240px;overflow:auto}
-.wnet{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:44px;padding:8px 12px;text-align:left;background:var(--raise);border:1px solid var(--line);color:var(--fg);font:inherit;cursor:pointer;border-radius:var(--r-card,0)}
+.mscrim{position:fixed;inset:0;z-index:55;display:grid;place-items:center;padding:16px;background:var(--scrim)}.mscrim[hidden]{display:none}
+.mbox{width:min(460px,100%);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow:auto;background:var(--panel);border:1px solid var(--line2);border-radius:var(--r-sheet,0);box-shadow:0 24px 60px -20px rgba(0,0,0,.6);padding:18px;display:grid;gap:12px}
+.mbox h2{font-size:1.1rem;margin:0}.mcont{display:grid;gap:12px}.mrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.mrow .txt{flex:1;min-width:0}
+.mbox .acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}.mprog{display:flex;gap:10px;align-items:center;min-height:44px}
+.mbox .found .res{margin:0}
+.wlist{display:grid;grid-auto-rows:min-content;gap:6px;margin-top:6px;max-height:240px;overflow:auto}
+.wnet{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:44px;flex:none;padding:8px 12px;text-align:left;background:var(--raise);border:1px solid var(--line);color:var(--fg);font:inherit;cursor:pointer;border-radius:var(--r-card,0)}
 .wnet.on{border-color:var(--ac);background:var(--ac-bg)}.wnet:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 .vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin:8px 0}
 .vcard{background:var(--raise);border:1px solid var(--line);border-radius:var(--r-card,0);padding:12px 14px;display:grid;gap:4px;text-align:left;color:var(--fg);font:inherit;min-height:44px;cursor:pointer}
@@ -74,7 +79,7 @@ details.adv>.advbody{display:grid;gap:14px;padding-top:6px}
 .me svg{width:32px;height:32px;color:var(--ac)}
 .me small{position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);font-size:.8rem;font-weight:600;color:var(--mut);white-space:nowrap}
 .screen{position:absolute;left:30%;right:30%;top:1.5%;height:18px;border-radius:5px;background:var(--ctl);display:grid;place-items:center;font-size:.68rem;font-weight:600;color:var(--bg);letter-spacing:.03em}
-.spk{--s:1;min-width:98px;position:absolute;transform:translate(-50%,-50%) scale(var(--s));display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:0;padding:4px 6px;color:var(--fg);z-index:2;border-radius:12px}
+.spk{--s:1;min-width:98px;position:absolute;transform:translate(-50%,-50%) scale(var(--s));display:flex;flex-direction:column;align-items:center;gap:2px;background:var(--ac-bg);border:0;padding:4px 6px;color:var(--fg);z-index:2;border-radius:12px}
 .cab{position:relative;display:block;width:46px;height:62px;transition:transform .12s}
 .spk.sub .cab{width:56px;height:56px}
 .cab svg{width:100%;height:100%;display:block;overflow:visible}
@@ -553,6 +558,7 @@ td.bad{color:var(--bad)}td.warn{color:var(--warn)}
   <header><h2 id="btitle">Añadir altavoces</h2><button class="x" id="bclose" aria-label="Cerrar">✕</button></header>
   <div class="dbody" id="bbody"></div>
 </aside>
+<div class="mscrim" id="wm" hidden><div class="mbox" id="wm_box" role="dialog" aria-modal="true" aria-labelledby="wm_t"><h2 id="wm_t"></h2><div class="mcont" id="wm_body"></div></div></div>
 <div class="toasts" id="tb" role="status" aria-live="polite"></div>
 
 <script>
@@ -840,7 +846,7 @@ $('spks').addEventListener('keydown',e=>{
 function openDrawer(id){closeBle();openId=id;sig='';buildDrawer();$('drawer').classList.add('on');document.body.classList.toggle('has-dock',isDock());if(!isDock())$('scrim').classList.add('on');$('drawer').setAttribute('aria-hidden','false');sheetOpen($('drawer'));drawRoom();sig='x';loadNodes();}
 function closeDrawer(){const was=openId!==null;openId=null;document.body.classList.remove('has-dock');$('drawer').classList.remove('on');if(!$('bdrawer').classList.contains('on'))$('scrim').classList.remove('on');$('drawer').setAttribute('aria-hidden','true');sig='';drawRoom();sheetClose($('drawer'));}
 $('scrim').onclick=()=>{closeDrawer();closeBle();};$('dclose').onclick=closeDrawer;sheetDrag($('drawer'),closeDrawer);
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(openId!==null)closeDrawer();closeBle();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(wmS){wmClose();return;}if(openId!==null)closeDrawer();closeBle();}});
 function chOpts(sel){return CH.map((c,i)=>'<option value="'+i+'"'+(i===sel?' selected':'')+'>'+c+' · '+CHN[i]+'</option>').join('');}
 function buildDrawer(){
   const n=find(openId);if(!n)return;
@@ -1119,15 +1125,10 @@ function closeBle(){const d=$('bdrawer');if(!d.classList.contains('on'))return;d
 $('lble').onclick=openBle;$('bclose').onclick=closeBle;sheetDrag($('bdrawer'),closeBle);
 const onlineIds=()=>new Set(nodes.filter(n=>n.online).map(n=>n.id));
 function bleBuild(){
-  const credsOk=!!(bs.ssid&&bs.has_pass),keep=document.activeElement&&document.activeElement.id;
+  const keep=document.activeElement&&document.activeElement.id;
   let h='';
   if(!bs.available)h+='<div class="note warn"><b>Esta Raspberry no tiene el ayudante Bluetooth.</b><br>Instala <code>python3-bleak</code> (lo hace <code>scripts/build.sh</code>) o configura el ESP32 desde el móvil con <a href="'+(window._bleHref||'#')+'">la página Bluetooth</a>.</div>';
-  h+='<div class="fld"><b>WiFi de los altavoces</b><p class="hint" style="margin:3px 0 8px">Es la red 5 GHz a la que se unirá cada ESP32. Se guarda en la Raspberry.</p>'+
-     '<label for="b_ssid">Nombre de la red</label><input class="txt" id="b_ssid" maxlength="32" autocomplete="off" autocapitalize="off" value="'+esc(bs.ssid||'')+'">'+
-     '<div style="display:flex;gap:8px;align-items:center;margin-top:8px"><button class="btn ghost sm" id="b_wscan" type="button" style="white-space:nowrap;flex:none">Buscar redes WiFi</button><span class="hint" id="b_wmsg" aria-live="polite"></span></div><div class="wlist" id="b_wlist" role="listbox" aria-label="Redes WiFi encontradas"></div>'+
-     '<label for="b_pass" style="margin-top:8px">Contraseña</label><input class="txt" id="b_pass" type="password" maxlength="63" autocomplete="new-password" placeholder="'+(bs.has_pass?'Guardada (déjala vacía para conservarla)':'8 a 63 caracteres')+'">'+
-     '<details style="margin-top:8px"><summary class="hint" style="cursor:pointer">Opciones avanzadas</summary><label for="b_rip" style="margin-top:8px">IP de la Raspberry (solo si el router bloquea el broadcast)</label><input class="txt" id="b_rip" maxlength="15" inputmode="decimal" placeholder="192.168.1.10" value="'+esc(bs.rpi_ip||'')+'"></details>'+
-     '<div style="display:flex;gap:8px;align-items:center;margin-top:10px"><button class="btn sm" id="b_save">Guardar WiFi</button><span class="hint" id="b_ss">'+(credsOk?'Guardada: «'+esc(bs.ssid)+'»':'Falta guardarla')+'</span></div></div>'+
+  h+='<p class="hint" style="margin:0 0 10px">'+(bs.ssid?'Última red usada: «'+esc(bs.ssid)+'». ':'')+'Al pulsar «Configurar» en un altavoz se te pide la red y la contraseña.</p>'+
      '<hr class="sep"><div><button class="btn" id="b_scan"'+(!bs.available||bscan?' disabled':'')+'>'+(bscan?'<span class="spin"></span>Buscando…':'Buscar altavoces por Bluetooth')+'</button>'+
      '<p class="hint" style="margin-top:6px" id="b_hint">'+(bscan?'Puede tardar hasta 40 s. Los ESP32 deben estar encendidos y cerca.':'Enciende los ESP32 nuevos cerca de la Raspberry y busca.')+'</p></div>';
   h+=bdevs.map((d,i)=>{
@@ -1135,31 +1136,93 @@ function bleBuild(){
     const chip=d.error&&!d.status?'<span class="chip bad">No se pudo leer</span>':isNew?'<span class="chip ac">Nuevo, sin WiFi</span>':'<span class="chip">En la red'+(d.id!=null?' · #'+d.id:'')+'</span>';
     return '<div class="found'+(r.ok?' done':'')+'" data-i="'+i+'"><div class="hd"><b>'+esc(d.name)+'</b>'+chip+'<span class="hint">'+rssiTxt(d.rssi)+(d.rssi!=null?' ('+d.rssi+' dBm)':'')+'</span></div>'+
       (d.error&&!d.status?'<div class="res bad">'+esc(d.error)+'</div>':'')+
-      '<div class="ac"><button class="btn ghost sm" data-id="'+i+'">Sonar</button><button class="btn sm" data-pv="'+i+'"'+(credsOk?'':' disabled')+'>'+(isNew?'Configurar':'Reconfigurar')+'</button></div>'+
+      '<div class="ac"><button class="btn ghost sm" data-id="'+i+'">Sonar</button><button class="btn sm" data-pv="'+i+'">'+(isNew?'Configurar':'Reconfigurar')+'</button></div>'+
       '<div class="res'+(r.ok?' ok':r.err?' bad':'')+'" id="b_r'+i+'">'+(r.ok?'Enviado. Aparecerá en el panel en unos segundos.':r.err?esc(r.err):'')+'</div></div>';}).join('');
   const nn=bdevs.filter(d=>d.new&&d.status&&!(bres[d.address]||{}).ok);
-  if(nn.length>1)h+='<button class="btn" id="b_all"'+(credsOk?'':' disabled')+'>Configurar los '+nn.length+' nuevos</button>';
+  if(nn.length>1)h+='<button class="btn" id="b_all">Configurar los '+nn.length+' nuevos</button>';
   if(bs.available&&!bscan&&bdevs.length===0&&bleScanned)h+='<div class="empty">No se encontró ningún altavoz. Comprueba que está encendido y cerca, o que su Bluetooth sigue activo (se cierra a los 5 minutos de arrancar si ya tiene WiFi: reinícialo).</div>';
   h+='<p class="hint">¿Prefieres usar el móvil? <a href="'+(window._bleHref||'#')+'">Configurar desde el móvil</a>.</p>';
   $('bbody').innerHTML=h;
-  if($('b_wscan'))$('b_wscan').onclick=wifiDoScan;drawWlist();
-  if($('b_save'))$('b_save').onclick=bleSaveWifi;if($('b_scan'))$('b_scan').onclick=bleDoScan;if($('b_all'))$('b_all').onclick=bleProvAll;
+  if($('b_scan'))$('b_scan').onclick=bleDoScan;if($('b_all'))$('b_all').onclick=bleProvAll;
   $('bbody').querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>bleIdent(+b.dataset.id));
   $('bbody').querySelectorAll('[data-pv]').forEach(b=>b.onclick=()=>bleProv(+b.dataset.pv));
   if(keep&&$(keep)&&keep.startsWith('b_')&&keep!=='b_scan')$(keep).focus();
 }
+/* ── Ventana «Configurar»: pide la red y la contraseña, envía al altavoz y vuelve a escanear por Bluetooth para ver si se unió ── */
 const wBars=sg=>sg>=70?'Señal fuerte':sg>=45?'Señal media':'Señal débil';
-function drawWlist(){const l=$('b_wlist'),m=$('b_wmsg'),b=$('b_wscan');if(!l)return;
-  b.disabled=wscan;b.textContent=wscan?'Buscando redes…':(wnets?'Volver a buscar':'Buscar redes WiFi');
-  m.textContent=wscan?'Tarda unos segundos.':wmsg;
-  const cur=($('b_ssid')||{}).value||'';
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let wmS=null,wmBack=null;
+const wmDev=a=>bdevs.find(d=>d.address===a);
+function wmOpen(addrs){if(!addrs.length)return;wmS={t:addrs,step:'form',ssid:bs.ssid||''};wmBack=document.activeElement;
+  $('wm').hidden=false;$('bdrawer').inert=true;wmBuild();if(!wnets&&!wscan)wmScan();}
+function wmClose(){if(!wmS||wmS.step==='work')return;wmS=null;$('wm').hidden=true;$('bdrawer').inert=false;
+  const b=wmBack;wmBack=null;bleBuild();if(b&&b.isConnected)b.focus();}
+$('wm').onclick=e=>{if(e.target===$('wm'))wmClose();};
+$('wm').addEventListener('keydown',e=>{if(e.key!=='Tab')return;const f=[...$('wm_box').querySelectorAll('button:not([disabled]),input,summary,[tabindex="0"]')].filter(x=>x.offsetParent!==null);if(!f.length)return;
+  const a=f[0],z=f[f.length-1];if(e.shiftKey&&document.activeElement===a){e.preventDefault();z.focus();}else if(!e.shiftKey&&document.activeElement===z){e.preventDefault();a.focus();}});
+function wmBuild(){const S=wmS;if(!S)return;const box=$('wm_body'),names=S.t.map(a=>(wmDev(a)||{name:a}).name);
+  if(S.step==='form'){
+    $('wm_t').textContent=S.t.length===1?'Configurar '+names[0]:'Configurar '+S.t.length+' altavoces';
+    box.innerHTML='<p class="hint" style="margin:0">Elige la red a la que se unirá'+(S.t.length>1?'n':'')+'. El ESP32-C5 va mejor en 5 GHz; el ESP32 clásico solo usa 2,4 GHz.</p>'+
+      '<div class="mrow"><button class="btn ghost sm" id="wm_scan" type="button"></button><span class="hint" id="wm_msg" aria-live="polite"></span></div><div class="wlist" id="wm_list" role="listbox" aria-label="Redes WiFi encontradas"></div>'+
+      '<div><label for="wm_ssid">Nombre de la red</label><input class="txt" id="wm_ssid" maxlength="32" autocomplete="off" autocapitalize="off" value="'+esc(S.ssid)+'"></div>'+
+      '<div><label for="wm_pass">Contraseña</label><div class="mrow"><input class="txt" id="wm_pass" type="password" maxlength="63" autocomplete="new-password"><button class="btn ghost sm" id="wm_show" type="button" aria-pressed="false">Mostrar</button></div></div>'+
+      '<details><summary class="hint" style="cursor:pointer">Opciones avanzadas</summary><label for="wm_rip" style="margin-top:8px">IP de la Raspberry (solo si el router bloquea el broadcast)</label><input class="txt" id="wm_rip" maxlength="15" inputmode="decimal" placeholder="192.168.1.10" value="'+esc(bs.rpi_ip||'')+'"></details>'+
+      '<div class="res bad" id="wm_err" role="alert"></div>'+
+      '<div class="acts"><button class="btn ghost" id="wm_cancel" type="button">Cancelar</button><button class="btn" id="wm_go" type="button">Configurar</button></div>';
+    $('wm_scan').onclick=wmScan;$('wm_cancel').onclick=wmClose;
+    $('wm_show').onclick=function(){const sh=this.getAttribute('aria-pressed')!=='true';this.setAttribute('aria-pressed',sh);this.textContent=sh?'Ocultar':'Mostrar';$('wm_pass').type=sh?'text':'password';};
+    $('wm_ssid').oninput=()=>{wmPassPh();wmDrawList();};
+    $('wm_go').onclick=()=>{const ssid=$('wm_ssid').value,pass=$('wm_pass').value,e=$('wm_err');e.textContent='';
+      if(!ssid){e.textContent='Elige una red de la lista o escribe su nombre.';$('wm_ssid').focus();return;}
+      if(!pass&&!(ssid===bs.ssid&&bs.has_pass)){e.textContent='Escribe la contraseña de «'+ssid+'».';$('wm_pass').focus();return;}
+      if(pass&&(pass.length<8||pass.length>63)){e.textContent='La contraseña debe tener entre 8 y 63 caracteres.';$('wm_pass').focus();return;}
+      wmRun(ssid,pass,$('wm_rip').value.trim());};
+    wmPassPh();wmDrawList();($('wm_ssid').value?$('wm_pass'):$('wm_ssid')).focus();
+  }else if(S.step==='work'){
+    $('wm_t').textContent='Configurando…';
+    box.innerHTML='<div class="mprog"><span class="spin"></span><span id="wm_prog" aria-live="polite"></span></div><p class="hint" style="margin:0">No cierres esta ventana: se envía la red, se espera a que el altavoz se una y se vuelve a buscar por Bluetooth.</p>';
+  }else{
+    $('wm_t').textContent='Resultado';
+    box.innerHTML=S.t.map(a=>{const r=S.res[a]||{k:'warn',m:''},d=wmDev(a)||{name:a};
+      return '<div class="found'+(r.k==='ok'?' done':'')+'"><div class="hd"><b>'+esc(d.name)+'</b><span class="chip'+(r.k==='ok'?' ac':r.k==='bad'?' bad':'')+'">'+(r.k==='ok'?'Conectado':r.k==='bad'?'No se conectó':'Sin confirmar')+'</span></div><div class="res'+(r.k==='ok'?' ok':r.k==='bad'?' bad':'')+'">'+esc(r.m)+'</div></div>';}).join('')+
+      '<div class="acts">'+(S.t.some(a=>(S.res[a]||{}).k!=='ok')?'<button class="btn ghost" id="wm_retry" type="button">Reintentar</button>':'')+'<button class="btn" id="wm_done" type="button">'+(S.t.every(a=>(S.res[a]||{}).k==='ok')?'Listo':'Cerrar')+'</button></div>';
+    $('wm_done').onclick=wmClose;
+    if($('wm_retry'))$('wm_retry').onclick=()=>{S.t=S.t.filter(a=>(S.res[a]||{}).k!=='ok');S.step='form';wmBuild();};
+    ($('wm_retry')||$('wm_done')).focus();
+  }}
+function wmPassPh(){const p=$('wm_pass');if(p)p.placeholder=($('wm_ssid').value===bs.ssid&&bs.has_pass)?'Guardada (déjala vacía para usarla)':'8 a 63 caracteres';}
+function wmDrawList(){const l=$('wm_list');if(!l)return;const b=$('wm_scan'),cur=$('wm_ssid').value;
+  b.disabled=wscan;b.textContent=wscan?'Buscando redes…':(wnets?'Volver a buscar':'Buscar redes WiFi');$('wm_msg').textContent=wscan?'Tarda unos segundos.':wmsg;
   l.innerHTML=(wnets||[]).map((n,i)=>'<button class="wnet'+(n.ssid===cur?' on':'')+'" type="button" role="option" aria-selected="'+(n.ssid===cur)+'" data-w="'+i+'"><b>'+esc(n.ssid)+'</b><span class="hint">'+n.band+' · '+wBars(n.signal)+' ('+n.signal+'%)'+(n.security?'':' · abierta')+'</span></button>').join('');
-  l.querySelectorAll('[data-w]').forEach(x=>x.onclick=()=>{const n=wnets[+x.dataset.w];$('b_ssid').value=n.ssid;
-    wmsg=n.freq<4900?'«'+n.ssid+'» es de 2,4 GHz: el audio va mejor en 5 GHz (el ESP32 WROOM solo usa 2,4).':'';drawWlist();$('b_pass').focus();});}
-async function wifiDoScan(){wscan=true;wmsg='';drawWlist();const r=await J('/api/wifi/scan',{});wscan=false;
+  l.querySelectorAll('[data-w]').forEach(x=>x.onclick=()=>{const n=wnets[+x.dataset.w];$('wm_ssid').value=n.ssid;
+    wmsg=n.freq<4900?'«'+n.ssid+'» es de 2,4 GHz: el audio va mejor en 5 GHz (el ESP32 clásico solo usa 2,4).':'';wmPassPh();wmDrawList();$('wm_pass').focus();});}
+async function wmScan(){wscan=true;wmsg='';wmDrawList();const r=await J('/api/wifi/scan',{});wscan=false;
   if(r.networks){wnets=r.networks;wmsg=r.networks.length?'Toca la red de tus altavoces.':'No se vio ninguna red.';log('WiFi: '+r.networks.length+' red(es) encontrada(s)');}
   else{wnets=null;wmsg=r.error||'No se pudo buscar redes. Escribe el nombre a mano.';}
-  drawWlist();}
+  wmDrawList();}
+async function wmRun(ssid,pass,rip){const S=wmS;S.ssid=ssid;S.step='work';S.res={};wmBuild();const say=m=>{const e=$('wm_prog');if(e)e.textContent=m;};
+  say('Guardando la red…');
+  const r=await J('/api/ble/wifi',{ssid,pass,rpi_ip:rip});
+  if(!r.ok){S.step='form';wmBuild();$('wm_err').textContent=r.error||'No se pudo guardar la red.';return;}
+  try{bs=await (await fetch('/api/ble/status')).json();}catch(e){}
+  const sent=[];
+  for(const a of S.t){const i=bdevs.findIndex(d=>d.address===a);say('Enviando la red a '+(bdevs[i]||{name:a}).name+'…');
+    if(await bleProvOne(i))sent.push(a);else S.res[a]={k:'bad',m:(bres[a]||{}).err||'No se pudo enviar la red al altavoz.'};}
+  if(sent.length){
+    for(let n=(window._wmWait??8);n>0;n--){say('Esperando a que se unan a la red… '+n+' s');await sleep(1000);}
+    say('Buscando por Bluetooth para comprobar…');
+    const sc=await J('/api/ble/scan',{seconds:6});
+    if(sc.devices){bdevs=sc.devices;bres={};bleBuild();}
+    for(const a of sent){const d=sc.devices?wmDev(a):null,st=d&&d.status;
+      if(!sc.devices)S.res[a]={k:'warn',m:'Se envió la red, pero no se pudo comprobar por Bluetooth: '+(sc.error||'error')+'. Mira si aparece en el panel.'};
+      else if(!d)S.res[a]={k:'warn',m:'Ya no responde por Bluetooth. Si se unió a la red aparecerá en el panel en unos segundos; si no, acércalo y busca de nuevo.'};
+      else if(st&&st.wifi===1)S.res[a]={k:'ok',m:'Se unió a «'+(d.ssid||ssid)+'»'+(st.ip?' · IP '+st.ip:'')+(st.rssi?' · '+st.rssi+' dBm':'')+'. Aparecerá en el panel en unos segundos.'};
+      else if(st)S.res[a]={k:'bad',m:'No pudo unirse a «'+ssid+'». Revisa la contraseña, que la red tenga la banda correcta (el ESP32 clásico solo usa 2,4 GHz) y que el altavoz esté al alcance.'};
+      else S.res[a]={k:'warn',m:'Se envió la red, pero no se pudo leer su estado por Bluetooth'+(d.error?': '+d.error:'')+'.'};}
+    if(sent.some(a=>(S.res[a]||{}).k==='ok'))setTimeout(()=>{sig='';loadNodes();},4000);
+  }
+  S.step='result';wmBuild();}
 /* ── Pestaña «Raspberry»: red de la RPi y actualización del servidor ── */
 let sysI=null,sysBusy=false,sysSeenDown=false,sysReloading=false,sysVer0='',rscan=false,rnets=null;
 async function sysLoad(){let j=null;try{j=await (await fetch('/api/system',{cache:'no-store'})).json();}catch(e){j=null;}
@@ -1189,11 +1252,9 @@ $('rpi_go').onclick=async()=>{const ssid=$('rpi_ssid').value.trim();if(!ssid){$(
   if(r.ok){$('rpi_pass').value='';log('Red de la Raspberry: cambiando a «'+ssid+'»');sysBusy=true;sysLoad();}else{$('rpi_wmsg').textContent=r.error||'No se pudo cambiar';$('rpi_wmsg').style.color='var(--bad)';}};
 $('upd_btn').onclick=async()=>{if(!confirm('Se descargará la última versión, se compilará y se reiniciará el servicio (el audio se corta unos segundos). ¿Actualizar?'))return;
   const r=await J('/api/update',{});if(r.ok){log('Actualización del servidor iniciada');sysBusy=true;sysSeenDown=false;sysVer0=(sysI&&sysI.version)||sysVer0;sysLoad();}else{$('upd_msg').textContent=r.error||'No se pudo actualizar';$('upd_msg').style.color='var(--bad)';}};
+$('sy_rpi').addEventListener('click',()=>setTimeout(sysLoad,0));   // al abrir «Raspberry» se lee al momento, sin esperar al siguiente ciclo
 (function sysTick(){if(!document.hidden){if(sysBusy||(!$('sp_rpi').hidden&&!$('p_sys').hidden))sysLoad();}setTimeout(sysTick,sysBusy?1500:4000);})();
 let bleScanned=false;
-async function bleSaveWifi(){const r=await J('/api/ble/wifi',{ssid:$('b_ssid').value,pass:$('b_pass').value,rpi_ip:$('b_rip').value.trim()});
-  if(r.ok){toast('WiFi guardada');log('WiFi de los altavoces guardada: «'+$('b_ssid').value+'»');try{bs=await (await fetch('/api/ble/status')).json();}catch(e){}bleBuild();}
-  else{$('b_ss').textContent=r.error||'No se pudo guardar';$('b_ss').style.color='var(--bad)';}}
 async function bleDoScan(){bscan=true;bleScanned=true;bleBuild();const r=await J('/api/ble/scan',{seconds:6});bscan=false;
   if(r.devices){bdevs=r.devices;bres={};log('Bluetooth: '+bdevs.length+' altavoz(ces) encontrado(s)');}
   else{bdevs=[];toast(r.error||'No se pudo buscar. Comprueba el Bluetooth de la Raspberry.',false);log('Bluetooth: '+(r.error||'error'));}
@@ -1205,12 +1266,8 @@ async function bleProvOne(i){const d=bdevs[i];   // sin número: la Raspberry as
   bres[d.address]=r.ok?{ok:true}:{err:r.error||'No se pudo configurar'};
   if(r.ok){log('Bluetooth: '+d.name+' configurado (la Raspberry le asignará su número al unirse)');setTimeout(()=>{sig='';loadNodes();},6000);}else log('Bluetooth: '+d.name+': '+bres[d.address].err);
   return !!r.ok;}
-async function bleProv(i){const okk=await bleProvOne(i);if(okk)toast('Enviado a '+bdevs[i].name);else toast('No se pudo configurar el altavoz. El motivo está en la lista.',false);bleBuild();}
-async function bleProvAll(){const todo=[];bdevs.forEach((d,i)=>{if(d.new&&d.status&&!(bres[d.address]||{}).ok)todo.push(i);});
-  if(!todo.length)return;
-  const msg='Se enviará la WiFi «'+bs.ssid+'» a:\n'+todo.map(i=>'  '+bdevs[i].name).join('\n')+'\n\n¿Continuar?';
-  if(!confirm(msg))return;
-  let n=0;for(const i of todo){if(await bleProvOne(i))n++;}toast(n+' de '+todo.length+' enviados',n===todo.length);bleBuild();}
+function bleProv(i){wmOpen([bdevs[i].address]);}
+function bleProvAll(){wmOpen(bdevs.filter(d=>d.new&&d.status&&!(bres[d.address]||{}).ok).map(d=>d.address));}
 
 /* Estado de la transmisión y vúmetros (consulta ligera /api/levels) */
 const MDB=60;                                   // la escala va de −60 a 0 dBFS

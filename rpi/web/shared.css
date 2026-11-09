@@ -20,11 +20,11 @@
    El script del <head> (theme.js) resuelve «Automático» según el sistema. */
 html[data-theme=graphite]{
   --bg:#1c1c1e; --panel:#2b2b2d; --raise:#363639; --line:#3d3d41; --line2:#4c4c51;
-  --fg:#e9e9ec; --mut:#a3a3aa; --ac:#5aaeff; --ac-bg:rgba(90,174,255,.15); --ac-ln:rgba(90,174,255,.55);
+  --fg:#e9e9ec; --mut:#a3a3aa; --ac:#ff5959; --ac-bg:rgb(0 0 0 / 15%); --ac-ln:rgba(255,89,89,.55);
   --ctl:#8a8a91; --ok:#46d39a; --warn:#f0b64a; --bad:#ff7b72;
-  --on-ac:#06121f; --ac-hi:#a5d3ff; --ac-lo:#3478b8; --bad-fg:#ffb4ae; --bad-ln:rgba(255,123,114,.5); --warn-ln:rgba(240,182,74,.45);
+  --on-ac:#1c0505; --ac-hi:#ff9d9d; --ac-lo:#c23b3b; --bad-fg:#ffb4ae; --bad-ln:rgba(255,123,114,.5); --warn-ln:rgba(240,182,74,.45);
   --top-bg:rgba(28,28,30,.9); --top-solid:#1c1c1e; --tabs-bg:rgba(43,43,45,.95); --scrim:rgba(0,0,0,.5); --code-bg:#1f1f21; --bar-bg:#18181a; --cl-off:#4a2a28;
-  --thumb:#f2f2f4; --thumb-ring:rgba(90,174,255,.4); --cap-bg:rgba(28,28,30,.78); --glow:rgba(90,174,255,.07); --orb-glow:rgba(90,174,255,.35);
+  --thumb:#f2f2f4; --thumb-ring:rgba(255,89,89,.4); --cap-bg:rgba(28,28,30,.78); --glow:rgba(255,89,89,.07); --orb-glow:rgba(255,89,89,.35);
   --room-bg:#2b2b2d; --led-g:#34c759; --led-y:#ffd60a; --led-r:#ff5a50;
   color-scheme:dark;
 }
@@ -141,7 +141,7 @@ label,.lbl{display:block;color:var(--mut);font-size:.74rem;font-weight:600;lette
 @media (prefers-contrast:more){
   :root{--mut:#b4bccc;--ctl:#8d9ab3;--line2:#6b7a96;--ac:#7ec0ff;--ac-ln:rgba(126,192,255,.8)}
   html[data-theme=light]{--mut:#323b4a;--ctl:#4a5468;--line2:#7d8798;--ac:#0a4f99;--ac-ln:rgba(10,79,153,.8)}
-  html[data-theme=graphite]{--mut:#c6c6cc;--ctl:#a8a8af;--line2:#7d7d84;--ac:#8cc6ff;--ac-ln:rgba(140,198,255,.8)}
+  html[data-theme=graphite]{--mut:#c6c6cc;--ctl:#a8a8af;--line2:#7d7d84;--ac:#ff8a8a;--ac-ln:rgba(255,138,138,.8)}
 }
 @media (prefers-reduced-transparency:reduce){
   .top{background:var(--top-solid);backdrop-filter:none;-webkit-backdrop-filter:none}
