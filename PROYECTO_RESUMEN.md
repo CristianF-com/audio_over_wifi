@@ -100,7 +100,8 @@ Constantes clave (`protocol.h`): `FRAMES_PER_PACKET=120`, `PLAYOUT_DELAY_US=8000
 | Firmware: validador IPv4 y UUID C↔JS | ✅ | `tests/test_firmware_units.py` |
 | Firmware: reordenación/NACK + tarea RX real (PC, loopback) | ✅ | `tests/test_reorder.c`, `tests/test_esp_rx.c` |
 | Firmware ESP32-C5 (incl. BLE) | ⚠️ compila y se flashea | el usuario lo compiló con ESP-IDF real y lo flasheó sin problemas (v9.7); audio/sync/NimBLE/pairing en placa sin confirmar |
-| Firmware ESP32-WROOM (`esp32_wroom/`) | ❌ no compilado | el usuario no lo probará por ahora |
+| Firmware ESP32-WROOM (`esp32_wroom/`) | ⚠️ compila y se flashea | confirmado por el usuario (nov 2026): compila, se flashea, la RPi lo detecta por Bluetooth y lo configura (WiFi de 2.4 GHz); audio/sync/OTA en placa sin confirmar |
+| Bluetooth RPi → ESP (`sonos_ble_prov.py`), lista de redes WiFi (`/api/wifi/scan`) | ✅ en placa | confirmado por el usuario con el C5 y el WROOM |
 | Calibración con móvil real / Web Bluetooth real | ❌ no probado | certificado autofirmado en iOS/Android, permisos de micrófono, pairing |
 | ALSA con Traktor real | ❌ no probado | sin hardware |
 | Audio/sync reales en WiFi | ❌ no probado | el plazo de reenvío y el colchón mínimo hay que ajustarlos en la red real (contadores `perd`/`rec`/`tarde`) |

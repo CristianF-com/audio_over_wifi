@@ -2,7 +2,7 @@
 
 Repuesto del XIAO ESP32-C5: si falta un C5 puedes usar un ESP32 normal. **Usa el mismo código** que `../esp32` (los fuentes se compilan desde ahí); esta carpeta solo cambia el chip, los pines y la configuración.
 
-> **No probado.** Este firmware nunca se compiló con ESP-IDF real ni se probó en una placa (ni el del C5 lo he compilado yo; el C5 lo compilaste y probaste tú). Si algo no compila, copia el error.
+> **Estado:** compila y se flashea con ESP-IDF real, y la RPi lo detecta por Bluetooth y le configura el WiFi (confirmado por el usuario). **Sin probar en placa:** el audio, el sync y la OTA. Si algo falla, copia el error.
 
 ## Diferencias con el C5
 | | XIAO ESP32-C5 | ESP32-WROOM-32D |
@@ -33,4 +33,4 @@ Después se configura igual que el C5: ID y WiFi por Bluetooth desde el panel (�
 * El ESP32 clásico tiene un solo ADC/GPIO sensible al arranque: GPIO22/25/26 no son pines de arranque, pero evita mover los pines a GPIO0/2/12/15.
 
 ## Actualización por WiFi (OTA)
-Comparte `ota_update.c` con el C5. `partitions.csv` define dos aplicaciones de 1,5 MB y `sdkconfig.defaults` fija flash de 4 MB (los WROOM-32D suelen traer 4 MB; con menos no cabe). La primera vez hay que flashear por cable. **No compilado ni probado.**
+Comparte `ota_update.c` con el C5. `partitions.csv` define dos aplicaciones de 1,5 MB y `sdkconfig.defaults` fija flash de 4 MB (los WROOM-32D suelen traer 4 MB; con menos no cabe). La primera vez hay que flashear por cable. Compila; la OTA en sí **no se ha probado** en el WROOM.
