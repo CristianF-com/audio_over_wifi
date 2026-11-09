@@ -70,7 +70,9 @@ check("receiver_main.c: #if/#endif balanceados", _balanced(src))
 # ── OTA por WiFi, versión/chip en el HELLO y RSSI en el REPORT (NO compilado con ESP-IDF real: solo comprobaciones de coherencia) ──
 ou = open(f"{here}/../esp32/main/ota_update.c").read()
 fwv = int(_re.search(r"#define FW_VERSION\s+(\d+)", src).group(1))
-check("FW_VERSION = 9 y cabe en 6 bits del HELLO (≤ 63)", fwv == 9 and fwv <= 63, fwv)
+check("FW_VERSION = 10 y cabe en 6 bits del HELLO (≤ 63)", fwv == 10 and fwv <= 63, fwv)
+_pr = {m.group(1): int(m.group(2)) for m in _re.finditer(r'xTaskCreate\((\w+),\s*"\w+",\s*\d+,\s*NULL,\s*(\d+),', src)}
+check("prioridades: I2S (20) y recepción (19) sobre lwIP (18) y bajo el WiFi (23); control por debajo", _pr.get("i2s_task") == 20 and _pr.get("audio_rx_task") == 19 and 18 < _pr["audio_rx_task"] < _pr["i2s_task"] < 23 and _pr.get("control_task", 99) < 18, _pr)
 check("ID automático: HELLO con ESP_ID_AUTO, el WELCOME asignado se acepta solo sin ID y no se escribe en NVS", "g_receiver_id == ESP_ID_AUTO && (w.reserved & WELCOME_F_ASSIGNED)" in src and "hello.esp_id = g_receiver_id;" in src and "nvs_erase_key(nh, \"receiver_id\")" in src)
 check("ID automático: Kconfig por defecto 255 en C5 y WROOM; DEF_L/DEF_R no se indexan con 255", all("default 255" in open(f).read() for f in (f"{here}/../esp32/main/Kconfig.projbuild", f"{here}/../esp32_wroom/main/Kconfig.projbuild")) and "g_receiver_id < MAX_NODES ? g_receiver_id : 0" in src)
 check("HELLO: reserved = HELLO_PACK(FW_VERSION, chip) con el chip según el target", "hello.reserved = HELLO_PACK(FW_VERSION, FW_CHIP_ID)" in src and "#define FW_CHIP_ID          FW_CHIP_C5" in src and "#define FW_CHIP_ID          FW_CHIP_ESP32" in src)
