@@ -179,3 +179,6 @@ App instalada / zonas seguras (v9.21, patrón tomado de `interval-hiit`): `--sal
 ## v9.23 — entrada con clave dentro de la web y LED de estado (sin probar en placa / app instalada)
 * Login propio (`/api/login`, cookie de sesión, páginas públicas, `X-Requested-With: sonos` evita el diálogo Basic). Pruebas: `tests/test_auth.py`, `tests/test_ui.js` («Entrada»).
 * FW v15: LED de estado (ver CLAUDE.md). El C5 tiene un solo LED por software.
+
+## v9.24 — contra los microcortes (FW v17; sin probar en placa)
+* Diagnóstico por altavoz («Tapados», «Retraso I2S»), envío doble opcional (sin firmware nuevo), PLC nuevo (`plc.h`), WROOM con I2S en el núcleo 1 y 240 MHz, y prioridad voz/vídeo elegible. Detalle en CLAUDE.md. Pruebas: `tests/test_plc.c`, `tests/fake_esp.py`, `tests/test_firmware_units.py`, `tests/test_ui.js`.

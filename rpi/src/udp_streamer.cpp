@@ -130,8 +130,7 @@ bool UdpStreamer::init() {
     if (audio_sock_ < 0) { perror("audio socket"); return false; }
     int sndbuf = 1 << 20;
     setsockopt(audio_sock_, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf));
-    int tos = 0xB8;                                   // DSCP EF: prioridad WMM si el AP la respeta
-    setsockopt(audio_sock_, IPPROTO_IP, IP_TOS, &tos, sizeof(tos));
+    applyQos();
 
     running_ = true;
     ctrl_thread_ = std::thread(&UdpStreamer::controlLoop, this);
@@ -292,8 +291,8 @@ void UdpStreamer::handleHello(const uint8_t* b, int n, const sockaddr_in& src) {
 }
 
 void UdpStreamer::handleReport(const uint8_t* b, int n, const sockaddr_in& src) {
-    if (n < (int)sizeof(ReportPacket)) return;
-    ReportPacket r; memcpy(&r, b, sizeof(r));
+    if (n < REPORT_BASE_SIZE) return;                  // el firmware anterior a v17 manda 52 bytes (sin concealed ni i2s_gap_max_us)
+    ReportPacket r{}; memcpy(&r, b, n < (int)sizeof(r) ? (size_t)n : sizeof(r));
     if (r.esp_id >= MAX_NODES) return;
     char ip[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &src.sin_addr, ip, sizeof(ip));
@@ -322,6 +321,10 @@ void UdpStreamer::handleReport(const uint8_t* b, int n, const sockaddr_in& src) 
     nd.underruns     = r.underruns;
     nd.drift_ppm     = r.drift_ppm;
     nd.recovered_packets = r.recovered_packets;
+    nd.concealed     = r.concealed;
+    nd.i2s_gap_us    = r.i2s_gap_max_us;
+    {   const uint64_t now = mono_us();
+        if (r.i2s_gap_max_us >= nd.i2s_gap_peak_us || now - nd.i2s_gap_peak_t > 60000000ULL) { nd.i2s_gap_peak_us = r.i2s_gap_max_us; nd.i2s_gap_peak_t = now; } }
     nd.rssi_dbm      = r.rssi_dbm;
     nd.last_seen     = mono_us();
     nd.online        = true;
@@ -606,6 +609,7 @@ void UdpStreamer::pushFrames(const int32_t* s32, uint32_t frames, uint64_t captu
         return v;
     };
 
+    const bool redund = redund_.load(std::memory_order_relaxed);
     for (int i = 0; i < MAX_NODES; i++) {
         TxState& tx = tx_[i];
         if (!rt[i].active) { tx.n = 0; continue; }
@@ -655,6 +659,13 @@ void UdpStreamer::pushFrames(const int32_t* s32, uint32_t frames, uint64_t captu
                     send_errors_.fetch_add(1, std::memory_order_relaxed);
                 else
                     pkts_sent_.fetch_add(1, std::memory_order_relaxed);
+                if (redund) {                            // redundancia: el paquete de hace 5 ms sale otra vez (mismo seq y timestamp);
+                    const uint32_t back = tx.mono ? 1 : 2;   // si el original se perdió, el ESP lo recupera sin pedir reenvío; si no, lo descarta
+                    const HistSlot& h = hist_[i][(tx.pkt.seq - back) & (TX_HISTORY_PACKETS - 1)];   // solo este hilo escribe el historial
+                    if (h.used && h.seq == tx.pkt.seq - back &&
+                        sendto(audio_sock_, &h.pkt, sizeof(h.pkt), MSG_DONTWAIT, (const sockaddr*)&rt[i].addr, sizeof(rt[i].addr)) >= 0)
+                        redund_sent_.fetch_add(1, std::memory_order_relaxed);
+                }
                 tx.n = 0;
             }
         }
@@ -782,6 +793,17 @@ bool UdpStreamer::setNodeDist(uint8_t id, float m) {
     dirty_.store(true);
     return true;
 }
+// Clase de prioridad de los paquetes de audio: 0 = voz (DSCP EF, 0xB8), 1 = vídeo (DSCP AF41, 0x88). El AP la traduce a WMM si la respeta.
+void UdpStreamer::applyQos() {
+    if (audio_sock_ < 0) return;
+    int tos = qos_.load() == 1 ? 0x88 : 0xB8;
+    setsockopt(audio_sock_, IPPROTO_IP, IP_TOS, &tos, sizeof(tos));
+}
+bool UdpStreamer::setQos(int q) {
+    if (q != 0 && q != 1) return false;
+    qos_.store(q); applyQos(); dirty_.store(true);
+    return true;
+}
 bool UdpStreamer::setLipsyncExtraMs(int ms) {
     if (ms < -50 || ms > 200) return false;
     lipsync_extra_ms_.store(ms); dirty_.store(true);
@@ -900,6 +922,7 @@ bool UdpStreamer::saveConfig() {
             master_vol_.load(), playout_us_.load(), layout_.load(), xover_hz_.load(), lipsync_extra_ms_.load(),
             xover_on_.load() ? 1 : 0, eq_on_.load() ? 1 : 0);
     fprintf(f, "dsp_night=%d\ndsp_lfe=%d\nlfe_db=%.1f\n", night_.load(), lfe_front_.load() ? 1 : 0, lfe_db_.load());
+    fprintf(f, "net_redundancy=%d\nnet_qos=%d\n", redund_.load() ? 1 : 0, qos_.load());
     fprintf(f, "playout_auto=%d\nplayout_floor_us=%u\nplayout_max_us=%u\n", auto_on_.load() ? 1 : 0, auto_floor_us_.load(), auto_max_us_.load());
     fprintf(f, "auto_raise_events=%u\nauto_clean_min=%u\nauto_step_ms=%u\n", auto_raise_events_.load(), auto_clean_min_.load(), auto_step_us_.load() / 1000);
     for (const auto& n : nodes)
@@ -946,6 +969,8 @@ bool UdpStreamer::loadConfig() {
         if (!strcmp(key, "auto_raise_events")) { if (dv >= 1 && dv <= 100 && dv == (int)dv) { auto_raise_events_.store((uint32_t)dv); applied++; } continue; }
         if (!strcmp(key, "auto_clean_min")) { if (dv >= 1 && dv <= 120 && dv == (int)dv) { auto_clean_min_.store((uint32_t)dv); applied++; } continue; }
         if (!strcmp(key, "auto_step_ms"))  { if (dv >= 5 && dv <= 40 && dv == (int)dv && (int)dv % 5 == 0) { auto_step_us_.store((uint32_t)dv * 1000); applied++; } continue; }
+        if (!strcmp(key, "net_redundancy")) { redund_.store(dv != 0); applied++; continue; }
+        if (!strcmp(key, "net_qos")) { if (dv == 0 || dv == 1) { qos_.store((int)dv); applyQos(); applied++; } continue; }
         if (!strcmp(key, "playout_auto"))  { auto_on_.store(dv != 0); applied++; continue; }
         if (!strcmp(key, "playout_floor_us")) { if (dv >= PLAYOUT_MIN_US && dv <= PLAYOUT_MAX_US) { auto_floor_us_.store((uint32_t)dv); applied++; } continue; }
         if (!strcmp(key, "playout_max_us")) { if (dv >= PLAYOUT_MIN_US && dv <= PLAYOUT_MAX_US) { auto_max_us_.store((uint32_t)dv); applied++; } continue; }

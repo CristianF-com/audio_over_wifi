@@ -50,6 +50,7 @@
 #include <math.h>
 #include "protocol.h"
 #include "reorder.h"
+#include "plc.h"
 #include "ble_prov.h"
 #include "ota_update.h"
 
@@ -90,7 +91,7 @@ static const char* TAG = "RECV";
 #ifndef CONFIG_SONOS_BLE_WINDOW_S
   #define CONFIG_SONOS_BLE_WINDOW_S 15
 #endif
-#define FW_VERSION          16  /* 16: ajustes por WiFi (PKT_SETTINGS: LED, ventana BLE, potencia WiFi, reiniciar, abrir BLE, olvidar WiFi). 15: LED de estado (GPIO27 en el C5). 14: cambio de red WiFi por WiFi (PKT_WIFI) con vuelta a la anterior si no conecta. 13: el BLE se apaga a los 15 s de tener Wi-Fi (sin Wi-Fi sigue activo). 12: ventana BLE de 60 s (v13 la reemplaza). 11: vuelve a las prioridades 15/14 (la v10 con 20/19 empeoró en placa). 10: prioridades de las tareas I2S (20) y recepción (19) sobre lwIP (18). 9: vuelve a la cola DMA de 6 y al mínimo de 40 ms (la de 4 daba cortes en placa; v8 fue ese experimento). 7: ID automático por MAC (HELLO con ESP_ID_AUTO, WELCOME_F_ASSIGNED). 6: OTA por WiFi, versión/chip en el HELLO y RSSI en el REPORT (protocolo sin cambios: v5) */
+#define FW_VERSION          17  /* 17: PLC en vaivén con fundido cruzado (plc.h), REPORT ampliado (huecos tapados y retraso máximo del I2S), WROOM: I2S en el núcleo 1 y 240 MHz. 16: ajustes por WiFi (PKT_SETTINGS: LED, ventana BLE, potencia WiFi, reiniciar, abrir BLE, olvidar WiFi). 15: LED de estado (GPIO27 en el C5). 14: cambio de red WiFi por WiFi (PKT_WIFI) con vuelta a la anterior si no conecta. 13: el BLE se apaga a los 15 s de tener Wi-Fi (sin Wi-Fi sigue activo). 12: ventana BLE de 60 s (v13 la reemplaza). 11: vuelve a las prioridades 15/14 (la v10 con 20/19 empeoró en placa). 10: prioridades de las tareas I2S (20) y recepción (19) sobre lwIP (18). 9: vuelve a la cola DMA de 6 y al mínimo de 40 ms (la de 4 daba cortes en placa; v8 fue ese experimento). 7: ID automático por MAC (HELLO con ESP_ID_AUTO, WELCOME_F_ASSIGNED). 6: OTA por WiFi, versión/chip en el HELLO y RSSI en el REPORT (protocolo sin cambios: v5) */
 #if CONFIG_IDF_TARGET_ESP32C5
 #define FW_CHIP_ID          FW_CHIP_C5
 #else
@@ -701,8 +702,15 @@ static void audio_rx_task(void* pv)
 }
 
 /* ─── Tarea I2S: reproducción alineada + corrección de desvío ──────────────── */
+/* Diagnóstico: mayor intervalo entre dos escrituras seguidas al I2S (normal ≈ 2,5 ms). Si supera lo que cabe en la cola DMA
+   (I2S_DMA_DESC trozos = 15 ms), el DAC se quedó sin datos: el corte es del propio ESP (tarea retrasada), no de la red. */
+static volatile uint32_t g_i2s_gap_max_us = 0;
+static int64_t g_i2s_last_put = 0;                        /* solo i2s_task; 0 = no medir el siguiente */
 static inline void i2s_put(const int16_t* d, size_t frames)
 {
+    const int64_t t = esp_timer_get_time();
+    if (g_i2s_last_put) { const uint32_t gap = (uint32_t)(t - g_i2s_last_put); if (gap > g_i2s_gap_max_us) g_i2s_gap_max_us = gap; }
+    g_i2s_last_put = t;
     size_t w = 0;
     i2s_channel_write(g_i2s, d, frames * 2 * sizeof(int16_t), &w, 100);
 }
@@ -720,7 +728,7 @@ static void i2s_task(void* pv)
      * (1.º chunk = último audio con fade-out, resto silencio) y el siguiente paquete entra con fade-in.
      * Así se conserva la línea de tiempo (no se pierde sincronía con los demás altavoces) y no hay clic. */
     static int16_t last_chunk[FRAMES_PER_PACKET * 2];
-    uint64_t last_ts = 0; bool have_last = false, fade_in = false;
+    uint64_t last_ts = 0; bool have_last = false, fade_in = false; int fade_k = 0;
 
     while (1) {
         if (esp_timer_get_time() < g_identify_until_us) {      /* 440 Hz, -20 dBFS, ambos canales */
@@ -743,6 +751,7 @@ static void i2s_task(void* pv)
             xQueueReset(g_q);
             have = false; was_playing = false; err_valid = false; have_last = false;
             vTaskDelay(pdMS_TO_TICKS(20));                    /* auto_clear emite silencio */
+            g_i2s_last_put = 0;                               /* pausa voluntaria: no cuenta como retraso */
             continue;
         }
 
@@ -757,21 +766,13 @@ static void i2s_task(void* pv)
                 int64_t gap = (int64_t)cur.ts - (int64_t)last_ts - CHUNK_US;     /* >0: faltan paquetes */
                 if (gap > CHUNK_US / 2 && gap <= PLC_MAX_K * CHUNK_US + CHUNK_US / 2) {
                     int k = (int)((gap + CHUNK_US / 2) / CHUNK_US);
-                    for (int i = 0; i < k; i++) {
-                        if (i == 0) {
-                            for (int f = 0; f < FRAMES_PER_PACKET; f++) {
-                                int32_t g = FRAMES_PER_PACKET - f;                /* rampa 1 -> 0 */
-                                work[2 * f]     = (int16_t)((last_chunk[2 * f]     * g) / FRAMES_PER_PACKET);
-                                work[2 * f + 1] = (int16_t)((last_chunk[2 * f + 1] * g) / FRAMES_PER_PACKET);
-                            }
-                            i2s_put(work, FRAMES_PER_PACKET);
-                        } else {
-                            i2s_put(silence, FRAMES_PER_PACKET);
-                        }
+                    for (int i = 0; i < k; i++) {                 /* relleno: último audio en vaivén y bajando (plc.h) */
+                        plc_fill(work, last_chunk, i);
+                        i2s_put(work, FRAMES_PER_PACKET);
                         g_concealed++;
                     }
                     last_ts += (uint64_t)k * (uint64_t)CHUNK_US;
-                    fade_in = true;
+                    fade_in = true; fade_k = k;
                 }
             }
         }
@@ -793,15 +794,9 @@ static void i2s_task(void* pv)
 
         size_t frames = FRAMES_PER_PACKET;
         memcpy(work, cur.s, sizeof(cur.s));
-        memcpy(last_chunk, cur.s, sizeof(cur.s));                 /* sin fade: base del próximo PLC */
+        if (fade_in) { plc_blend_in(work, last_chunk, fade_k); fade_in = false; }   /* tras un hueco: fundido cruzado con el relleno */
+        memcpy(last_chunk, cur.s, sizeof(cur.s));                 /* sin fundido: base del próximo PLC */
         last_ts = cur.ts; have_last = true;
-        if (fade_in) {                                            /* tras un hueco: entrada suave */
-            for (int f = 0; f < FRAMES_PER_PACKET; f++) {
-                work[2 * f]     = (int16_t)((work[2 * f]     * f) / FRAMES_PER_PACKET);
-                work[2 * f + 1] = (int16_t)((work[2 * f + 1] * f) / FRAMES_PER_PACKET);
-            }
-            fade_in = false;
-        }
 
         if (++chunk_n % SLEW_EVERY == 0) {
             if (err_f > SLEW_DEADBAND_US) {                   /* vamos tarde -> saltar 1 frame */
@@ -910,6 +905,7 @@ static void report_task(void* pv)
         r.buffer_frames = qframes; r.sync_err_us = g_sync_err_us;
         r.lost_packets = g_lost; r.late_packets = g_late; r.underruns = g_underruns;
         r.recovered_packets = g_ro.recovered;
+        r.concealed = g_concealed; r.i2s_gap_max_us = g_i2s_gap_max_us; g_i2s_gap_max_us = 0;   /* máximo desde el REPORT anterior */
         r.drift_ppm = g_drift_ppm;
         {   wifi_ap_record_t ap;
             if (g_wifi_up && esp_wifi_sta_get_ap_info(&ap) == ESP_OK) r.rssi_dbm = ap.rssi; }
@@ -952,7 +948,12 @@ void app_main(void)
 
     i2s_init();
     /* UN solo núcleo: prioridades por debajo de WiFi (23) y tcpip (18). Probado en placa: subirlas sobre lwIP (v10: 20/19) empeoró los cortes. */
+#if !CONFIG_FREERTOS_UNICORE && !CONFIG_IDF_TARGET_ESP32C5
+    /* ESP32 clásico (dos núcleos): el I2S va solo en el núcleo 1; WiFi, lwIP y BLE quedan en el 0 y ya no le quitan tiempo. */
+    xTaskCreatePinnedToCore(i2s_task, "i2s", 4096, NULL, 15, NULL, 1);
+#else
     xTaskCreate(i2s_task, "i2s", 4096, NULL, 15, NULL);    /* ya activa: permite "identificar" sin WiFi */
+#endif
     xTaskCreate(report_task, "rpt", 4096, NULL, 5, NULL);
 #if CONFIG_SONOS_LED_GPIO >= 0
     xTaskCreate(led_task, "led", 2048, NULL, 3, NULL);
@@ -965,8 +966,13 @@ void app_main(void)
     wifi_wait();
     if (!sockets_init()) { vTaskDelay(pdMS_TO_TICKS(1000)); esp_restart(); }
 
+#if !CONFIG_FREERTOS_UNICORE && !CONFIG_IDF_TARGET_ESP32C5
+    xTaskCreatePinnedToCore(control_task,  "ctrl", 4096, NULL, 12, NULL, 0);
+    xTaskCreatePinnedToCore(audio_rx_task, "arx",  4096, NULL, 14, NULL, 0);
+#else
     xTaskCreate(control_task,  "ctrl", 4096, NULL, 12, NULL);
     xTaskCreate(audio_rx_task, "arx",  4096, NULL, 14, NULL);
+#endif
 
     ESP_LOGI(TAG, "Listo. Esperando WELCOME de la RPi...");
 }

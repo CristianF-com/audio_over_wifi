@@ -40,3 +40,7 @@ CONFIG_BT_NIMBLE_NVS_PERSIST=n
 CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=247
 # Wi-Fi + BLE comparten radio en 2.4 GHz: coexistencia por software (por defecto al activar ambos)
 CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y
+
+# 240 MHz (por defecto el ESP32 clásico arranca a 160): más margen para WiFi + audio
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=240

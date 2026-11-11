@@ -60,7 +60,7 @@ int main(int argc, char** argv) {
     uint64_t t0 = now_us();
     uint64_t next = t0;
     bool cfg_done = false;
-    while (now_us() - t0 < 150000000ULL) {
+    while (now_us() - t0 < 200000000ULL) {
         next += 5000;
         for (uint32_t f = 0; f < P; f++, tone_n++)
             buf[(size_t)f * AUDIO_CHANNELS + 4] = (int32_t)(std::sin(2.0 * M_PI * 1414.0 * (double)tone_n / 48000.0) * 8192.0) << 16;

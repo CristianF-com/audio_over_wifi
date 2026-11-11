@@ -319,7 +319,7 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
   await p.click('#distapply');
   ok('distancias: «Aplicar» fija retardo 4373 µs y volumen 146 en el altavoz de 2 m',await until(async()=>{const x=(await J('/api/nodes'))[3];return Math.abs(x.latency_offset_us-4373)<=1&&x.volume_l===146&&x.volume_r===146;}),(await J('/api/nodes'))[3]);
   ok('distancias: el más lejano queda a 255 y 0 µs',await until(async()=>{const x=(await J('/api/nodes'))[4];return x.latency_offset_us===0&&x.volume_l===255;}));
-  ok('salud: la tabla tiene columnas WiFi y Firmware y 11 columnas por fila',await p.evaluate(()=>[...document.querySelectorAll('#health tr')].every(r=>r.children.length===11)&&[...document.querySelectorAll('thead th')].some(t=>t.textContent==='WiFi')&&[...document.querySelectorAll('thead th')].some(t=>t.textContent==='Firmware')));
+  ok('salud: la tabla tiene columnas WiFi y Firmware y 13 columnas por fila',await p.evaluate(()=>[...document.querySelectorAll('#health tr')].every(r=>r.children.length===13)&&[...document.querySelectorAll('thead th')].some(t=>t.textContent==='WiFi')&&[...document.querySelectorAll('thead th')].some(t=>t.textContent==='Firmware')));
   ok('aviso de desconexión: un altavoz que pasa de en línea a desconectado muestra un aviso',await p.evaluate(()=>{wasOn[3]=true;nodes=nodes.map(n=>n.id===3?{...n,online:false,enabled:true}:n);watchOnline();return [...document.querySelectorAll('#tb .toast.bad')].some(t=>t.textContent.includes('#3')&&t.textContent.includes('se desconectó'));}));
   await p.evaluate(()=>document.querySelectorAll('#tb .toast').forEach(t=>t.remove()));
   await p.click('.tab[data-tab="snd"]');await sleep(300);await p.click('#sb_mix');
@@ -420,6 +420,23 @@ async function until(f,ms=4000){const t=Date.now();while(Date.now()-t<ms){try{if
    ok('forma: ?forma=recta la activa y se recuerda; ?forma=redonda la quita',await p.evaluate(()=>SonosTheme.getShape()==='square')&&(await p.goto(BASE+'/?forma=redonda'),await p.waitForSelector('#spks .spk',{state:'attached'}),await p.evaluate(()=>SonosTheme.getShape()==='round'&&document.documentElement.getAttribute('data-shape')==='round')));
    await p.click('.tab[data-tab="spk"]');}
   // Móvil
+  {// Latencia → Red: envío doble y prioridad; Sistema: columnas «Tapados» y «Retraso I2S»
+   const np=await ctx.newPage();await np.goto(BASE+'/');await np.waitForSelector('#spks .spk',{state:'attached'});
+   await np.click('.tab[data-tab="lat"]');await sleep(300);
+   ok('Red: tarjeta con interruptor de envío doble (apagado) y prioridad «Voz»',await np.evaluate(()=>document.getElementById('net_rd').getAttribute('aria-checked')==='false'&&document.querySelector('#net_qos [aria-pressed=true]').dataset.q==='voz'));
+   ok('Red: interruptor y botones ≥ 44 px de alto táctil o con etiqueta',await np.evaluate(()=>!!document.getElementById('net_rd').getAttribute('aria-label')&&[...document.querySelectorAll('#net_qos button')].every(b=>b.getBoundingClientRect().height>=36)));
+   await np.click('#net_rd');
+   ok('Red: activar el envío doble llega al servidor',await until(async()=>(await (await fetch(BASE+'/api/status')).json()).net_redundancy===true));
+   await np.click('#net_qos [data-q="video"]');
+   ok('Red: elegir «Vídeo» llega al servidor y queda marcado',await until(async()=>(await (await fetch(BASE+'/api/status')).json()).net_qos==='video')&&await until(()=>np.evaluate(()=>document.querySelector('#net_qos [aria-pressed=true]').dataset.q==='video')));
+   await np.click('#net_rd');await np.click('#net_qos [data-q="voz"]');
+   ok('Red: se puede volver a dejar como estaba',await until(async()=>{const j=await (await fetch(BASE+'/api/status')).json();return j.net_redundancy===false&&j.net_qos==='voz';}));
+   await np.route('**/api/nodes',async r=>{const resp=await r.fetch();const j=await resp.json();const n=j.find(x=>x.online)||j[0];n.online=true;n.fw_version=17;n.concealed=42;n.i2s_gap_peak_us=18300;const o=j.find(x=>x!==n);if(o){o.fw_version=16;}await r.fulfill({response:resp,json:j});});
+   await np.click('.tab[data-tab="sys"]');await np.evaluate(()=>loadNodes());await sleep(500);
+   ok('Sistema: la tabla tiene las columnas «Tapados» y «Retraso I2S»',await np.evaluate(()=>{const t=[...document.querySelectorAll('thead th')].map(x=>x.textContent);return t.includes('Tapados')&&t.includes('Retraso I2S');}));
+   ok('Sistema: con firmware 17 muestra los tapados y el retraso (18,3 ms en rojo: corte del propio altavoz)',await np.evaluate(()=>{const tds=[...document.querySelectorAll('#health td')];return tds.some(td=>td.textContent==='42')&&tds.some(td=>td.textContent==='18,3 ms'&&td.className==='bad');}));
+   ok('Sistema: con firmware anterior esas columnas muestran «—»',await np.evaluate(()=>[...document.querySelectorAll('#health tr')].some(tr=>{const c=tr.children;return c.length===13&&c[7].textContent==='—'&&c[8].textContent==='—';})));
+   await np.close();}
   {// Pantalla de entrada propia (sin diálogo Basic): un 401 de /api/ la muestra; la clave sale por POST /api/login
    const lc=await b.newContext({viewport:{width:390,height:844}});const lp=await lc.newPage();let logged=false,xh=null,authed=false;
    await lp.route('**/api/status',r=>{xh=r.request().headers()['x-requested-with'];return authed?r.continue():r.fulfill({status:401,contentType:'application/json',body:'{"error":"unauthorized"}'});});

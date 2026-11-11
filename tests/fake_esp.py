@@ -820,5 +820,42 @@ check("inputs: lista vacía y nada pendiente", json.loads(b).get("ok") is True a
 c, b = http("POST", "/api/node", {"id": 1, "ch_left": 10, "ch_right": 11}); check("inputs: con 10 entradas un altavoz no puede usar el canal 11", "error" in b or c >= 400, (c, b))
 c, b = http("POST", "/api/names", {"names": ["x"] * 11}); check("inputs: /api/names exige un nombre por canal activo (11 ≠ 10)", c == 400 and "10" in b, (c, b))
 
+# ── Diagnóstico de cortes (REPORT ampliado, FW >= 17), envío doble y prioridad de los paquetes ──
+c, b = http("GET", "/api/nodes"); n0 = json.loads(b)[0]
+check("REPORT antiguo (52 B) sigue aceptado: tapados = 0 y sin retraso I2S", n0["online"] and n0["concealed"] == 0 and n0["i2s_gap_peak_us"] == 0, (n0.get("concealed"), n0.get("i2s_gap_peak_us")))
+rep60 = rep + struct.pack("<II", 33, 17000)
+check("REPORT ampliado = 60 bytes", len(rep60) == 60, len(rep60))
+ctrl.sendto(rep60, (RPI_IP, 5005)); time.sleep(0.25)
+c, b = http("GET", "/api/nodes"); n0 = json.loads(b)[0]
+check("REPORT ampliado: el retraso máximo del I2S (17 ms) queda como pico del último minuto", n0["i2s_gap_peak_us"] == 17000, n0.get("i2s_gap_peak_us"))
+check("REPORT ampliado: huecos tapados visibles (33, o 0 si ya llegó otro REPORT antiguo)", n0["concealed"] in (33, 0), n0.get("concealed"))
+st0 = json.loads(http("GET", "/api/status")[1])
+check("red: por defecto sin envío doble y prioridad «voz»", st0.get("net_redundancy") is False and st0.get("net_qos") == "voz", (st0.get("net_redundancy"), st0.get("net_qos")))
+for _b, _n in (({}, "vacío"), ({"redundancy": "quizá"}, "redundancy inválido"), ({"qos": "datos"}, "qos inválido")):
+    c, _ = http("POST", "/api/net", _b); check(f"/api/net: {_n} -> 400", c == 400, c)
+def _dups(secs=1.0):
+    while True:                                   # vacía lo que hubiera en cola
+        try: aud.settimeout(0.01); aud.recvfrom(2048)
+        except socket.timeout: break
+    aud.settimeout(0.5); pk = grab(secs)
+    sq = [struct.unpack("<IBBHIQ", p[:20])[4] for p in pk]
+    return len(sq), len(sq) - len(set(sq)), sq, pk
+n_a, d_a, _, _ = _dups()
+check("sin envío doble: ningún paquete repetido", n_a > 150 and d_a == 0, (n_a, d_a))
+c, b = http("POST", "/api/net", {"redundancy": True}); check("/api/net redundancy=true -> ok", c == 200 and json.loads(b).get("ok") is True, (c, b))
+n_b, d_b, sq, pk2 = _dups()
+check("envío doble: llega cada paquete dos veces (≈ el doble de paquetes)", d_b > n_b * 0.45 and n_b > n_a * 1.7, (n_a, n_b, d_b))
+_first = {}; _lag = []; _same = True
+for i, s in enumerate(sq):
+    if s in _first: _lag.append(max(sq[:i + 1]) - s); _same &= pk2[i] == pk2[_first[s]]
+    else: _first[s] = i
+check("envío doble: la copia es idéntica (mismo seq, timestamp y audio)", _same and len(_lag) > 100)
+_want = 1 if pk2[0][4] == 8 else 2             # mono (paquetes de 5 ms): 1 paquete; estéreo (2,5 ms): 2 paquetes
+check("envío doble: la copia sale 5 ms después del original (2 paquetes en estéreo, 1 en mono)", len(_lag) > 100 and sorted(_lag)[len(_lag) // 2] == _want, (sorted(_lag)[len(_lag) // 2] if _lag else None, _want))
+st1 = json.loads(http("GET", "/api/status")[1]); check("envío doble visible en /api/status y contador de copias", st1["net_redundancy"] is True and st1["redund_sent"] > 100, (st1.get("net_redundancy"), st1.get("redund_sent")))
+http("POST", "/api/net", {"redundancy": False}); n_c, d_c, _, _ = _dups(0.6); check("envío doble desactivado: vuelve a no repetir", d_c == 0, (n_c, d_c))
+c, b = http("POST", "/api/net", {"qos": "video"}); st2 = json.loads(http("GET", "/api/status")[1]); check("prioridad «video» aplicada y visible", c == 200 and st2["net_qos"] == "video", (c, st2.get("net_qos")))
+http("POST", "/api/net", {"qos": "voz"}); check("prioridad de vuelta a «voz»", json.loads(http("GET", "/api/status")[1])["net_qos"] == "voz")
+
 print("\nRESULTADO:", "TODO OK" if ok else "HAY FALLOS")
 sys.exit(0 if ok else 1)

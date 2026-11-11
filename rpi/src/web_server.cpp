@@ -469,6 +469,13 @@ std::string WebServer::handlePOST(const std::string& p, const std::string& b, in
     else if (p == "/api/names")     r = namesPost(b);
     else if (p == "/api/inputs")    r = inputsPost(b);
     else if (p == "/api/firmware")  r = firmwareUpload(b);
+    else if (p == "/api/net") {                       // {"redundancy":true|false,"qos":"voz"|"video"}
+        const std::string rd = jsonGet(b, "redundancy"), q = jsonGet(b, "qos");
+        if (rd.empty() && q.empty()) r = "{\"error\":\"Falta redundancy o qos\"}";
+        else if (!rd.empty() && rd != "true" && rd != "false") r = "{\"error\":\"redundancy debe ser true o false\"}";
+        else if (!q.empty() && q != "voz" && q != "video") r = "{\"error\":\"qos debe ser voz o video\"}";
+        else { if (!rd.empty()) streamer_.setRedundancy(rd == "true"); if (!q.empty()) streamer_.setQos(q == "video" ? 1 : 0); r = "{\"ok\":true}"; }
+    }
     else if (p == "/api/ota")       r = otaStart(b);
     else if (p == "/api/esp/settings") {
         // olvidar la WiFi deja el altavoz sin red hasta reconfigurarlo por Bluetooth: solo con contraseña configurada
@@ -605,7 +612,7 @@ std::string WebServer::getStatus() {
       << jnum("send_errors", (double)streamer_.sendErrors()) << ","
       << jnum("max_nodes", MAX_NODES) << "," << jnum("layout", streamer_.layout()) << ","
       << jnum("xover_hz", streamer_.xoverHz()) << ","
-      << jbool("dsp_xover", streamer_.xoverOn()) << "," << jbool("dsp_eq", streamer_.eqOn()) << "," << jnum("lipsync_extra_ms", streamer_.lipsyncExtraMs()) << ","
+      << jbool("dsp_xover", streamer_.xoverOn()) << "," << jbool("dsp_eq", streamer_.eqOn()) << "," << jnum("lipsync_extra_ms", streamer_.lipsyncExtraMs()) << "," << jbool("net_redundancy", streamer_.redundancy()) << "," << jstr("net_qos", streamer_.qos() == 1 ? "video" : "voz") << "," << jnum("redund_sent", streamer_.redundSent()) << ","
       << jbool("running", capture_.isRunning() || (mixer_ && mixer_->active())) << "," << jnum("input_channels", streamer_.inputChannels()) << ","
       << jbool("lfe_front", streamer_.lfeFront()) << "," << jnum("lfe_db", streamer_.lfeDb()) << "," << jbool("lfe_active", streamer_.lfeActive()) << ","
       << jnum("night", streamer_.nightLevel()) << "," << jnum("profile_active", streamer_.profileActive()) << ","
@@ -645,7 +652,7 @@ std::string WebServer::getNodes() {
           << "\"eq\":[" ;
         for (int b = 0; b < EQ_BANDS; b++) o << (b ? "," : "") << std::round(n.eq_db[b] * 100.0) / 100.0;
         o << "],"
-          << jnum("recovered_packets", n.recovered_packets) << "," << jnum("retx_sent", n.retx_sent) << ","
+          << jnum("recovered_packets", n.recovered_packets) << "," << jnum("concealed", n.concealed) << "," << jnum("i2s_gap_us", n.i2s_gap_us) << "," << jnum("i2s_gap_peak_us", n.i2s_gap_peak_us) << "," << jnum("retx_sent", n.retx_sent) << ","
           << jbool("online",  n.online)   << ","
           << jnum("jitter_us",    n.jitter_us)    << ","
           << jnum("rtt_us",       n.rtt_us)       << ","

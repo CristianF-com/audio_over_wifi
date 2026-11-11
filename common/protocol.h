@@ -151,7 +151,11 @@ typedef struct {
     uint32_t underruns;
     float    drift_ppm;        /* corrección neta aplicada (+ = descarta) */
     uint32_t recovered_packets;/* recuperados por reenvío/reordenación (v5) */
-} ReportPacket;            /* 52 */
+    /* Ampliación compatible (FW >= 17): la RPi acepta también el REPORT antiguo de REPORT_BASE_SIZE bytes */
+    uint32_t concealed;        /* trozos de 2,5 ms rellenados por el PLC (huecos tapados) */
+    uint32_t i2s_gap_max_us;   /* mayor intervalo entre escrituras al I2S desde el REPORT anterior (normal ≈ 2500) */
+} ReportPacket;            /* 60 */
+#define REPORT_BASE_SIZE 52
 
 typedef struct {
     uint32_t magic;
@@ -224,7 +228,7 @@ PROTO_ASSERT(sizeof(HelloPacket)    == 16, "HelloPacket");
 PROTO_ASSERT(sizeof(WelcomePacket)  == 20, "WelcomePacket");
 PROTO_ASSERT(sizeof(ConfigPacket)   == 16, "ConfigPacket");
 PROTO_ASSERT(sizeof(AudioPacket)    == 500, "AudioPacket");
-PROTO_ASSERT(sizeof(ReportPacket)   == 52, "ReportPacket");
+PROTO_ASSERT(sizeof(ReportPacket)   == 60, "ReportPacket");
 PROTO_ASSERT(sizeof(NackPacket)     == 40, "NackPacket");
 PROTO_ASSERT(sizeof(OtaPacket)      == 24, "OtaPacket");
 PROTO_ASSERT(sizeof(WifiPacket)    == 112, "WifiPacket");

@@ -54,6 +54,10 @@ struct ESPNode {
     uint32_t underruns       = 0;
     float    drift_ppm       = 0.0f;
     uint32_t recovered_packets = 0;      // recuperados por reenvío (REPORT del ESP)
+    uint32_t concealed = 0;              // trozos tapados por el PLC (FW >= 17)
+    uint32_t i2s_gap_us = 0;             // mayor retraso del I2S en el último REPORT (FW >= 17; 0 = sin dato)
+    uint32_t i2s_gap_peak_us = 0;        // el mayor del último minuto
+    uint64_t i2s_gap_peak_t = 0;
     uint32_t retx_sent       = 0;        // reenvíos servidos por la RPi
 
     // Cortes recientes: los contadores del ESP son acumulados desde que arrancó; aquí se guardan por minuto (últimos RECENT_MIN)
@@ -130,6 +134,12 @@ public:
     void setEqOn(bool on)    { eq_on_.store(on);    dirty_.store(true); }
     // Ajuste manual extra (ms) que se suma a la latencia recomendada para el reproductor (p. ej. retardo de entrada USB)
     int  lipsyncExtraMs() const { return lipsync_extra_ms_.load(); }
+    // Red: redundancia (cada paquete se envía otra vez 5 ms después; el ESP descarta los repetidos) y clase de prioridad WMM (0 = voz, 1 = vídeo)
+    bool redundancy() const { return redund_.load(); }
+    int  qos() const { return qos_.load(); }
+    void setRedundancy(bool on) { redund_.store(on); dirty_.store(true); }
+    bool setQos(int q);
+    uint64_t redundSent() const { return redund_sent_.load(); }
     bool setLipsyncExtraMs(int ms);                                  // -50..200
 
     // Calibración: sequence = ids de nodo en orden de emisión (se repite por rondas).
@@ -263,6 +273,10 @@ private:
     std::atomic<float>    xover_hz_{(float)XOVER_DEFAULT_HZ};
     std::atomic<bool>     xover_on_{false}, eq_on_{false};
     std::atomic<int>      lipsync_extra_ms_{0};
+    std::atomic<bool>     redund_{false};
+    std::atomic<int>      qos_{0};
+    std::atomic<uint64_t> redund_sent_{0};
+    void applyQos();
     std::atomic<bool>     lfe_front_{false}, lfe_active_{false};
     std::atomic<float>    lfe_db_{0.0f};
     std::atomic<int>      night_{0};

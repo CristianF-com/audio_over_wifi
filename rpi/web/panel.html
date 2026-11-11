@@ -453,6 +453,14 @@ html[data-theme=light] .sub[aria-selected=true]{color:var(--fg);border-bottom-co
     </div>
   </div>
   <div class="cards" style="margin-top:14px">
+    <div class="card" id="c_net">
+      <div><b>Red: contra los microcortes</b><span class="hint">Opciones de envío. Pruébalas de una en una y mira en Sistema si bajan los «Tapados» y los «Vacíos».</span></div>
+      <div class="sw"><div><b>Enviar cada paquete dos veces</b><span class="hint">La copia sale 5 ms después. Si el original se pierde, el altavoz usa la copia sin tener que pedir un reenvío. Duplica los datos por la WiFi.</span></div>
+        <button class="switch" id="net_rd" role="switch" aria-checked="false" aria-label="Enviar cada paquete dos veces"></button></div>
+      <div class="fld"><label>Prioridad de los paquetes en el router</label>
+        <div class="seg block" id="net_qos" role="group" aria-label="Prioridad de los paquetes"><button data-q="voz" aria-pressed="true">Voz</button><button data-q="video" aria-pressed="false">Vídeo</button></div>
+        <p class="hint" style="margin-top:6px">«Voz» es la de siempre. Algunos routers reparten mejor varios altavoces con «Vídeo». Solo tiene efecto si el router respeta la prioridad (WMM).</p></div>
+    </div>
     <div class="card" id="c_dist">
       <div><b>Retardo y volumen por distancia</b><span class="hint">Mide a cuántos metros de tu sitio está cada altavoz (en la ficha del altavoz) y calcula el retardo y el volumen para que el sonido llegue a la vez</span></div>
       <div class="tw" id="distw"></div>
@@ -477,7 +485,7 @@ html[data-theme=light] .sub[aria-selected=true]{color:var(--fg);border-bottom-co
     <p class="hint" style="margin:0 0 12px">Cómo llega el audio a cada altavoz. Se valora con lo que ocurrió en el último minuto.</p>
     <div class="vgrid" id="hverd"></div>
     <details class="help" id="hdet"><summary>Ver todos los números</summary>
-  <div class="tw"><table><thead><tr><th>Altavoz</th><th>RTT</th><th>Jitter</th><th>Perdidos</th><th>Recuperados</th><th>Tarde</th><th>Vacíos</th><th>Sync</th><th>Búfer</th><th>WiFi</th><th>Firmware</th></tr></thead><tbody id="health"></tbody></table></div>
+  <div class="tw"><table><thead><tr><th>Altavoz</th><th>RTT</th><th>Jitter</th><th>Perdidos</th><th>Recuperados</th><th>Tarde</th><th>Vacíos</th><th title="Trozos de 2,5 ms que el altavoz rellenó porque faltó audio">Tapados</th><th title="Mayor retraso de la salida de audio del altavoz en el último minuto. Normal: 2,5 ms; más de 15 ms es un corte causado por el propio altavoz, no por la red">Retraso I2S</th><th>Sync</th><th>Búfer</th><th>WiFi</th><th>Firmware</th></tr></thead><tbody id="health"></tbody></table></div>
       <p class="hint" style="margin-top:8px">Los números son el total desde que arrancó el altavoz; el color (verde/ámbar/rojo) solo cuenta los últimos 10 minutos, así que un altavoz que ya anda bien vuelve a verde. Perdidos: paquetes que no llegaron. Tarde: llegaron fuera de plazo y se descartaron. Vacíos: tramos sin audio. Búfer: cuánto margen tiene el altavoz.</p>
     </details>
   </div>
@@ -653,6 +661,7 @@ async function loadStatus(){
     if(!lvOK){$('hs').textContent=(d.running?'Capturando':'Detenido')+' · '+d.sample_rate/1000+' kHz';$('dot').className='dot '+(d.running?'ok':'bad');}
     if(document.activeElement!==$('xos')){$('xos').value=d.xover_hz||80;$('xod').textContent=Math.round(d.xover_hz||80)+' Hz';fillRng($('xos'));}
     if(document.activeElement!==$('lex')&&d.lipsync_extra_ms!==undefined)$('lex').value=d.lipsync_extra_ms;
+    if(d.net_qos!==undefined){setSw($('net_rd'),!!d.net_redundancy);setSeg($('net_qos'),'q',d.net_qos);}
     if(document.activeElement!==$('pls')&&d.playout_ms){$('pls').value=d.playout_ms;$('pld').textContent=Math.round(d.playout_ms)+' ms';fillRng($('pls'));setSeg($('plseg'),'pl',Math.round(d.playout_ms));}
     if(document.activeElement!==$('mvs')&&d.master_volume!==undefined){const v=Math.round(Math.min(1,d.master_volume)*100);$('mvs').value=v;$('mvd').textContent=v+'%';$('mvs').setAttribute('aria-valuetext',v+' %');fillRng($('mvs'));}
     drawSound();
@@ -975,7 +984,7 @@ function wireDrawer(){
 }
 function updDrawerStats(){const n=find(openId),s=$('d_stats');if(!n||!s)return;
   $('dst').className='chip '+(n.online?'ac':'bad');$('dst').textContent=n.online?(n.ip||'en línea'):'sin conexión';$('dst').title=n.mac?'MAC '+n.mac+' · casilla '+n.id+' (asignada por la Raspberry)':'';
-  s.textContent=n.online?'RTT '+((n.rtt_us||0)/1000).toFixed(1)+' ms · jitter '+(n.jitter_us||0)+' µs · perdidos '+(n.lost_packets||0)+' · recuperados '+(n.recovered_packets||0)+' · vacíos '+(n.underruns||0)+' · '+wifiTxt(n)+' · '+fwTxt(n):'Este altavoz no responde ahora mismo.';}
+  s.textContent=n.online?'RTT '+((n.rtt_us||0)/1000).toFixed(1)+' ms · jitter '+(n.jitter_us||0)+' µs · perdidos '+(n.lost_packets||0)+' · recuperados '+(n.recovered_packets||0)+' · vacíos '+(n.underruns||0)+(n.fw_version>=17?' · tapados '+(n.concealed||0)+' · retraso I2S '+((n.i2s_gap_peak_us||0)/1000).toFixed(1).replace('.',',')+' ms':'')+' · '+wifiTxt(n)+' · '+fwTxt(n):'Este altavoz no responde ahora mismo.';}
 
 
 /* Sonido */
@@ -1141,6 +1150,8 @@ async function setPL(v){const r=await J('/api/playout',{ms:+v});if(r.ok){toast('
 $('pls').oninput=function(){$('pld').textContent=this.value+' ms';fillRng(this);};
 $('pls').onchange=function(){setPL(this.value);};
 $('plseg').querySelectorAll('button').forEach(b=>b.onclick=()=>setPL(b.dataset.pl));
+$('net_rd').onclick=async function(){const on=this.getAttribute('aria-checked')!=='true';const r=await J('/api/net',{redundancy:on});if(r.ok){setSw(this,on);toast(on?'Envío doble activado':'Envío doble desactivado');log('Red: envío doble '+(on?'sí':'no'));}else toast(r.error||'No se pudo cambiar',false);};
+$('net_qos').querySelectorAll('button').forEach(b=>b.onclick=async()=>{const r=await J('/api/net',{qos:b.dataset.q});if(r.ok){setSeg($('net_qos'),'q',b.dataset.q);toast('Prioridad: '+b.textContent);log('Red: prioridad '+b.dataset.q);}else toast(r.error||'No se pudo cambiar',false);});
 $('lex').onchange=async function(){const r=await J('/api/latency',{extra_ms:+this.value});if(r.ok){toast('Ajuste extra '+this.value+' ms');updLat();}else toast('Valor fuera de rango (−50 a 200)',false);};
 const CHIPN=['','C5','ESP32','?'];
 const wifiTxt=n=>n.rssi_dbm?n.rssi_dbm+' dBm · '+(n.rssi_dbm>-60?'fuerte':n.rssi_dbm>-75?'media':'débil'):'WiFi sin dato';
@@ -1174,7 +1185,7 @@ function drawWizard(){const w=$('wiz');if(!w)return;const vis=nodes.filter(isKno
 const rc=(n,r,t)=>n.recent_min!==undefined?n[r]||0:n[t]||0;   // errores recientes (últimos minutos); los acumulados solo si la RPi es antigua
 const rt=(n,r)=>n.recent_min!==undefined?' title="Últimos '+n.recent_min+' min: '+(n[r]||0)+'. El color se basa en este dato; el número es el total desde que arrancó el altavoz."':'';
 function drawHealth(){const vis=nodes.filter(isKnown);drawVerdicts();drawWizard();
-  $('health').innerHTML=vis.map(n=>'<tr><td><i class="dot '+(n.online?'ok':'bad')+'"></i> '+esc(spkName(n))+' · '+nodeLabel(n)+'</td><td>'+(n.online?((n.rtt_us||0)/1000).toFixed(1)+' ms':'—')+'</td><td>'+(n.jitter_us||0)+' µs</td><td'+cls(rc(n,'recent_lost','lost_packets'),1,50)+rt(n,'recent_lost')+'>'+(n.lost_packets||0)+'</td><td>'+(n.recovered_packets||0)+'</td><td'+cls(rc(n,'recent_late','late_packets'),5,50)+rt(n,'recent_late')+'>'+(n.late_packets||0)+'</td><td'+cls(rc(n,'recent_underruns','underruns'),1,10)+rt(n,'recent_underruns')+'>'+(n.underruns||0)+'</td><td>'+((n.sync_err_us||0))+' µs</td><td>'+Math.round(n.fill_pct||0)+'%</td><td'+(n.online&&n.rssi_dbm?cls(-n.rssi_dbm,76,83):'')+'>'+(n.online?wifiTxt(n):'—')+'</td><td>'+fwTxt(n)+'</td></tr>').join('')||'<tr><td colspan="11" class="mut">Sin altavoces</td></tr>';}
+  $('health').innerHTML=vis.map(n=>'<tr><td><i class="dot '+(n.online?'ok':'bad')+'"></i> '+esc(spkName(n))+' · '+nodeLabel(n)+'</td><td>'+(n.online?((n.rtt_us||0)/1000).toFixed(1)+' ms':'—')+'</td><td>'+(n.jitter_us||0)+' µs</td><td'+cls(rc(n,'recent_lost','lost_packets'),1,50)+rt(n,'recent_lost')+'>'+(n.lost_packets||0)+'</td><td>'+(n.recovered_packets||0)+'</td><td'+cls(rc(n,'recent_late','late_packets'),5,50)+rt(n,'recent_late')+'>'+(n.late_packets||0)+'</td><td'+cls(rc(n,'recent_underruns','underruns'),1,10)+rt(n,'recent_underruns')+'>'+(n.underruns||0)+'</td><td>'+(n.fw_version>=17?(n.concealed||0):'—')+'</td><td'+(n.online&&n.fw_version>=17?cls(n.i2s_gap_peak_us||0,8000,15000):'')+'>'+(n.online&&n.fw_version>=17?((n.i2s_gap_peak_us||0)/1000).toFixed(1).replace('.',',')+' ms':'—')+'</td><td>'+((n.sync_err_us||0))+' µs</td><td>'+Math.round(n.fill_pct||0)+'%</td><td'+(n.online&&n.rssi_dbm?cls(-n.rssi_dbm,76,83):'')+'>'+(n.online?wifiTxt(n):'—')+'</td><td>'+fwTxt(n)+'</td></tr>').join('')||'<tr><td colspan="13" class="mut">Sin altavoces</td></tr>';}
 
 /* Añadir altavoces por Bluetooth desde la Raspberry */
 let bs={available:false,ssid:'',has_pass:false,rpi_ip:''},bdevs=[],bscan=false,bres={},wnets=null,wscan=false,wmsg='';

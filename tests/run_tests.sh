@@ -11,6 +11,8 @@ g++ -std=c++17 -O1 -Wall -Wextra -I../rpi/include -I../common test_config.cpp ..
 echo "== Firmware (unidades sin ESP-IDF) =="; python3 test_firmware_units.py || exit 1
 echo; echo "== Firmware: reordenación + reenvío (reorder.h) =="
 gcc -std=c11 -Wall -Wextra -I../common test_reorder.c -o /tmp/sonos_test_reorder && /tmp/sonos_test_reorder || exit 1
+echo; echo "== Firmware: ocultación de pérdidas (plc.h) =="
+gcc -std=gnu11 -Wall -Wextra -I../common test_plc.c -lm -o /tmp/sonos_test_plc && /tmp/sonos_test_plc || exit 1
 echo; echo "== Firmware: tarea RX real del ESP en el PC (loopback, pérdidas, mono) =="
 awk '/\/\* ─── Tarea RX audio/{f=1} /\/\* ─── Tarea I2S/{f=0} f' ../esp32/main/receiver_main.c > /tmp/esp_rx_section.inc
 gcc -std=gnu11 -Wall -Wextra -Wno-unused-parameter -Wno-cast-function-type -I../common -I../esp32/main test_esp_rx.c -lpthread -o /tmp/sonos_test_esp_rx && timeout 30 /tmp/sonos_test_esp_rx || exit 1
